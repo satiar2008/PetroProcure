@@ -1,0 +1,18 @@
+<MudDialog>
+<DialogContent><MudForm @ref="_form">
+    <MudTextField @bind-Value="_code" Label="کد MESC" Required="true" Validation="@((Func<string,string?>)ValidateCode)" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="_description" Label="شرح اختصاصی" Required="true" RequiredError="شرح اختصاصی الزامی است" Variant="Variant.Outlined" Class="mt-3" />
+    <MudTextField @bind-Value="_unit" Label="واحد اندازه‌گیری" Required="true" RequiredError="واحد اندازه‌گیری الزامی است" Variant="Variant.Outlined" Class="mt-3" />
+    <MudText Typo="Typo.caption" Class="mt-2">کد گروه عمومی به‌صورت خودکار از ۶ رقم اول استخراج می‌شود.</MudText>
+</MudForm></DialogContent>
+<DialogActions><MudButton OnClick="Cancel">انصراف</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">ذخیره</MudButton></DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; }=default!;
+    [Parameter] public MescItemDto? Model { get; set; }
+    private MudForm? _form;private string _code="",_description="",_unit="";
+    protected override void OnInitialized(){if(Model is not null){_code=Model.Code;_description=Model.SpecificDescription;_unit=Model.UnitOfMeasure;}}
+    private static string? ValidateCode(string value)=>value?.Length>=6&&value.All(char.IsDigit)?null:"کد MESC باید حداقل ۶ رقم و فقط شامل عدد باشد.";
+    private async Task Save(){await _form!.Validate();if(!_form.IsValid)return;Dialog.Close(DialogResult.Ok((_code,_description,_unit)));}
+    private void Cancel()=>Dialog.Cancel();
+}

@@ -1,0 +1,155 @@
+@page "/admin/users"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+<PageTitle>مدیریت کاربران</PageTitle>
+<PageHeader Title="مدیریت کاربران" Subtitle="ایجاد کاربر و تخصیص نقش‌ها و واحدهای سازمانی" />
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <EmptyState Title="دریافت کاربران ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else
+{
+    <MudPaper Class="filter-panel" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" md="8"><MudTextField @bind-Value="_search" Label="جست‌وجو در نام کاربری، ایمیل یا نام نمایشی" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" /></MudItem>
+            <MudItem xs="12" md="4" Class="d-flex align-center justify-end">
+                <MudButton Disabled="@(!AdminUiPolicy.CanManageUsers(Access.HasPermission))" Variant="Variant.Filled" Color="Color.Primary" OnClick="ShowCreate">ایجاد کاربر</MudButton>
+            </MudItem>
+        </MudGrid>
+    </MudPaper>
+    <MudPaper Class="data-panel" Elevation="0">
+        <MudTable Items="Filtered" Dense="true" Hover="true">
+            <HeaderContent><MudTh>نام کاربری</MudTh><MudTh>نام نمایشی</MudTh><MudTh>ایمیل</MudTh><MudTh>نقش‌ها</MudTh><MudTh>واحدها</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.UserName</MudTd>
+                <MudTd>@context.DisplayName</MudTd>
+                <MudTd>@context.Email</MudTd>
+                <MudTd>@string.Join("، ", context.Roles)</MudTd>
+                <MudTd>@context.DepartmentIds.Count</MudTd>
+                <MudTd>
+                    <MudButton Size="Size.Small" OnClick="@(() => BeginEdit(context))">ویرایش</MudButton>
+                    <MudButton Size="Size.Small" OnClick="@(() => BeginRoles(context))">نقش‌ها</MudButton>
+                    <MudButton Size="Size.Small" OnClick="@(() => BeginDepartment(context))">واحد</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Warning" OnClick="@(() => BeginResetPassword(context))">بازنشانی رمز</MudButton>
+                </MudTd>
+            </RowTemplate>
+            <NoRecordsContent><EmptyState Title="کاربری یافت نشد" Description="عبارت جست‌وجو را تغییر دهید یا کاربر جدید بسازید." /></NoRecordsContent>
+        </MudTable>
+    </MudPaper>
+    <MudPaper Class="form-panel mt-4" Elevation="0">
+        @if (_mode == "create")
+        {
+            <MudText Typo="Typo.h6">ایجاد کاربر</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="3"><MudTextField @bind-Value="_createUserName" Label="نام کاربری" Required="true" /></MudItem>
+                <MudItem xs="12" md="3"><MudTextField @bind-Value="_createEmail" Label="ایمیل" Required="true" /></MudItem>
+                <MudItem xs="12" md="3"><MudTextField @bind-Value="_createDisplayName" Label="نام نمایشی" Required="true" /></MudItem>
+                <MudItem xs="12" md="3"><MudTextField @bind-Value="_createPassword" Label="رمز عبور اولیه" InputType="InputType.Password" Required="true" /></MudItem>
+                <MudItem xs="12"><MudSelect T="string" MultiSelection="true" @bind-SelectedValues="_selectedRoleNames" Label="نقش‌ها">@foreach (var role in _roles) { <MudSelectItem Value="@role.Name">@role.Name</MudSelectItem> }</MudSelect></MudItem>
+            </MudGrid>
+            <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="CreateUser">ثبت کاربر</MudButton>
+            <MudButton Class="mt-3" Variant="Variant.Text" OnClick="CancelMode">انصراف</MudButton>
+        }
+        else if (_mode == "edit" && _selectedUser is not null)
+        {
+            <MudText Typo="Typo.h6">ویرایش پروفایل: @_selectedUser.UserName</MudText>
+            <MudGrid>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_editDisplayName" Label="نام نمایشی" /></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_editEmail" Label="ایمیل" /></MudItem>
+                <MudItem xs="12" md="4"><MudSwitch @bind-Value="_editIsActive" Color="Color.Success" Label="فعال" /></MudItem>
+            </MudGrid>
+            <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveUser">ذخیره</MudButton>
+            <MudButton Class="mt-3" Variant="Variant.Text" OnClick="CancelMode">انصراف</MudButton>
+        }
+        else if (_mode == "roles" && _selectedUser is not null)
+        {
+            <MudText Typo="Typo.h6">تخصیص نقش به @_selectedUser.UserName</MudText>
+            <MudSelect T="string" MultiSelection="true" @bind-SelectedValues="_selectedRoleNames" Label="نقش‌ها">@foreach (var role in _roles) { <MudSelectItem Value="@role.Name">@role.Name</MudSelectItem> }</MudSelect>
+            <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveRoles">ذخیره نقش‌ها</MudButton>
+            <MudButton Class="mt-3" Variant="Variant.Text" OnClick="CancelMode">انصراف</MudButton>
+        }
+        else if (_mode == "department" && _selectedUser is not null)
+        {
+            <MudText Typo="Typo.h6">تخصیص واحد به @_selectedUser.UserName</MudText>
+            @if (!_selectedUser.UserProfileId.HasValue) { <MudAlert Severity="Severity.Warning">این کاربر پروفایل سازمانی ندارد.</MudAlert> }
+            <MudSelect T="Guid" @bind-Value="_selectedDepartmentId" Label="واحد سازمانی">@foreach (var department in _departments) { <MudSelectItem Value="@department.Id">@department.Name</MudSelectItem> }</MudSelect>
+            <MudSwitch @bind-Value="_isPrimaryDepartment" Label="واحد اصلی" Color="Color.Primary" />
+            <MudButton Class="mt-3" Disabled="@(!_selectedUser.UserProfileId.HasValue)" Variant="Variant.Filled" Color="Color.Primary" OnClick="SaveDepartment">ثبت واحد</MudButton>
+            <MudButton Class="mt-3" Variant="Variant.Text" OnClick="CancelMode">انصراف</MudButton>
+        }
+        else if (_mode == "reset" && _selectedUser is not null)
+        {
+            <MudText Typo="Typo.h6">بازنشانی رمز عبور @_selectedUser.UserName</MudText>
+            <MudTextField @bind-Value="_resetPassword" Label="رمز عبور جدید" InputType="InputType.Password" Required="true" />
+            <MudButton Class="mt-3" Disabled="@string.IsNullOrWhiteSpace(_resetPassword)" Variant="Variant.Filled" Color="Color.Warning" OnClick="ResetPassword">ثبت رمز جدید</MudButton>
+            <MudButton Class="mt-3" Variant="Variant.Text" OnClick="CancelMode">انصراف</MudButton>
+        }
+        else
+        {
+            <MudAlert Severity="Severity.Info">برای مدیریت امنیت کاربران از عملیات ویرایش، نقش، واحد و بازنشانی رمز استفاده کنید.</MudAlert>
+        }
+    </MudPaper>
+}
+@code {
+    private List<UserDto> _users = [];
+    private List<RoleDto> _roles = [];
+    private List<DepartmentDto> _departments = [];
+    private bool _loading = true, _editIsActive = true, _isPrimaryDepartment;
+    private string? _error, _search, _mode, _createUserName, _createEmail, _createDisplayName, _createPassword, _editDisplayName, _editEmail, _resetPassword;
+    private UserDto? _selectedUser;
+    private IEnumerable<string> _selectedRoleNames = [];
+    private Guid _selectedDepartmentId;
+    private IEnumerable<UserDto> Filtered => _users.Where(user => string.IsNullOrWhiteSpace(_search)
+        || (user.UserName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)
+        || (user.Email?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false)
+        || (user.DisplayName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false));
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!AdminUiPolicy.CanManageUsers(Access.HasPermission)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load(); StateHasChanged();
+    }
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { var users = Api.GetUsersAsync(); var roles = Api.GetRolesAsync(); var departments = Api.GetDepartmentsAsync(); await Task.WhenAll(users, roles, departments); _users = await users; _roles = await roles; _departments = await departments; }
+        catch (Exception ex) { _error = "امکان دریافت کاربران وجود ندارد."; Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _loading = false; }
+    }
+    private void ShowCreate() { _mode = "create"; _selectedRoleNames = []; }
+    private void BeginEdit(UserDto user) { _selectedUser = user; _editDisplayName = user.DisplayName; _editEmail = user.Email; _editIsActive = true; _mode = "edit"; }
+    private void BeginRoles(UserDto user) { _selectedUser = user; _selectedRoleNames = user.Roles; _mode = "roles"; }
+    private void BeginDepartment(UserDto user) { _selectedUser = user; _selectedDepartmentId = _departments.FirstOrDefault()?.Id ?? Guid.Empty; _mode = "department"; }
+    private void BeginResetPassword(UserDto user) { _selectedUser = user; _resetPassword = null; _mode = "reset"; }
+    private void CancelMode() { _mode = null; _selectedUser = null; }
+    private async Task CreateUser()
+    {
+        try { await Api.CreateUserAsync(new(_createUserName ?? "", _createEmail ?? "", _createPassword ?? "", _createDisplayName ?? "", true, _selectedRoleNames.ToArray())); Snackbar.Add("کاربر ایجاد شد.", Severity.Success); CancelMode(); await Load(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+    private async Task SaveUser()
+    {
+        if (_selectedUser is null) return;
+        try { await Api.UpdateUserAsync(_selectedUser.Id, new(_editEmail, _editDisplayName, _editIsActive)); Snackbar.Add("کاربر ذخیره شد.", Severity.Success); CancelMode(); await Load(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+    private async Task SaveRoles()
+    {
+        if (_selectedUser is null) return;
+        try { await Api.AssignUserRolesAsync(_selectedUser.Id, new(_selectedRoleNames.ToArray())); Snackbar.Add("نقش‌ها ذخیره شد.", Severity.Success); CancelMode(); await Load(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+    private async Task SaveDepartment()
+    {
+        if (_selectedUser?.UserProfileId is not Guid profileId) return;
+        try { await Api.AssignUserDepartmentAsync(_selectedUser.Id, new(profileId, _selectedDepartmentId, _isPrimaryDepartment)); Snackbar.Add("واحد کاربر ثبت شد.", Severity.Success); CancelMode(); await Load(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+    private async Task ResetPassword()
+    {
+        if (_selectedUser is null || string.IsNullOrWhiteSpace(_resetPassword)) return;
+        try { await Api.ResetPasswordAsync(_selectedUser.Id, new(_resetPassword)); Snackbar.Add("رمز عبور بازنشانی شد.", Severity.Success); CancelMode(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

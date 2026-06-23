@@ -1,0 +1,46 @@
+@inherits ErrorBoundary
+@inject ILogger<AppErrorBoundary> Logger
+@inject NavigationManager Navigation
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <MudRTLProvider RightToLeft="true">
+        <MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="min-height:100vh">
+            <MudPaper Class="pa-8 text-center" Elevation="4">
+                <MudIcon Icon="@Icons.Material.Filled.ErrorOutline" Color="Color.Error" Size="Size.Large" />
+                <MudText Typo="Typo.h5" Class="mt-3">خطای پیش‌بینی‌نشده رخ داد</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-2">
+                    صفحه به‌صورت امن متوقف شد. لطفاً دوباره بارگذاری کنید یا به داشبورد برگردید.
+                </MudText>
+                <div class="d-flex justify-center gap-3 mt-5">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Reload">بارگذاری مجدد</MudButton>
+                    <MudButton Variant="Variant.Outlined" OnClick="GoHome">بازگشت به خانه</MudButton>
+                </div>
+            </MudPaper>
+        </MudContainer>
+    </MudRTLProvider>
+}
+
+@code {
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        Logger.LogError(exception, "Unhandled Web UI exception.");
+        return Task.CompletedTask;
+    }
+
+    private void Reload()
+    {
+        Recover();
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+    }
+
+    private void GoHome()
+    {
+        Recover();
+        Navigation.NavigateTo("/");
+    }
+}

@@ -1,0 +1,23 @@
+<MudPaper Class="@Class" Elevation="0" Outlined="@Outlined">
+    @if (!string.IsNullOrWhiteSpace(Title) || Actions is not null)
+    {
+        <div class="d-flex align-center mb-4">
+            <div>
+                @if (!string.IsNullOrWhiteSpace(Title)) { <MudText Typo="Typo.h6">@Title</MudText> }
+                @if (!string.IsNullOrWhiteSpace(Subtitle)) { <MudText Typo="Typo.body2" Color="Color.Secondary">@Subtitle</MudText> }
+            </div>
+            <MudSpacer />
+            @Actions
+        </div>
+    }
+    @ChildContent
+</MudPaper>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Subtitle { get; set; }
+    [Parameter] public string Class { get; set; } = "form-panel";
+    [Parameter] public bool Outlined { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

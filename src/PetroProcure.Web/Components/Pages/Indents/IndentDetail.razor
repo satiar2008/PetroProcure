@@ -1,0 +1,41 @@
+@page "/orders/indents/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+<PageTitle>جزئیات تقاضای خرید</PageTitle>
+<PageHeader Title="@(_indent is null?"جزئیات تقاضا":$"تقاضا {IndentUiPolicy.FormatNumber(_indent.IndentNumber)}")" Subtitle="@(_indent?.Title??"در حال دریافت اطلاعات")" />
+@if(_loading){<LoadingOverlay Visible="true" />}
+else if(_error is not null||_indent is null){<EmptyState Title="تقاضا قابل نمایش نیست" Description="@(_error??"تقاضا یافت نشد.")"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState>}
+else{
+<MudTabs Rounded="true" PanelClass="pa-4">
+<MudTabPanel Text="خلاصه" Icon="@Icons.Material.Filled.Info"><MudGrid><MudItem xs="12" md="6">@Info("شماره نمایشی",IndentUiPolicy.FormatNumber(_indent.IndentNumber))</MudItem><MudItem xs="12" md="6">@Info("شماره خام",_indent.IndentNumber)</MudItem><MudItem xs="12" md="4">@Info("نوع",IndentUiPolicy.TypeText(_indent.IndentType))</MudItem><MudItem xs="12" md="4">@Info("رقم نوع",_indent.TypeDigit.ToString())</MudItem><MudItem xs="12" md="4">@Info("وضعیت",IndentUiPolicy.StatusText(_indent.Status))</MudItem><MudItem xs="12" md="6">@Info("واحد درخواست‌کننده",FakeDirectory.DepartmentName(_indent.RequestingDepartmentId))</MudItem><MudItem xs="12" md="6">@Info("واحد متقاضی",_indent.ApplicantDepartmentId.HasValue?FakeDirectory.DepartmentName(_indent.ApplicantDepartmentId.Value):"—")</MudItem><MudItem xs="12">@Info("شرح",_indent.Description??"—")</MudItem></MudGrid></MudTabPanel>
+<MudTabPanel Text="اقلام" Icon="@Icons.Material.Filled.Inventory2">
+@if(_itemsLoading){<MudProgressLinear Indeterminate="true" />}else if(_itemsError is not null){<EmptyState Title="خطا در دریافت اقلام" Description="@_itemsError"><Action><MudButton OnClick="LoadItems">تلاش مجدد</MudButton></Action></EmptyState>}else if(_groups.Count==0){<EmptyState Title="قلمی ثبت نشده است" Description="این تقاضا هنوز قلم کالا ندارد." />}else{<IndentGroupedItemsTable Groups="_groups" />}
+</MudTabPanel>
+<MudTabPanel Text="گردش وضعیت" Icon="@Icons.Material.Filled.AccountTree">
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined">وضعیت جاری: <strong>@IndentUiPolicy.StatusText(_indent.Status)</strong></MudAlert>
+<div class="report-actions mt-4">
+@if(IndentUiPolicy.CanSubmit(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(()=>ConfirmAction("submit","ارسال تقاضا","تقاضا برای بررسی ارسال شود؟"))">ارسال برای بررسی</MudButton>}
+@if(IndentUiPolicy.CanApproveOrReject(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@(()=>ConfirmAction("approve","تأیید تقاضا","تقاضا تأیید شود؟"))">تأیید</MudButton><MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="Reject">رد</MudButton>}
+@if(IndentUiPolicy.CanSendToPurchase(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Info" Variant="Variant.Filled" OnClick="@(()=>ConfirmAction("send-to-purchase","ارسال به واحد خرید","تقاضا به واحد خرید ارسال شود؟"))">ارسال به واحد خرید</MudButton>}
+@if(IndentUiPolicy.CanCreatePurchaseFile(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Secondary" Variant="Variant.Filled" Href="@($"/purchase/files/from-indent/{Id}")">ایجاد پرونده خرید از این تقاضا</MudButton>}
+</div></MudTabPanel>
+<MudTabPanel Text="پرونده خرید مرتبط" Icon="@Icons.Material.Filled.FolderOpen">
+@if(_relatedLoading){<MudProgressLinear Indeterminate="true" />}else if(_relatedError is not null){<EmptyState Title="خطا در دریافت پرونده مرتبط" Description="@_relatedError"><Action><MudButton OnClick="LoadRelated">تلاش مجدد</MudButton></Action></EmptyState>}else if(_related is null){<EmptyState Title="پرونده خرید ایجاد نشده است" Description="پس از ارسال تقاضا به واحد خرید می‌توانید پرونده ایجاد کنید." />}else{<MudAlert Severity="Severity.Success"><MudLink Href="@($"/purchase/files/{_related.Id}")">@_related.FileNumber — @_related.Title</MudLink></MudAlert>}
+</MudTabPanel>
+<MudTabPanel Text="گزارش" Icon="@Icons.Material.Filled.PictureAsPdf"><div class="report-actions"><MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@($"/report-preview/indent/{Id}")" Target="_blank">دریافت PDF</MudButton><MudButton Variant="Variant.Outlined" OnClick="@(()=>_preview=!_preview)">پیش‌نمایش</MudButton></div>@if(_preview){<div class="report-preview"><iframe src="@($"/report-preview/indent/{Id}")" title="پیش‌نمایش گزارش تقاضا"></iframe></div>}<MudAlert Severity="Severity.Info" Class="mt-3">ذخیره گزارش Indent در مخزن پرونده، پس از ایجاد پرونده خرید مرتبط قابل انجام است.</MudAlert></MudTabPanel>
+</MudTabs>}
+@code{
+[Parameter]public Guid Id{get;set;}private IndentDto?_indent;private bool _loading=true,_itemsLoading=true,_relatedLoading=true,_preview;private string?_error,_itemsError,_relatedError;private List<IndentGroupedItemsDto>_groups=[];private PurchaseFileSummaryDto?_related;
+protected override async Task OnParametersSetAsync(){if(!IndentUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();}
+private async Task Load(){_loading=true;_error=null;try{_indent=await Api.GetIndentAsync(Id);if(_indent is null)return;await Task.WhenAll(LoadItems(),LoadRelated());}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+private async Task LoadItems(){_itemsLoading=true;_itemsError=null;try{_groups=await Api.GetIndentGroupedItemsAsync(Id);}catch(Exception ex){_itemsError=ex.Message;}finally{_itemsLoading=false;}}
+private async Task LoadRelated(){if(_indent is null)return;_relatedLoading=true;_relatedError=null;try{var result=await Api.GetPurchaseFilesAsync(new(SourceIndentNumber:_indent.IndentNumber,PageSize:1));_related=result.Items.FirstOrDefault();}catch(Exception ex){_relatedError=ex.Message;}finally{_relatedLoading=false;}}
+private async Task ConfirmAction(string action,string title,string message){var d=await Dialog.ShowAsync<ConfirmDialog>(title,new DialogParameters{{"Message",message}});var r=await d.Result;if(r?.Canceled!=false)return;await Execute(action);}
+private async Task Reject(){var d=await Dialog.ShowAsync<RejectIndentDialog>("رد تقاضا");var r=await d.Result;if(r?.Canceled!=false)return;await Execute("reject");Snackbar.Add("Backend فعلی علت رد را نگهداری نمی‌کند.",Severity.Warning);}
+private async Task Execute(string action){try{await Api.ChangeIndentStatusAsync(Id,action);Snackbar.Add("وضعیت تقاضا تغییر کرد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private RenderFragment Info(string label,string value)=>@<MudPaper Class="pa-3" Elevation="0" Outlined="true"><MudText Typo="Typo.caption">@label</MudText><MudText Typo="Typo.body1"><strong>@value</strong></MudText></MudPaper>;
+}

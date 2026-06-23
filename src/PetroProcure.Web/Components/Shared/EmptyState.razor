@@ -1,0 +1,12 @@
+<MudPaper Class="empty-state" Elevation="0">
+    <MudIcon Icon="@Icon" Size="Size.Large" Color="Color.Primary" />
+    <MudText Typo="Typo.h6">@Title</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary">@Description</MudText>
+    @if (Action is not null) { <div class="empty-action">@Action</div> }
+</MudPaper>
+@code {
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Inbox;
+    [Parameter] public string Title { get; set; } = "اطلاعاتی وجود ندارد";
+    [Parameter] public string Description { get; set; } = "در حال حاضر موردی برای نمایش نیست.";
+    [Parameter] public RenderFragment? Action { get; set; }
+}

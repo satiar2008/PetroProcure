@@ -1,0 +1,47 @@
+@page "/admin"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+<PageTitle>مدیریت سامانه</PageTitle>
+<PageHeader Title="مدیریت سامانه" Subtitle="پایه مدیریتی کاربران، نقش‌ها، واحدها، مجوزها و ماتریس گردش کار" />
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <EmptyState Title="دسترسی یا دریافت اطلاعات ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else
+{
+    <MudGrid>
+        @Metric("کاربران", _dashboard.UsersCount, Icons.Material.Filled.People, "/admin/users")
+        @Metric("نقش‌ها", _dashboard.RolesCount, Icons.Material.Filled.Badge, "/admin/roles")
+        @Metric("واحدها", _dashboard.DepartmentsCount, Icons.Material.Filled.Apartment, "/admin/departments")
+        @Metric("مجوزهای فعال", _dashboard.ActivePermissionsCount, Icons.Material.Filled.VerifiedUser, "/admin/permissions")
+        @Metric("اقدام‌های گردش کار", _dashboard.WorkflowActionsCount, Icons.Material.Filled.AccountTree, "/admin/workflow-matrix")
+    </MudGrid>
+}
+@code {
+    private AdminDashboardDto _dashboard = new(0, 0, 0, 0, 0);
+    private bool _loading = true;
+    private string? _error;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!AdminUiPolicy.CanOpenAdmin(Access.HasPermission)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load();
+        StateHasChanged();
+    }
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { _dashboard = await Api.GetAdminDashboardAsync(); }
+        catch (Exception ex) { _error = "امکان دریافت خلاصه مدیریت وجود ندارد."; Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _loading = false; }
+    }
+    private RenderFragment Metric(string title, int value, string icon, string href) => @<MudItem xs="12" md="4">
+        <MudPaper Class="metric-card" Elevation="0">
+            <MudIcon Icon="@icon" Color="Color.Primary" />
+            <div><MudText Typo="Typo.caption">@title</MudText><MudText Typo="Typo.h4">@value</MudText></div>
+            <MudSpacer />
+            <MudButton Href="@href" Variant="Variant.Text">مشاهده</MudButton>
+        </MudPaper>
+    </MudItem>;
+}

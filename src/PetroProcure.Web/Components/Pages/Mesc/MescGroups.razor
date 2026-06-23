@@ -1,0 +1,43 @@
+@page "/orders/mesc/groups"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+<PageTitle>گروه‌های عمومی MESC</PageTitle>
+<PageHeader Title="گروه‌های عمومی کالا" Subtitle="مدیریت کد شش‌رقمی و شرح عمومی خانواده کالا" />
+
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <EmptyState Title="خطا در دریافت گروه‌ها" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else
+{
+    <MudPaper Class="form-panel" Elevation="0">
+        <div class="d-flex flex-wrap gap-3 align-center">
+            <MudTextField @bind-Value="_search" Label="جستجوی کد یا شرح" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+            <MudSpacer />
+            @if (Access.HasPermission("Item.Create")) { <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="Create">ایجاد گروه</MudButton> }
+        </div>
+        <MudTable Items="Filtered" Dense="true" Hover="true" RowsPerPage="10" Class="mt-4">
+            <HeaderContent><MudTh>کد عمومی</MudTh><MudTh>شرح عمومی</MudTh><MudTh>تعداد اقلام</MudTh><MudTh>وضعیت</MudTh><MudTh></MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd><MescCodeDisplay Code="@context.Code" /></MudTd>
+                <MudTd>@context.GeneralDescription</MudTd>
+                <MudTd>@ItemCount(context.Code)</MudTd>
+                <MudTd><StatusChip Status="@(context.IsActive ? "Active" : "Inactive")" /></MudTd>
+                <MudTd>@if (Access.HasPermission("Item.Edit")) { <MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="@(()=>Edit(context))" /> }</MudTd>
+            </RowTemplate>
+            <NoRecordsContent><EmptyState Title="گروهی یافت نشد" Description="عبارت جستجو را تغییر دهید یا گروه جدید بسازید." /></NoRecordsContent>
+            <PagerContent><MudTablePager PageSizeOptions="new int[]{10,25,50}" /></PagerContent>
+        </MudTable>
+    </MudPaper>
+}
+@code {
+    private List<MescGeneralGroupDto> _groups=[]; private List<MescItemDto> _items=[]; private bool _loading=true; private string? _error; private string _search="";
+    private IEnumerable<MescGeneralGroupDto> Filtered => _groups.Where(x=>string.IsNullOrWhiteSpace(_search)||x.Code.Contains(_search.Trim(),StringComparison.OrdinalIgnoreCase)||x.GeneralDescription.Contains(_search.Trim(),StringComparison.OrdinalIgnoreCase));
+    protected override async Task OnAfterRenderAsync(bool firstRender){if(!firstRender)return;if(!Access.HasPermission("Item.View")){Navigation.NavigateTo("/access-denied");return;}await Load();StateHasChanged();}
+    private async Task Load(){_loading=true;_error=null;try{var groups=Api.GetMescGroupsAsync(true);var items=Api.GetMescItemsAsync(true);await Task.WhenAll(groups,items);_groups=await groups;_items=await items;}catch(Exception ex){_error="امکان دریافت اطلاعات کاتالوگ وجود ندارد.";Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
+    private int ItemCount(string code)=>_items.Count(x=>x.GeneralGroupCode==code);
+    private async Task Create(){var dialog=await Dialog.ShowAsync<MescGroupDialog>("ایجاد گروه عمومی");var result=await dialog.Result;if(result?.Canceled!=false||result.Data is not ValueTuple<string,string> value)return;try{await Api.CreateMescGroupAsync(new(value.Item1,value.Item2));Snackbar.Add("گروه عمومی ایجاد شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task Edit(MescGeneralGroupDto model){var dialog=await Dialog.ShowAsync<MescGroupDialog>("ویرایش گروه عمومی",new DialogParameters{{"Model",model}});var result=await dialog.Result;if(result?.Canceled!=false||result.Data is not ValueTuple<string,string> value)return;try{await Api.UpdateMescGroupAsync(model.Id,new(value.Item1,value.Item2));Snackbar.Add("گروه عمومی ویرایش شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+}

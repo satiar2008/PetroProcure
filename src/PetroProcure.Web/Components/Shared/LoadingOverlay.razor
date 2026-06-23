@@ -1,0 +1,11 @@
+@if (Visible)
+{
+    <div class="loading-overlay">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+        <MudText Typo="Typo.body2">@Text</MudText>
+    </div>
+}
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Text { get; set; } = "در حال دریافت اطلاعات...";
+}

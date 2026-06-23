@@ -1,0 +1,17 @@
+@page "/orders/mesc/grouped"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+<PageTitle>نمای گروه‌بندی‌شده MESC</PageTitle>
+<PageHeader Title="اقلام گروه‌بندی‌شده MESC" Subtitle="نمای اقلام زیر شرح عمومی متناظر با شش رقم نخست کد" />
+@if(_loading){<LoadingOverlay Visible="true" />}
+else if(_error is not null){<EmptyState Title="خطا در دریافت اطلاعات" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState>}
+else if(_groups.Count==0){<EmptyState Title="قلمی برای نمایش وجود ندارد" Description="ابتدا گروه و اقلام کاتالوگ را ثبت کنید." />}
+else{<MescGroupedItemsTable Groups="_groups" />}
+@code{
+private List<MescItemGroupedDto>_groups=[];private bool _loading=true;private string?_error;
+protected override async Task OnAfterRenderAsync(bool firstRender){if(!firstRender)return;if(!Access.HasPermission("Item.View")){Navigation.NavigateTo("/access-denied");return;}await Load();StateHasChanged();}
+private async Task Load(){_loading=true;_error=null;try{_groups=await Api.GetMescItemsGroupedAsync(true);}catch(Exception ex){_error="امکان دریافت نمای گروه‌بندی‌شده وجود ندارد.";Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
+}

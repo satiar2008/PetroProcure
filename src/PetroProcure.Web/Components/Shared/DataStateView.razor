@@ -1,0 +1,30 @@
+@typeparam TItem
+
+@if (Loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="my-3" />
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <RetryPanel Message="@Error" OnRetry="OnRetry" />
+}
+else if (IsEmpty)
+{
+    <EmptyState Title="@EmptyTitle" Description="@EmptyDescription" />
+}
+else if (ChildContent is not null)
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter] public bool Loading { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public IReadOnlyCollection<TItem>? Items { get; set; }
+    [Parameter] public string EmptyTitle { get; set; } = "اطلاعاتی یافت نشد";
+    [Parameter] public string EmptyDescription { get; set; } = "هنوز رکوردی برای نمایش وجود ندارد.";
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private bool IsEmpty => Items is not null && Items.Count == 0;
+}

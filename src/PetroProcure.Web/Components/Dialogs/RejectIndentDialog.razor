@@ -1,0 +1,19 @@
+<MudDialog>
+    <DialogContent>
+        <MudForm @ref="_form">
+            <MudText Typo="Typo.body1">علت رد تقاضا را ثبت کنید.</MudText>
+            <MudTextField @bind-Value="_comment" Label="علت رد" Lines="4" Required="true"
+                          RequiredError="ثبت علت رد الزامی است." Variant="Variant.Outlined" Class="mt-3" />
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">انصراف</MudButton>
+        <MudButton Color="Color.Error" Variant="Variant.Filled" OnClick="Confirm">رد تقاضا</MudButton>
+    </DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+    private MudForm? _form; private string _comment = "";
+    private async Task Confirm(){await _form!.Validate();if(!_form.IsValid)return;Dialog.Close(DialogResult.Ok(_comment.Trim()));}
+    private void Cancel()=>Dialog.Cancel();
+}

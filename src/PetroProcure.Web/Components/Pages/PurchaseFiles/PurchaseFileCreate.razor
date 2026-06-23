@@ -1,0 +1,53 @@
+@page "/purchase/files/create"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>ایجاد پرونده خرید</PageTitle>
+<PageHeader Title="ایجاد پرونده خرید" Subtitle="ثبت پرونده دستی و انتخاب اقلام از کاتالوگ MESC" />
+<MudForm @ref="_form">
+<MudGrid Spacing="3">
+    <MudItem xs="12" lg="7"><MudPaper Class="form-panel" Elevation="0">
+        <MudText Typo="Typo.h6" Class="section-title">اطلاعات پرونده</MudText>
+        <MudTextField @bind-Value="_title" Label="عنوان پرونده" Required="true" RequiredError="عنوان الزامی است" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="_description" Label="شرح" Lines="4" Variant="Variant.Outlined" Class="mt-4" />
+        <MudGrid Class="mt-2">
+            <MudItem xs="12" sm="6"><MudSelect T="PurchaseFilePriority" @bind-Value="_priority" Label="اولویت" Variant="Variant.Outlined">@foreach(var p in Enum.GetValues<PurchaseFilePriority>()){<MudSelectItem Value="@p">@PurchaseFileList.PriorityText(p)</MudSelectItem>}</MudSelect></MudItem>
+            <MudItem xs="12" sm="6"><MudSelect T="Guid" @bind-Value="_department" Label="واحد اولیه" Variant="Variant.Outlined">@foreach(var d in FakeDirectory.Departments){<MudSelectItem Value="@d.Id">@d.Name</MudSelectItem>}</MudSelect></MudItem>
+        </MudGrid>
+    </MudPaper></MudItem>
+    <MudItem xs="12" lg="5"><MudPaper Class="form-panel" Elevation="0">
+        <MudText Typo="Typo.h6" Class="section-title">انتخاب اقلام MESC</MudText>
+        <MudTextField @bind-Value="_mescSearch" Label="جستجوی قلم" Placeholder="کد یا شرح کالا" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" OnKeyUp="SearchItems" />
+        @if (_searching) { <MudProgressLinear Indeterminate="true" Class="mt-2" /> }
+        <div class="mesc-results">
+        @foreach (var item in _mescResults)
+        {
+            <div class="mesc-option"><div><strong>@item.Code</strong><small>@item.GeneralGroupCode · @item.GeneralDescription</small><span>@item.SpecificDescription</span></div><MudIconButton Icon="@Icons.Material.Filled.AddCircle" Color="Color.Primary" OnClick="@(() => AddSelection(item))" /></div>
+        }
+        </div>
+    </MudPaper></MudItem>
+    <MudItem xs="12"><MudPaper Class="form-panel" Elevation="0">
+        <div class="panel-heading"><MudText Typo="Typo.h6">اقلام انتخاب‌شده</MudText><MudChip T="string" Size="Size.Small">@_selected.Count قلم</MudChip></div>
+        @if (_selected.Count == 0) { <EmptyState Title="هنوز قلمی انتخاب نشده" Description="با جستجوی کاتالوگ MESC اقلام مورد نیاز را اضافه کنید." /> }
+        else { <MudTable Items="_selected" Dense="true" Elevation="0"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>کد عمومی</MudTh><MudTh>شرح عمومی</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>واحد</MudTh><MudTh>مقدار</MudTh><MudTh></MudTh></HeaderContent><RowTemplate>
+            <MudTd>@context.Item.Code</MudTd><MudTd>@context.Item.GeneralGroupCode</MudTd><MudTd>@context.Item.GeneralDescription</MudTd><MudTd>@context.Item.SpecificDescription</MudTd><MudTd>@context.Item.UnitOfMeasure</MudTd>
+            <MudTd><MudNumericField T="decimal" @bind-Value="context.Quantity" Min="0.01M" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudTd><MudTd><MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(() => _selected.Remove(context))" /></MudTd>
+        </RowTemplate></MudTable> }
+        <div class="form-actions"><MudButton Href="/purchase/files">انصراف</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving" OnClick="SaveAsync" StartIcon="@Icons.Material.Filled.Save">ثبت پرونده</MudButton></div>
+    </MudPaper></MudItem>
+</MudGrid>
+</MudForm>
+<LoadingOverlay Visible="_saving" Text="در حال ایجاد پرونده..." />
+
+@code {
+    private MudForm? _form; private string _title=""; private string? _description; private PurchaseFilePriority _priority=PurchaseFilePriority.Normal;
+    private Guid _department=FakeDirectory.PurchaseDepartmentId; private string _mescSearch=""; private bool _searching,_saving;
+    private List<MescItemDto> _mescResults=[]; private List<SelectedItem> _selected=[];
+    private async Task SearchItems(KeyboardEventArgs _) { if (_mescSearch.Trim().Length < 2) { _mescResults=[]; return; } _searching=true; try { _mescResults=await Api.SearchMescItemsAsync(_mescSearch); } catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);} finally{_searching=false;} }
+    private void AddSelection(MescItemDto item) { if (_selected.All(x=>x.Item.Id!=item.Id)) _selected.Add(new(item,1)); }
+    private async Task SaveAsync() { await _form!.Validate(); if(!_form.IsValid)return; _saving=true; try { var file=await Api.CreatePurchaseFileAsync(new(DateTime.Now.Year,_title,_description,_priority,FakeDirectory.PurchaseDepartmentId,_department,null)); foreach(var item in _selected) await Api.AddPurchaseFileItemAsync(file.Id,new(item.Item.Id,FakeDirectory.UnitId(item.Item.UnitOfMeasure),item.Quantity,item.Quantity,null)); Snackbar.Add("پرونده با موفقیت ایجاد شد.",Severity.Success); Navigation.NavigateTo($"/purchase/files/{file.Id}"); } catch(Exception ex){Snackbar.Add("ایجاد پرونده ناموفق بود: "+ex.Message,Severity.Error);} finally{_saving=false;} }
+    private sealed class SelectedItem(MescItemDto item, decimal quantity) { public MescItemDto Item {get;}=item; public decimal Quantity {get;set;}=quantity; }
+}
+

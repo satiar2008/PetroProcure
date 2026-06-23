@@ -1,0 +1,40 @@
+@foreach (var group in Groups.OrderBy(x => x.MescGeneralGroupCode))
+{
+    <MudExpansionPanels Class="mb-2">
+        <MudExpansionPanel>
+            <TitleContent>
+                <div class="d-flex align-center gap-3">
+                    <MescCodeDisplay Code="@group.MescGeneralGroupCode" />
+                    <strong>@group.GeneralDescription</strong>
+                    <MudChip T="string" Size="Size.Small">@group.Items.Count قلم</MudChip>
+                </div>
+            </TitleContent>
+            <ChildContent>
+                <MudTable Items="group.Items" Dense="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>کد MESC</MudTh><MudTh>کد گروه</MudTh><MudTh>شرح عمومی</MudTh>
+                        <MudTh>شرح اختصاصی</MudTh><MudTh>واحد</MudTh><MudTh>مقدار</MudTh>
+                        <MudTh>شرح فنی</MudTh><MudTh>تاریخ نیاز</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd><MescCodeDisplay Code="@context.MescCode" /></MudTd>
+                        <MudTd>@context.MescGeneralGroupCode</MudTd><MudTd>@context.GeneralDescription</MudTd>
+                        <MudTd>@context.SpecificDescription</MudTd><MudTd>@UnitName(context.UnitOfMeasureId)</MudTd>
+                        <MudTd>@context.RequestedQuantity</MudTd><MudTd>@(context.TechnicalDescription ?? "—")</MudTd>
+                        <MudTd>@(context.RequiredDate?.ToString("yyyy/MM/dd") ?? "—")</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+}
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<IndentGroupedItemsDto> Groups { get; set; } = [];
+    private static string UnitName(Guid id) => FakeDirectory.Departments.Length > 0
+        ? id == FakeDirectory.UnitId("M") ? "متر"
+        : id == FakeDirectory.UnitId("KG") ? "کیلوگرم"
+        : id == FakeDirectory.UnitId("L") ? "لیتر"
+        : id == FakeDirectory.UnitId("PKG") ? "بسته"
+        : id == FakeDirectory.UnitId("DEV") ? "دستگاه" : "عدد"
+        : "واحد";
+}

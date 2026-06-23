@@ -1,0 +1,16 @@
+@inject IUserAccessContext Access
+
+@if (string.IsNullOrWhiteSpace(Permission) || Access.HasPermission(Permission))
+{
+    @ChildContent
+}
+else if (DeniedContent is not null)
+{
+    @DeniedContent
+}
+
+@code {
+    [Parameter] public string? Permission { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment? DeniedContent { get; set; }
+}

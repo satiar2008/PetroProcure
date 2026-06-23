@@ -1,0 +1,32 @@
+<MudTable Items="Tasks" Dense="true" Hover="true" RowsPerPage="10">
+    <HeaderContent>
+        <MudTh>عنوان</MudTh><MudTh>نوع</MudTh><MudTh>شماره پرونده / تقاضا</MudTh>
+        <MudTh>واحد مسئول</MudTh><MudTh>وضعیت</MudTh><MudTh>تاریخ ایجاد</MudTh>
+        <MudTh>مهلت انجام</MudTh><MudTh>عملیات</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd><MudLink Href="@($"/inbox/tasks/{context.Task.Id}")">@context.Task.Title</MudLink></MudTd>
+        <MudTd>@InboxUiPolicy.EntityType(context.Task)</MudTd>
+        <MudTd>@(context.RelatedNumber ?? "—")</MudTd><MudTd>@FakeDirectory.DepartmentName(context.Task.AssignedDepartmentId)</MudTd>
+        <MudTd><StatusChip Text="@InboxUiPolicy.StatusText(context.Task.Status)" /></MudTd>
+        <MudTd>@context.Task.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
+        <MudTd>@(context.Task.DueDate?.ToString("yyyy/MM/dd") ?? "—")</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" Href="@($"/inbox/tasks/{context.Task.Id}")" />
+            @if (CanAssignSelf(context.Task)) { <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" OnClick="@(()=>AssignSelf.InvokeAsync(context.Task))" /> }
+            @if (CanAssignOther(context.Task)) { <MudIconButton Icon="@Icons.Material.Filled.ManageAccounts" Color="Color.Secondary" OnClick="@(()=>AssignOther.InvokeAsync(context.Task))" /> }
+            @if (CanComplete(context.Task)) { <MudIconButton Icon="@Icons.Material.Filled.CheckCircle" Color="Color.Success" OnClick="@(()=>Complete.InvokeAsync(context.Task))" /> }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><EmptyState Title="کاری یافت نشد" Description="فیلترها را تغییر دهید یا کارتابل واحد دیگری را بررسی کنید." /></NoRecordsContent>
+    <PagerContent><MudTablePager PageSizeOptions="new[]{10,25,50}" /></PagerContent>
+</MudTable>
+@code {
+    [Parameter] public IReadOnlyList<InboxTaskRow> Tasks { get; set; } = [];
+    [Parameter] public Func<InboxTaskDto,bool> CanAssignSelf { get; set; } = _ => false;
+    [Parameter] public Func<InboxTaskDto,bool> CanComplete { get; set; } = _ => false;
+    [Parameter] public Func<InboxTaskDto,bool> CanAssignOther { get; set; } = _ => false;
+    [Parameter] public EventCallback<InboxTaskDto> AssignSelf { get; set; }
+    [Parameter] public EventCallback<InboxTaskDto> Complete { get; set; }
+    [Parameter] public EventCallback<InboxTaskDto> AssignOther { get; set; }
+}

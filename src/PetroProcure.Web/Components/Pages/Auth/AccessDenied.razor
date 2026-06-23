@@ -1,0 +1,8 @@
+@page "/access-denied"
+@layout PetroProcure.Web.Components.Layout.AuthLayout
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="min-height:100vh">
+    <EmptyState Icon="@Icons.Material.Filled.Block" Title="دسترسی مجاز نیست"
+                Description="شما مجوز لازم برای مشاهده این بخش را ندارید." />
+    <MudButton Href="/" Color="Color.Primary" Variant="Variant.Filled">بازگشت به صفحه اصلی</MudButton>
+</MudContainer>

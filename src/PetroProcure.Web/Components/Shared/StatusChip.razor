@@ -1,0 +1,6 @@
+<MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@Color" Icon="@Icon">@Text</MudChip>
+@code {
+    [Parameter] public string Text { get; set; } = "فعال";
+    [Parameter] public Color Color { get; set; } = Color.Success;
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Circle;
+}

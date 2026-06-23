@@ -1,0 +1,33 @@
+@page "/inbox/my"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject IAuthService Auth
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+<PageTitle>کارتابل من</PageTitle>
+<PageHeader Title="کارتابل من" Subtitle="کارهای اختصاص‌یافته به شما و واحدهای سازمانی مجاز" />
+@if(_loading){<LoadingOverlay Visible="true" />}
+else if(_error is not null){<EmptyState Title="خطا در دریافت کارتابل" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState>}
+else{
+<MudPaper Class="filter-panel" Elevation="0"><MudGrid>
+<MudItem xs="12" md="2"><MudSelect T="WorkflowStatus?" @bind-Value="_status" Label="وضعیت" Clearable="true">@foreach(var s in Enum.GetValues<WorkflowStatus>()){<MudSelectItem T="WorkflowStatus?" Value="@s">@InboxUiPolicy.StatusText(s)</MudSelectItem>}</MudSelect></MudItem>
+<MudItem xs="12" md="2"><MudSelect T="string" @bind-Value="_entity" Label="نوع"><MudSelectItem Value="@("all")">همه</MudSelectItem><MudSelectItem Value="@("file")">پرونده خرید</MudSelectItem><MudSelectItem Value="@("indent")">تقاضای خرید</MudSelectItem></MudSelect></MudItem>
+<MudItem xs="12" md="3"><MudTextField @bind-Value="_number" Label="شماره پرونده / تقاضا" Immediate="true" /></MudItem>
+<MudItem xs="12" md="2"><MudDatePicker @bind-Date="_due" Label="مهلت انجام" /></MudItem>
+<MudItem xs="12" md="3"><MudDatePicker @bind-Date="_created" Label="تاریخ ایجاد" /></MudItem>
+</MudGrid></MudPaper>
+<MudPaper Class="data-panel" Elevation="0"><InboxTaskTable Tasks="Filtered.ToArray()" CanAssignSelf="CanAssignSelf" CanComplete="CanComplete" AssignSelf="AssignSelf" Complete="Complete" /></MudPaper>}
+@code{
+private List<InboxTaskRow>_rows=[];private bool _loading=true;private string?_error,_number;private string _entity="all";private WorkflowStatus?_status;private DateTime?_due,_created;
+private Guid UserId=>Auth.CurrentUser?.Id??Guid.Empty;
+private IEnumerable<InboxTaskRow>Filtered=>_rows.Where(x=>(!_status.HasValue||x.Task.Status==_status)&&(_entity=="all"||(_entity=="file"&&x.Task.PurchaseFileId.HasValue)||(_entity=="indent"&&x.Task.IndentId.HasValue))&&(string.IsNullOrWhiteSpace(_number)||(x.RelatedNumber?.Contains(_number.Trim(),StringComparison.OrdinalIgnoreCase)??false))&&(!_due.HasValue||x.Task.DueDate==DateOnly.FromDateTime(_due.Value))&&(!_created.HasValue||x.Task.CreatedAt.Date==_created.Value.Date)).OrderBy(x=>x.Task.DueDate??DateOnly.MaxValue).ThenByDescending(x=>x.Task.CreatedAt);
+protected override async Task OnAfterRenderAsync(bool first){if(!first)return;if(!InboxUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();StateHasChanged();}
+private async Task Load(){_loading=true;_error=null;try{_rows=await Enrich(await Api.GetMyInboxTasksAsync());}catch(Exception ex){_error="امکان دریافت کارتابل وجود ندارد.";Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
+private async Task<List<InboxTaskRow>> Enrich(IEnumerable<InboxTaskDto> tasks){var rows=new List<InboxTaskRow>();foreach(var task in tasks){string? number=null;try{if(task.PurchaseFileId.HasValue)number=(await Api.GetPurchaseFileAsync(task.PurchaseFileId.Value))?.FileNumber;else if(task.IndentId.HasValue)number=(await Api.GetIndentAsync(task.IndentId.Value))?.IndentNumber;}catch{}rows.Add(new(task,number));}return rows;}
+private bool CanAssignSelf(InboxTaskDto task)=>InboxUiPolicy.CanAssignToSelf(task,UserId,Access.HasPermission);
+private bool CanComplete(InboxTaskDto task)=>InboxUiPolicy.CanComplete(task,UserId,Access.HasPermission);
+private async Task AssignSelf(InboxTaskDto task){try{await Api.AssignInboxTaskToSelfAsync(task.Id);Snackbar.Add("کار به شما اختصاص یافت.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private async Task Complete(InboxTaskDto task){var d=await Dialog.ShowAsync<ConfirmDialog>("تکمیل کار",new DialogParameters{{"Message","این کار به‌عنوان تکمیل‌شده ثبت شود؟"},{"ConfirmColor",Color.Success}});var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.CompleteInboxTaskAsync(task.Id);Snackbar.Add("کار تکمیل شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+}

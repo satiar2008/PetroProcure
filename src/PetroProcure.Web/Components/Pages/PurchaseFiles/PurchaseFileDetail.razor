@@ -1,0 +1,204 @@
+@page "/purchase/files/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject IUserAccessContext Access
+@inject IDialogService Dialog
+
+<PageTitle>@(_summary.Data?.FileNumber ?? "پرونده خرید")</PageTitle>
+@if (_summary.Loading) { <LoadingOverlay Visible="true" Text="در حال دریافت پرونده..." /> }
+else if (_summary.Error is not null) { @ErrorState(_summary.Error, LoadSummary) }
+else if (_summary.Data is { } file)
+{
+    <PageHeader Title="@file.Title" Subtitle="@file.FileNumber">
+        <Actions><StatusChip Text="@PurchaseFileList.StatusText(file.Status)" Color="@PurchaseFileList.StatusColor(file.Status)" /></Actions>
+    </PageHeader>
+    <MudTabs Rounded="true" ApplyEffectsToContainer="true" PanelClass="detail-tab-panel" Elevation="0">
+        <MudTabPanel Text="خلاصه" Icon="@Icons.Material.Filled.Dashboard">
+            <MudPaper Class="form-panel" Elevation="0"><div class="summary-grid">
+                <SummaryItem Label="شماره پرونده" Value="@file.FileNumber" />
+                <SummaryItem Label="وضعیت" Value="@PurchaseFileList.StatusText(file.Status)" />
+                <SummaryItem Label="اولویت" Value="@PurchaseFileList.PriorityText(file.Priority)" />
+                <SummaryItem Label="واحد جاری" Value="@DepartmentName(file.CurrentDepartmentId)" />
+                <SummaryItem Label="تاریخ ایجاد" Value="@file.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")" />
+                <SummaryItem Label="تعداد اقلام" Value="@file.Items.Count.ToString()" />
+            </div><MudDivider Class="my-4" /><MudText Typo="Typo.subtitle2">شرح پرونده</MudText>
+            <MudText Typo="Typo.body2">@(file.Description ?? "شرحی ثبت نشده است.")</MudText></MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="اقلام" Icon="@Icons.Material.Filled.Inventory2">
+            @TabBody(_items, LoadItems, ItemsContent)
+        </MudTabPanel>
+
+        <MudTabPanel Text="اسناد" Icon="@Icons.Material.Filled.Description">
+            @TabBody(_documents, LoadDocuments, DocumentsContent)
+        </MudTabPanel>
+
+        <MudTabPanel Text="گردش کار" Icon="@Icons.Material.Filled.AccountTree">
+            @TabBody(_workflow, LoadWorkflow, WorkflowContent)
+        </MudTabPanel>
+
+        <MudTabPanel Text="یادداشت‌ها" Icon="@Icons.Material.Filled.Notes">
+            <MudPaper Class="form-panel mb-4" Elevation="0">
+                <MudTextField @bind-Value="_noteText" Label="یادداشت جدید" Lines="3" Variant="Variant.Outlined" />
+                <MudCheckBox @bind-Value="_internalNote" Label="یادداشت داخلی" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_noteBusy || string.IsNullOrWhiteSpace(_noteText)" OnClick="AddNote">ثبت یادداشت</MudButton>
+            </MudPaper>
+            @if (_notes.Loading) { <MudProgressLinear Indeterminate="true" /> }
+            else if (_notes.Error is not null) { @ErrorState(_notes.Error, LoadNotes) }
+            else if (_notes.Data is null || _notes.Data.Count == 0) { <EmptyState Title="یادداشتی وجود ندارد" Description="اولین یادداشت پرونده را ثبت کنید." /> }
+            else { @foreach (var note in _notes.Data.OrderByDescending(x=>x.CreatedAt)) {
+                <MudAlert Severity="@(note.IsInternal ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined" Class="mb-2">
+                    @note.NoteText<br /><small><DepartmentDisplay DepartmentId="@note.DepartmentId" /> · @note.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small>
+                </MudAlert> } }
+        </MudTabPanel>
+
+        <MudTabPanel Text="گزارش‌ها" Icon="@Icons.Material.Filled.Assessment">
+            <MudPaper Class="form-panel" Elevation="0">
+                <MudText Typo="Typo.h6">گزارش خلاصه پرونده خرید</MudText>
+                <div class="report-actions mt-4">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Preview" OnClick="@(()=>_showPreview=!_showPreview)">پیش‌نمایش</MudButton>
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PictureAsPdf" Href="@($"/report-preview/purchase-file/{Id}")" Target="_blank">خروجی PDF</MudButton>
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SaveAlt" Disabled="_savingReport" OnClick="SaveReport">ذخیره در اسناد پرونده</MudButton>
+                </div>
+                @if (_showPreview) { <div class="report-preview"><iframe src="@($"/report-preview/purchase-file/{Id}")" title="پیش‌نمایش گزارش"></iframe></div> }
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="دستیار هوشمند" Icon="@Icons.Material.Filled.AutoAwesome">
+            <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3">نتایج هوش مصنوعی صرفاً پیشنهاد و تحلیل هستند و تصمیم نهایی بر عهده کاربران مجاز و کمیسیون‌ها است.</MudAlert>
+            <div class="report-actions mb-4">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_aiBusy" OnClick="@(()=>RunAi("summarize"))">خلاصه پرونده</MudButton>
+                <MudButton Variant="Variant.Outlined" Disabled="_aiBusy" OnClick="@(()=>RunAi("check-missing-documents"))">بررسی نقص مدارک</MudButton>
+                <MudButton Variant="Variant.Outlined" Disabled="_aiBusy" OnClick="@(()=>RunAi("evaluate-rules"))">بررسی قوانین خرید</MudButton>
+            </div>
+            @if (_ai.Loading || _aiBusy) { <MudProgressLinear Indeterminate="true" /> }
+            else if (_ai.Error is not null) { @ErrorState(_ai.Error, LoadAi) }
+            else if (_ai.Data is null || _ai.Data.Count == 0) { <EmptyState Title="هنوز تحلیلی انجام نشده" Description="یکی از عملیات بالا را اجرا کنید." /> }
+            else { @foreach(var evaluation in _ai.Data.OrderByDescending(x=>x.CreatedAt)) {
+                <MudPaper Class="ai-result-card mb-3" Elevation="0"><MudText Typo="Typo.h6">@AiType(evaluation.EvaluationType)</MudText>
+                <MudText Typo="Typo.body2" Class="mb-3">@evaluation.Summary</MudText>
+                @foreach(var finding in evaluation.Findings){<MudAlert Severity="@AiSeverity(finding.Severity)" Variant="Variant.Outlined" Class="mb-2"><strong>@finding.Title</strong><br/>@finding.Description</MudAlert>}
+                @foreach(var recommendation in evaluation.Recommendations){<div class="ai-recommendation"><MudIcon Icon="@Icons.Material.Filled.Lightbulb" /><div><strong>@recommendation.Title</strong><span>@recommendation.Description</span></div></div>}
+                </MudPaper> } }
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private readonly TabLoadState<PurchaseFileDto> _summary = new();
+    private readonly TabLoadState<List<PurchaseFileGroupedItemsDto>> _items = new();
+    private readonly TabLoadState<List<FileDocumentDto>> _documents = new();
+    private readonly TabLoadState<PurchaseFileWorkflowStateDto> _workflow = new();
+    private readonly TabLoadState<List<WorkflowActionDto>> _workflowActions = new();
+    private readonly TabLoadState<List<PurchaseFileNoteDto>> _notes = new();
+    private readonly TabLoadState<List<AiEvaluationResultDto>> _ai = new();
+    private bool _showPreview, _savingReport, _aiBusy, _noteBusy, _internalNote;
+    private string? _noteText, _mescSearch, _documentDescription; private List<MescItemDto> _mescResults = [];
+    private DocumentType _documentType = DocumentType.TechnicalSpecification;
+    private DocumentUploadLimitsDto? _uploadLimits; private bool _uploadBusy;
+    private string? _workflowComment;
+    private bool Editable => _summary.Data?.Status is not PurchaseFileStatus.Completed and not PurchaseFileStatus.Archived;
+    private bool CanEdit => _summary.Data is { } value && PurchaseFileUiPolicy.CanEdit(value.Status, Access.HasPermission);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadSummary();
+        _ = LoadItems(); _ = LoadDocuments(); _ = LoadWorkflow(); _ = LoadNotes(); _ = LoadAi();
+    }
+    private async Task LoadSummary() => await Load(_summary, async () =>
+        await Api.GetPurchaseFileAsync(Id) ?? throw new HttpRequestException("پرونده یافت نشد."), "خلاصه پرونده دریافت نشد.");
+    private async Task LoadItems() => await Load(_items, () => Api.GetGroupedItemsAsync(Id), "اقلام پرونده دریافت نشد.");
+    private async Task LoadDocuments(){await Load(_documents, () => Api.GetDocumentsAsync(Id), "اسناد پرونده دریافت نشد.");try{_uploadLimits??=await Api.GetUploadLimitsAsync();}catch{}}
+    private async Task LoadWorkflow()
+    {
+        await Task.WhenAll(
+            Load(_workflow, () => Api.GetWorkflowStateAsync(Id), "گردش کار دریافت نشد."),
+            Load(_workflowActions, () => Api.GetAllowedWorkflowActionsAsync(Id), "اقدامات مجاز دریافت نشد."));
+    }
+    private async Task LoadNotes()
+    {
+        var state = new TabLoadState<PurchaseFileDto>();
+        await Load(state, async () => await Api.GetPurchaseFileAsync(Id)
+            ?? throw new HttpRequestException("پرونده یافت نشد."), "یادداشت‌ها دریافت نشد.");
+        _notes.Loading = false; _notes.Error = state.Error; _notes.Data = state.Data?.Notes.ToList() ?? [];
+    }
+    private async Task LoadAi() => await Load(_ai, () => Api.GetAiEvaluationsAsync(Id), "نتایج هوش مصنوعی دریافت نشد.");
+    private async Task Load<T>(TabLoadState<T> state, Func<Task<T>> loader, string message)
+    {
+        state.Loading = true; state.Error = null; StateHasChanged();
+        try { state.Data = await loader(); if (state.Data is null) state.Error = message; }
+        catch (Exception ex) { state.Error = message; Snackbar.Add(ex.Message, Severity.Error); }
+        finally { state.Loading = false; StateHasChanged(); }
+    }
+    private RenderFragment ErrorState(string error, Func<Task> retry) => @<EmptyState Icon="@Icons.Material.Filled.CloudOff" Title="دریافت اطلاعات ناموفق بود" Description="@error"><Action><MudButton OnClick="retry">تلاش مجدد</MudButton></Action></EmptyState>;
+    private RenderFragment TabBody<T>(TabLoadState<T> state, Func<Task> retry, RenderFragment<T> content) => builder =>
+    {
+        if (state.Loading) builder.AddContent(0, (RenderFragment)(b => { b.OpenComponent<MudProgressLinear>(0); b.AddAttribute(1, "Indeterminate", true); b.CloseComponent(); }));
+        else if (state.Error is not null) builder.AddContent(1, ErrorState(state.Error, retry));
+        else if (state.Data is not null) builder.AddContent(2, content(state.Data));
+    };
+    private RenderFragment<List<PurchaseFileGroupedItemsDto>> ItemsContent => groups => @<div>
+        @if (CanEdit) {
+            <MudPaper Class="form-panel mb-4" Elevation="0"><MudTextField @bind-Value="_mescSearch" Label="جستجوی قلم MESC" Variant="Variant.Outlined" />
+            <MudButton OnClick="SearchMesc" Variant="Variant.Outlined">جستجو</MudButton>
+            @foreach(var result in _mescResults){<div class="d-flex justify-space-between align-center mt-2"><span>@result.Code - @result.SpecificDescription</span><MudButton Size="Size.Small" OnClick="@(()=>AddItem(result))">افزودن</MudButton></div>}</MudPaper>
+        }
+        @if(groups.Count==0){<EmptyState Title="قلمی ثبت نشده" Description="اقلام مورد نیاز را به پرونده اضافه کنید." />}
+        @foreach(var group in groups){<MudPaper Class="item-group" Elevation="0"><div class="group-header"><div><strong>@group.MescGeneralGroupCode</strong><span>@group.GeneralDescription</span></div></div>
+        <MudTable Items="group.Items" Dense="true"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>درخواستی</MudTh><MudTh>تأییدشده</MudTh><MudTh></MudTh></HeaderContent>
+        <RowTemplate><MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.RequestedQuantity</MudTd><MudTd>@context.ApprovedQuantity</MudTd>
+        <MudTd>@if(CanEdit){<MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(()=>RemoveItem(context.Id))" />}</MudTd></RowTemplate></MudTable></MudPaper>}
+    </div>;
+    private RenderFragment<List<FileDocumentDto>> DocumentsContent => docs => @<div>
+        @if(CanEdit){<MudPaper Class="form-panel mb-4" Elevation="0"><MudGrid>
+            <MudItem xs="12" md="4"><MudSelect T="DocumentType" @bind-Value="_documentType" Label="نوع سند">@foreach(var type in Enum.GetValues<DocumentType>()){<MudSelectItem Value="@type">@DocumentTypeText(type)</MudSelectItem>}</MudSelect></MudItem>
+            <MudItem xs="12" md="5"><MudTextField @bind-Value="_documentDescription" Label="توضیحات سند" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><InputFile OnChange="UploadDocument" disabled="@_uploadBusy" /></MudItem>
+        </MudGrid>@if(_uploadLimits is not null){<MudText Typo="Typo.caption">حداکثر @_uploadLimits.MaxFileSizeMb مگابایت؛ پسوندهای مجاز: @string.Join("، ",_uploadLimits.AllowedExtensions)</MudText>}</MudPaper>}
+        @if(docs.Count==0){<EmptyState Title="سندی ثبت نشده است" Description="فایل مورد نظر را با نوع سند مناسب بارگذاری کنید." />}
+        else {<MudTable Items="docs"><HeaderContent><MudTh>نام فایل</MudTh><MudTh>نوع</MudTh><MudTh>نسخه</MudTh><MudTh>حجم</MudTh><MudTh>بارگذار</MudTh><MudTh>تاریخ</MudTh><MudTh></MudTh></HeaderContent>
+        <RowTemplate><MudTd>@context.OriginalFileName</MudTd><MudTd>@DocumentTypeText(context.DocumentType)</MudTd><MudTd>@context.VersionNo</MudTd><MudTd>@FormatSize(context.Size)</MudTd><MudTd><UserDisplay UserId="@context.UploadedByUserId" /></MudTd><MudTd>@context.UploadedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
+        <MudTd><MudIconButton Icon="@Icons.Material.Filled.Download" Href="@($"/document-download/{context.Id}")" Target="_blank" />@if(CanEdit){<label class="mud-button-root mud-icon-button"><InputFile OnChange="@(e=>UploadVersion(context.Id,e))" style="display:none" /><MudIcon Icon="@Icons.Material.Filled.UploadFile" /></label><MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(()=>DeleteDocument(context.Id))" />}</MudTd></RowTemplate></MudTable>}
+    </div>;
+    private RenderFragment<PurchaseFileWorkflowStateDto> WorkflowContent => state => @<div>
+        <MudPaper Class="form-panel mb-4" Elevation="0"><MudText>واحد جاری: <DepartmentDisplay DepartmentId="@state.CurrentDepartmentId" /></MudText><MudText>وضعیت: @PurchaseFileList.StatusText(Enum.Parse<PurchaseFileStatus>(state.Status))</MudText>
+        @if(_workflowActions.Loading){<MudProgressLinear Indeterminate="true" />}
+        else if(_workflowActions.Error is not null){@ErrorState(_workflowActions.Error,LoadWorkflow)}
+        else if(_workflowActions.Data is null||_workflowActions.Data.Count==0){<MudAlert Severity="Severity.Info" Class="mt-3">در وضعیت فعلی اقدامی برای شما مجاز نیست.</MudAlert>}
+        else {
+            <MudTextField @bind-Value="_workflowComment" Label="توضیحات اقدام" Lines="2" Variant="Variant.Outlined" Class="mt-3" />
+            <div class="report-actions mt-3">@foreach(var action in _workflowActions.Data){
+                <MudButton Color="@(action.IsFinalAction?Color.Success:action.IsReturnAction?Color.Warning:Color.Primary)"
+                           Variant="Variant.Filled" OnClick="@(()=>ExecuteMatrixAction(action))">@action.Title</MudButton>
+            }</div>
+        }
+        </MudPaper>
+        @if(state.Steps.Count==0){<EmptyState Title="گردش کاری ثبت نشده" Description="پس از شروع گردش، اقدامات اینجا نمایش داده می‌شوند." />}
+        @foreach(var step in state.Steps.OrderByDescending(x=>x.CreatedAt)){<div class="timeline-row"><div class="timeline-marker"></div><div><strong>@step.ActionName</strong><small><DepartmentDisplay DepartmentId="@step.FromDepartmentId" /> ← <DepartmentDisplay DepartmentId="@step.ToDepartmentId" /> · @step.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small></div></div>}
+    </div>;
+    private async Task AddNote(){_noteBusy=true;try{var department=_summary.Data!.CurrentDepartmentId;var note=await Api.AddNoteAsync(Id,new(department,_noteText!,_internalNote));_notes.Data??=[];_notes.Data.Insert(0,note);_noteText=null;Snackbar.Add("یادداشت ثبت شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_noteBusy=false;}}
+    private async Task UploadDocument(InputFileChangeEventArgs e){_uploadBusy=true;try{var file=e.File;var max=(_uploadLimits?.MaxFileSizeMb??25)*1024L*1024L;await using var stream=file.OpenReadStream(max);await Api.UploadDocumentAsync(Id,stream,file.Name,file.ContentType,new(_documentType,_summary.Data?.CurrentDepartmentId,_documentDescription));await LoadDocuments();_documentDescription=null;Snackbar.Add("سند بارگذاری شد.",Severity.Success);}catch(Exception ex){Snackbar.Add("بارگذاری ناموفق بود: "+ex.Message,Severity.Error);}finally{_uploadBusy=false;}}
+    private async Task UploadVersion(Guid documentId,InputFileChangeEventArgs e){try{var file=e.File;var max=(_uploadLimits?.MaxFileSizeMb??25)*1024L*1024L;await using var stream=file.OpenReadStream(max);await Api.UploadDocumentVersionAsync(documentId,stream,file.Name,file.ContentType);await LoadDocuments();Snackbar.Add("نسخه جدید ثبت شد.",Severity.Success);}catch(Exception ex){Snackbar.Add("ثبت نسخه ناموفق بود: "+ex.Message,Severity.Error);}}
+    private async Task DeleteDocument(Guid documentId){var dialog=await Dialog.ShowAsync<ConfirmDialog>("حذف سند",new DialogParameters{{"Message","سند به صورت نرم حذف شود؟"},{"ConfirmColor",Color.Error}});var result=await dialog.Result;if(result is null||result.Canceled)return;try{await Api.DeleteDocumentAsync(documentId);await LoadDocuments();Snackbar.Add("سند حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task SearchMesc(){if(string.IsNullOrWhiteSpace(_mescSearch))return;_mescResults=await Api.SearchMescItemsAsync(_mescSearch);}
+    private async Task AddItem(MescItemDto item){try{await Api.AddPurchaseFileItemAsync(Id,new(item.Id,FakeDirectory.UnitId(item.UnitOfMeasure),1,1,null));await LoadItems();Snackbar.Add("قلم اضافه شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task RemoveItem(Guid itemId){var dialog=await Dialog.ShowAsync<ConfirmDialog>("حذف قلم",new DialogParameters{{"Message","قلم از پرونده حذف شود؟"},{"ConfirmColor",Color.Error}});var result=await dialog.Result;if(result is null||result.Canceled)return;try{await Api.RemovePurchaseFileItemAsync(Id,itemId);await LoadItems();Snackbar.Add("قلم حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task StartWorkflow(){try{await Api.StartWorkflowAsync(new("PurchaseFile",Id,_summary.Data!.CurrentDepartmentId));await LoadWorkflow();Snackbar.Add("گردش کار آغاز شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task ExecuteMatrixAction(WorkflowActionDto action)
+    {
+        if(action.RequiresComment&&string.IsNullOrWhiteSpace(_workflowComment)){Snackbar.Add("ثبت توضیحات برای این اقدام الزامی است.",Severity.Warning);return;}
+        var dialog=await Dialog.ShowAsync<ConfirmDialog>("تأیید اقدام گردش کار",new DialogParameters{{"Message",$"اقدام «{action.Title}» انجام شود؟"},{"ConfirmColor",action.IsFinalAction?Color.Success:Color.Primary}});
+        var confirmation=await dialog.Result;if(confirmation is null||confirmation.Canceled)return;
+        try{await Api.ExecuteWorkflowActionAsync(Id,new(action.Code,_workflowComment));_workflowComment=null;await Task.WhenAll(LoadWorkflow(),LoadSummary());Snackbar.Add("اقدام گردش کار با موفقیت انجام شد.",Severity.Success);}
+        catch(Exception ex){Snackbar.Add("اجرای اقدام ناموفق بود: "+ex.Message,Severity.Error);}
+    }
+    private async Task SaveReport(){_savingReport=true;try{await Api.SavePurchaseFileSummaryAsync(Id);await LoadDocuments();Snackbar.Add("گزارش در اسناد ذخیره شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_savingReport=false;}}
+    private async Task RunAi(string action){_aiBusy=true;try{await Api.RunAiAsync(Id,action);await LoadAi();Snackbar.Add("تحلیل تکمیل شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_aiBusy=false;}}
+    private string DepartmentName(Guid id)=>Access.Departments.FirstOrDefault(x=>x.Id==id)?.Title??FakeDirectory.DepartmentName(id);
+    private static string FormatSize(long size)=>size<1024?$"{size} B":size<1048576?$"{size/1024d:0.#} KB":$"{size/1048576d:0.#} MB";
+    private static string DocumentTypeText(DocumentType type)=>type switch{DocumentType.Indent=>"درخواست خرید",DocumentType.TechnicalSpecification=>"مشخصات فنی",DocumentType.CommercialOffer=>"پیشنهاد تجاری",DocumentType.Correspondence=>"مکاتبات",DocumentType.TenderDocument=>"اسناد مناقصه",DocumentType.TenderCommissionMinutes=>"صورتجلسه کمیسیون",DocumentType.Contract=>"قرارداد",DocumentType.PurchaseOrder=>"سفارش خرید",DocumentType.WarehouseReceipt=>"رسید انبار",DocumentType.FinalReport=>"گزارش نهایی",_=>type.ToString()};
+    private static string AiType(string type)=>type switch{"Summary"=>"خلاصه پرونده","MissingDocuments"=>"بررسی نقص مدارک","Rules"=>"ارزیابی قوانین خرید",_=>type};
+    private static Severity AiSeverity(PetroProcure.Contracts.V1.Ai.AiSeverity s)=>s>=PetroProcure.Contracts.V1.Ai.AiSeverity.High?Severity.Error:s>=PetroProcure.Contracts.V1.Ai.AiSeverity.Medium?Severity.Warning:Severity.Info;
+}

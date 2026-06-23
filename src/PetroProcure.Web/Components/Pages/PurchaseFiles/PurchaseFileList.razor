@@ -1,0 +1,87 @@
+@page "/purchase/files"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject IUserAccessContext Access
+
+<PageTitle>پرونده‌های خرید</PageTitle>
+<PageHeader Title="پرونده‌های خرید" Subtitle="جستجو، پایش و مدیریت پرونده‌های تدارکات">
+    <Actions>
+        @if (Access.HasPermission("PurchaseFile.Create"))
+        { <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" Href="/purchase/files/create">پرونده جدید</MudButton> }
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="filter-panel" Elevation="0">
+    <MudGrid Spacing="2">
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_fileNumber" Label="شماره پرونده" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_title" Label="عنوان" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_indentNumber" Label="شماره درخواست" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        <MudItem xs="12" md="3"><MudSelect T="PurchaseFileStatus?" @bind-Value="_status" Label="وضعیت" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+            @foreach (var status in Enum.GetValues<PurchaseFileStatus>()) { <MudSelectItem T="PurchaseFileStatus?" Value="@status">@StatusText(status)</MudSelectItem> }
+        </MudSelect></MudItem>
+        <MudItem xs="12" md="3"><MudSelect T="Guid?" @bind-Value="_department" Label="واحد جاری" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
+            @foreach (var department in Access.Departments) { <MudSelectItem T="Guid?" Value="@department.Id">@department.Title</MudSelectItem> }
+        </MudSelect></MudItem>
+        <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_from" Label="از تاریخ" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_to" Label="تا تاریخ" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center">
+            <MudButton FullWidth="true" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Search" OnClick="ApplyFilters">اعمال فیلتر</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudPaper Class="data-panel" Elevation="0">
+    <MudTable @ref="_table" T="PurchaseFileSummaryDto" ServerData="LoadServerData" Hover="true" Breakpoint="Breakpoint.Sm" Elevation="0">
+        <HeaderContent>
+            <MudTh><MudTableSortLabel SortLabel="FileNumber" T="PurchaseFileSummaryDto">شماره پرونده</MudTableSortLabel></MudTh>
+            <MudTh>عنوان</MudTh>
+            <MudTh><MudTableSortLabel SortLabel="Status" T="PurchaseFileSummaryDto">وضعیت</MudTableSortLabel></MudTh>
+            <MudTh>اولویت</MudTh><MudTh>واحد جاری</MudTh><MudTh>درخواست مبنا</MudTh>
+            <MudTh><MudTableSortLabel SortLabel="CreatedAt" T="PurchaseFileSummaryDto">تاریخ ایجاد</MudTableSortLabel></MudTh>
+            <MudTh>اقلام</MudTh><MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd><MudLink Href="@($"/purchase/files/{context.Id}")"><strong>@context.FileNumber</strong></MudLink></MudTd>
+            <MudTd>@context.Title</MudTd>
+            <MudTd><StatusChip Text="@StatusText(context.Status)" Color="@StatusColor(context.Status)" /></MudTd>
+            <MudTd>@PriorityText(context.Priority)</MudTd>
+            <MudTd>@DepartmentName(context.CurrentDepartmentId)</MudTd>
+            <MudTd>@(context.SourceIndentNumber ?? "—")</MudTd>
+            <MudTd>@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
+            <MudTd>@context.ItemCount</MudTd>
+            <MudTd><MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Href="@($"/purchase/files/{context.Id}")" /></MudTd>
+        </RowTemplate>
+        <NoRecordsContent><EmptyState Icon="@Icons.Material.Filled.FolderOff" Title="پرونده‌ای یافت نشد" Description="فیلترهای جستجو را تغییر دهید." /></NoRecordsContent>
+        <LoadingContent><MudText>در حال دریافت پرونده‌ها...</MudText></LoadingContent>
+        <PagerContent><MudTablePager PageSizeOptions="new[] { 10, 25, 50 }" RowsPerPageString="تعداد در صفحه" InfoFormat="{first_item}-{last_item} از {all_items}" /></PagerContent>
+    </MudTable>
+</MudPaper>
+
+@code {
+    private MudTable<PurchaseFileSummaryDto>? _table;
+    private string? _fileNumber, _title, _indentNumber;
+    private PurchaseFileStatus? _status; private Guid? _department; private DateTime? _from, _to;
+
+    private async Task<TableData<PurchaseFileSummaryDto>> LoadServerData(TableState state, CancellationToken ct)
+    {
+        try
+        {
+            var result = await Api.GetPurchaseFilesAsync(new(
+                _fileNumber, _title, _status, _department, _from, _to, _indentNumber,
+                state.SortLabel ?? "CreatedAt", state.SortDirection != SortDirection.Ascending,
+                state.Page + 1, state.PageSize), ct);
+            return new() { Items = result.Items, TotalItems = (int)Math.Min(int.MaxValue, result.TotalCount) };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("دریافت پرونده‌ها ناموفق بود: " + ex.Message, Severity.Error);
+            return new() { Items = [], TotalItems = 0 };
+        }
+    }
+    private Task ApplyFilters() => _table?.ReloadServerData() ?? Task.CompletedTask;
+    private string DepartmentName(Guid id) => Access.Departments.FirstOrDefault(x => x.Id == id)?.Title ?? FakeDirectory.DepartmentName(id);
+    internal static string StatusText(PurchaseFileStatus s) => s switch { PurchaseFileStatus.Draft=>"پیش‌نویس", PurchaseFileStatus.WaitingForIndentReview=>"بررسی درخواست", PurchaseFileStatus.WaitingForPurchaseDepartment=>"در انتظار خرید", PurchaseFileStatus.InPurchaseDepartment=>"در واحد خرید", PurchaseFileStatus.WaitingForTechnicalReview=>"بررسی فنی", PurchaseFileStatus.WaitingForTenderCommission=>"در انتظار کمیسیون", PurchaseFileStatus.InTender=>"در مناقصه", PurchaseFileStatus.WaitingForContract=>"در انتظار قرارداد", PurchaseFileStatus.WaitingForPurchaseOrder=>"در انتظار سفارش", PurchaseFileStatus.WaitingForWarehouseReceipt=>"در انتظار انبار", PurchaseFileStatus.Completed=>"تکمیل‌شده", PurchaseFileStatus.Cancelled=>"لغوشده", PurchaseFileStatus.Archived=>"آرشیوشده", _=>s.ToString() };
+    internal static Color StatusColor(PurchaseFileStatus s) => s switch { PurchaseFileStatus.Completed=>Color.Success, PurchaseFileStatus.Archived=>Color.Dark, PurchaseFileStatus.Cancelled=>Color.Error, PurchaseFileStatus.Draft=>Color.Default, PurchaseFileStatus.WaitingForTechnicalReview or PurchaseFileStatus.WaitingForTenderCommission=>Color.Warning, _=>Color.Primary };
+    internal static string PriorityText(PurchaseFilePriority p) => p switch { PurchaseFilePriority.Low=>"کم", PurchaseFilePriority.Normal=>"عادی", PurchaseFilePriority.High=>"بالا", PurchaseFilePriority.Urgent=>"فوری", _=>p.ToString() };
+}

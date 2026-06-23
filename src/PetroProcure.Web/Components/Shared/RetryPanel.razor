@@ -1,0 +1,18 @@
+<MudPaper Class="pa-6 d-flex flex-column align-center justify-center gap-3" Elevation="0" Outlined="true">
+    <MudIcon Icon="@Icon" Color="Color.Warning" Size="Size.Large" />
+    <MudText Typo="Typo.h6">@Title</MudText>
+    <MudText Typo="Typo.body2" Color="Color.Secondary">@Message</MudText>
+    @if (OnRetry.HasDelegate)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh" OnClick="OnRetry">
+            تلاش مجدد
+        </MudButton>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public string Title { get; set; } = "دریافت اطلاعات ناموفق بود";
+    [Parameter] public string Message { get; set; } = "لطفاً دوباره تلاش کنید.";
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.CloudOff;
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

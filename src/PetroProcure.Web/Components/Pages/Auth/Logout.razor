@@ -1,0 +1,15 @@
+@page "/logout"
+@layout PetroProcure.Web.Components.Layout.AuthLayout
+@inject IAuthService Auth
+@inject NavigationManager Navigation
+
+<LoadingOverlay Visible="true" Text="در حال خروج از سامانه..." />
+
+@code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Auth.LogoutAsync();
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+}

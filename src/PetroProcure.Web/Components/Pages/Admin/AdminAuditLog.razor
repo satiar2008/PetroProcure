@@ -1,0 +1,45 @@
+@page "/admin/audit-log"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+
+<PageTitle>گزارش ممیزی ادمین</PageTitle>
+<PageHeader Title="گزارش ممیزی ادمین" Subtitle="آخرین تغییرات مدیریتی حساس" />
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <RetryPanel Message="@_error" OnRetry="Load" /> }
+else if (_logs.Count == 0) { <EmptyState Title="لاگ ممیزی وجود ندارد" Description="هنوز عملیات مدیریتی ثبت نشده است." /> }
+else
+{
+    <MudPaper Class="data-panel" Elevation="0">
+        <MudTable Items="_logs" Dense="true" Hover="true">
+            <HeaderContent><MudTh>زمان</MudTh><MudTh>کاربر</MudTh><MudTh>عملیات</MudTh><MudTh>موجودیت</MudTh><MudTh>شرح</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudTd>
+                <MudTd><UserDisplay UserId="@context.ActorUserId" /></MudTd>
+                <MudTd>@context.Action</MudTd>
+                <MudTd>@context.EntityType</MudTd>
+                <MudTd>@context.Summary</MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private List<AdminAuditLogDto> _logs = [];
+    private bool _loading = true;
+    private string? _error;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!AdminUiPolicy.CanManageSettings(Access.HasPermission)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load(); StateHasChanged();
+    }
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { _logs = await Api.GetAdminAuditLogsAsync(); }
+        catch { _error = "دریافت گزارش ممیزی ناموفق بود."; }
+        finally { _loading = false; }
+    }
+}

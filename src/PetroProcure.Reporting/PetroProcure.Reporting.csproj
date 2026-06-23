@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <PackageReference Include="DevExpress.AspNetCore.Reporting" Version="24.2.3" />
+    <ProjectReference Include="..\PetroProcure.Application\PetroProcure.Application.csproj" />
+    <ProjectReference Include="..\PetroProcure.Domain\PetroProcure.Domain.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);DX1000</NoWarn>
+  </PropertyGroup>
+
+</Project>

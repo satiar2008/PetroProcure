@@ -1,0 +1,36 @@
+@page "/orders/indents/create"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+<PageTitle>ایجاد تقاضای خرید</PageTitle>
+<PageHeader Title="ایجاد تقاضای خرید" Subtitle="شماره هفت‌رقمی پس از ذخیره امن در سرور تولید می‌شود" />
+<MudForm @ref="_form">
+<MudPaper Class="form-panel" Elevation="0"><MudGrid>
+<MudItem xs="12" md="8"><MudTextField @bind-Value="_title" Label="عنوان تقاضا" Required="true" RequiredError="عنوان تقاضا الزامی است." Variant="Variant.Outlined" /></MudItem>
+<MudItem xs="12" md="4"><MudSelect T="int" @bind-Value="_typeDigit" Label="رقم نوع تقاضا" Required="true" Variant="Variant.Outlined">@for(var i=0;i<=9;i++){var digit=i;<MudSelectItem Value="@digit">@digit — @TypeDigitText(digit)</MudSelectItem>}</MudSelect></MudItem>
+<MudItem xs="12"><MudAlert Severity="Severity.Info" Variant="Variant.Outlined"><strong>راهنمای رقم نوع:</strong> @IndentUiPolicy.TypeDigitHelpText. ترتیب شماره توسط سرور تعیین می‌شود.</MudAlert></MudItem>
+<MudItem xs="12" md="6"><MudSelect T="Guid" @bind-Value="_requestingDepartment" Label="واحد درخواست‌کننده" Required="true" RequiredError="واحد درخواست‌کننده الزامی است." Variant="Variant.Outlined">@foreach(var d in AvailableDepartments){<MudSelectItem Value="@d.Id">@d.Name</MudSelectItem>}</MudSelect></MudItem>
+<MudItem xs="12" md="6"><MudSelect T="Guid?" @bind-Value="_applicantDepartment" Label="واحد متقاضی (اختیاری)" Clearable="true" Variant="Variant.Outlined">@foreach(var d in FakeDirectory.Departments){<MudSelectItem T="Guid?" Value="@d.Id">@d.Name</MudSelectItem>}</MudSelect></MudItem>
+<MudItem xs="12"><MudTextField @bind-Value="_description" Label="شرح تقاضا" Lines="3" Variant="Variant.Outlined" /></MudItem>
+</MudGrid></MudPaper>
+</MudForm>
+<MudPaper Class="form-panel mt-4" Elevation="0">
+<MudText Typo="Typo.h6">اقلام تقاضا</MudText><MescItemSelector Value="_selectedMesc" ValueChanged="SelectMesc" Required="false" />
+@if(_selectedMesc is not null){<MudGrid Class="mt-2"><MudItem xs="12" md="2"><MudNumericField T="decimal" @bind-Value="_quantity" Label="مقدار درخواستی" Min="0.01m" /></MudItem><MudItem xs="12" md="4"><MudTextField @bind-Value="_technical" Label="شرح فنی" /></MudItem><MudItem xs="12" md="3"><MudDatePicker @bind-Date="_requiredDate" Label="تاریخ نیاز" /></MudItem><MudItem xs="12" md="3" Class="d-flex align-center"><MudButton FullWidth="true" Variant="Variant.Filled" Color="Color.Secondary" OnClick="AddPending">افزودن قلم</MudButton></MudItem></MudGrid>}
+@if(_pending.Count==0){<EmptyState Title="هنوز قلمی اضافه نشده است" Description="حداقل یک قلم MESC را جستجو و اضافه کنید." />}
+else{<MudTable Items="_pending" Dense="true"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>گروه عمومی</MudTh><MudTh>شرح عمومی</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>واحد</MudTh><MudTh>مقدار</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.Item.Code</MudTd><MudTd>@context.Item.GeneralGroupCode</MudTd><MudTd>@context.Item.GeneralDescription</MudTd><MudTd>@context.Item.SpecificDescription</MudTd><MudTd>@context.Item.UnitOfMeasure</MudTd><MudTd>@context.Quantity</MudTd><MudTd><MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(()=>_pending.Remove(context))" /></MudTd></RowTemplate></MudTable>}
+</MudPaper>
+<div class="form-actions"><MudButton Href="/orders/indents">انصراف</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@_saving" OnClick="Save">ثبت تقاضا</MudButton></div>
+<LoadingOverlay Visible="_saving" Text="در حال تولید شماره و ثبت تقاضا..." />
+@code{
+private sealed record PendingItem(MescItemDto Item,decimal Quantity,string? Technical,DateTime? RequiredDate);
+private MudForm?_form;private string _title="",_description="";private int _typeDigit=3;private Guid _requestingDepartment;private Guid?_applicantDepartment;private MescItemDto?_selectedMesc;private decimal _quantity=1;private string?_technical;private DateTime?_requiredDate;private bool _saving;private List<PendingItem>_pending=[];
+private IEnumerable<(Guid Id,string Name)> AvailableDepartments=>Access.Departments.Count>0?Access.Departments.Select(x=>(x.Id,x.Title)):FakeDirectory.Departments;
+protected override void OnInitialized(){if(!IndentUiPolicy.CanCreate(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}_requestingDepartment=Access.CurrentDepartment.Id!=Guid.Empty?Access.CurrentDepartment.Id:FakeDirectory.OrdersDepartmentId;}
+private Task SelectMesc(MescItemDto? item){_selectedMesc=item;return Task.CompletedTask;}
+private void AddPending(){if(_selectedMesc is null||_quantity<=0){Snackbar.Add("قلم و مقدار معتبر را انتخاب کنید.",Severity.Warning);return;}if(_pending.Any(x=>x.Item.Id==_selectedMesc.Id)){Snackbar.Add("این قلم قبلاً اضافه شده است.",Severity.Warning);return;}_pending.Add(new(_selectedMesc,_quantity,_technical,_requiredDate));_selectedMesc=null;_quantity=1;_technical=null;_requiredDate=null;}
+private async Task Save(){await _form!.Validate();if(!_form.IsValid)return;if(!IndentUiPolicy.IsCreateFormValid(_title,_requestingDepartment,_pending.Count)){Snackbar.Add("عنوان، واحد درخواست‌کننده و حداقل یک قلم الزامی است.",Severity.Warning);return;}_saving=true;try{var indent=await Api.CreateIndentAsync(new(DateTime.Now.Year%100,_typeDigit,_title,_requestingDepartment,_applicantDepartment,_description));foreach(var row in _pending)await Api.AddIndentItemAsync(indent.Id,new(row.Item.Id,FakeDirectory.UnitId(row.Item.UnitOfMeasure),row.Quantity,row.Technical,row.RequiredDate.HasValue?DateOnly.FromDateTime(row.RequiredDate.Value):null));Snackbar.Add($"تقاضا با شماره {IndentUiPolicy.FormatNumber(indent.IndentNumber)} ثبت شد.",Severity.Success);Navigation.NavigateTo($"/orders/indents/{indent.Id}");}catch(Exception ex){Snackbar.Add("ثبت تقاضا ناموفق بود: "+ex.Message,Severity.Error);}finally{_saving=false;}}
+private static string TypeDigitText(int d)=>d<=2?"خرید مستقیم":d<=4?"تقاضای دستی":"تقاضای سیستمی";
+}

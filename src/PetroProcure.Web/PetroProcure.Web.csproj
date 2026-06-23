@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="MudBlazor" Version="8.15.0" />
+    <ProjectReference Include="..\PetroProcure.Contracts\PetroProcure.Contracts.csproj" />
+    <ProjectReference Include="..\PetroProcure.ServiceDefaults\PetroProcure.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

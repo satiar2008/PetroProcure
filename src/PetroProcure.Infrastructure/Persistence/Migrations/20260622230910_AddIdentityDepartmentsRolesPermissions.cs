@@ -1,0 +1,574 @@
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
+
+#nullable disable
+
+#pragma warning disable CA1814 // Prefer jagged arrays over multidimensional
+
+namespace PetroProcure.Infrastructure.Persistence.Migrations
+{
+    /// <inheritdoc />
+    public partial class AddIdentityDepartmentsRolesPermissions : Migration
+    {
+        /// <inheritdoc />
+        protected override void Up(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.EnsureSchema(
+                name: "identity");
+
+            migrationBuilder.CreateTable(
+                name: "DepartmentMenuItems",
+                schema: "org",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    DepartmentType = table.Column<int>(type: "int", nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    Route = table.Column<string>(type: "nvarchar(300)", maxLength: 300, nullable: false),
+                    RequiredPermission = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: true),
+                    Order = table.Column<int>(type: "int", nullable: false),
+                    IsVisible = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    ModifiedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ModifiedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DepartmentMenuItems", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Permissions",
+                schema: "identity",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(150)", maxLength: 150, nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    ModifiedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ModifiedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Permissions", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Roles",
+                schema: "identity",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    NormalizedName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Roles", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Users",
+                schema: "identity",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    UserProfileId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    NormalizedEmail = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    EmailConfirmed = table.Column<bool>(type: "bit", nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SecurityStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PhoneNumberConfirmed = table.Column<bool>(type: "bit", nullable: false),
+                    TwoFactorEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    LockoutEnd = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    LockoutEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    AccessFailedCount = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Users", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Users_ApplicationUserProfiles_UserProfileId",
+                        column: x => x.UserProfileId,
+                        principalSchema: "org",
+                        principalTable: "ApplicationUserProfiles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RoleClaims",
+                schema: "identity",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    RoleId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ClaimType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ClaimValue = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RoleClaims", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RoleClaims_Roles_RoleId",
+                        column: x => x.RoleId,
+                        principalSchema: "identity",
+                        principalTable: "Roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "RolePermissions",
+                schema: "identity",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    RoleId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    PermissionId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    CreatedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    ModifiedAtUtc = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ModifiedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RolePermissions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RolePermissions_Permissions_PermissionId",
+                        column: x => x.PermissionId,
+                        principalSchema: "identity",
+                        principalTable: "Permissions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_RolePermissions_Roles_RoleId",
+                        column: x => x.RoleId,
+                        principalSchema: "identity",
+                        principalTable: "Roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserClaims",
+                schema: "identity",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    ClaimType = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ClaimValue = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserClaims", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UserClaims_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "identity",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserLogins",
+                schema: "identity",
+                columns: table => new
+                {
+                    LoginProvider = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ProviderKey = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ProviderDisplayName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserLogins", x => new { x.LoginProvider, x.ProviderKey });
+                    table.ForeignKey(
+                        name: "FK_UserLogins_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "identity",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserRoles",
+                schema: "identity",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    RoleId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserRoles", x => new { x.UserId, x.RoleId });
+                    table.ForeignKey(
+                        name: "FK_UserRoles_Roles_RoleId",
+                        column: x => x.RoleId,
+                        principalSchema: "identity",
+                        principalTable: "Roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_UserRoles_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "identity",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserTokens",
+                schema: "identity",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    LoginProvider = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Value = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserTokens", x => new { x.UserId, x.LoginProvider, x.Name });
+                    table.ForeignKey(
+                        name: "FK_UserTokens_Users_UserId",
+                        column: x => x.UserId,
+                        principalSchema: "identity",
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.InsertData(
+                schema: "org",
+                table: "ApplicationUserProfiles",
+                columns: new[] { "Id", "CreatedAtUtc", "CreatedBy", "DisplayName", "Email", "IsActive", "ModifiedAtUtc", "ModifiedBy" },
+                values: new object[] { new Guid("ea73b3d2-ada1-3014-e807-0287736b56c8"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "مدیر سامانه", "admin@petroprocure.local", true, null, null });
+
+            migrationBuilder.InsertData(
+                schema: "org",
+                table: "DepartmentMenuItems",
+                columns: new[] { "Id", "CreatedAtUtc", "CreatedBy", "DepartmentType", "IsVisible", "ModifiedAtUtc", "ModifiedBy", "Order", "RequiredPermission", "Route", "Title" },
+                values: new object[,]
+                {
+                    { new Guid("2f80ca31-8359-9994-135a-3a782c71bf4f"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, 4, true, null, null, 1, "Indent.Create", "/applicant/requests", "درخواست‌های من" },
+                    { new Guid("31bf56ae-e556-b51a-f761-6de74c50d4b5"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, 5, true, null, null, 1, "Tender.View", "/tenders", "کمیسیون مناقصه" },
+                    { new Guid("45dfbc5f-2534-97b2-2305-4eac32110b27"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, 1, true, null, null, 1, "PurchaseFile.View", "/purchase-files", "پرونده‌های خرید" },
+                    { new Guid("d8d58a49-2d1e-6882-b5a2-52756b006e96"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, 3, true, null, null, 1, "Warehouse.View", "/warehouse", "عملیات انبار" },
+                    { new Guid("e755fc22-f997-ceeb-4688-d3015885d8dd"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, 2, true, null, null, 1, "Indent.View", "/indents", "درخواست‌های خرید" }
+                });
+
+            migrationBuilder.InsertData(
+                schema: "identity",
+                table: "Permissions",
+                columns: new[] { "Id", "CreatedAtUtc", "CreatedBy", "Description", "IsActive", "ModifiedAtUtc", "ModifiedBy", "Name" },
+                values: new object[,]
+                {
+                    { new Guid("02eecd9e-94ae-ef20-8cbf-bf5922f4ccfd"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Warehouse.Issue", true, null, null, "Warehouse.Issue" },
+                    { new Guid("12ad9300-f80e-f386-070c-c93f0117b66f"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "AiAgent.EvaluatePurchaseRules", true, null, null, "AiAgent.EvaluatePurchaseRules" },
+                    { new Guid("1ab75a4b-ef24-8a2a-bc82-9ae054003d86"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Warehouse.Receive", true, null, null, "Warehouse.Receive" },
+                    { new Guid("1d35913f-cea9-6fa2-2bb6-17009ea75417"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Report.ExportPdf", true, null, null, "Report.ExportPdf" },
+                    { new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "PurchaseFile.View", true, null, null, "PurchaseFile.View" },
+                    { new Guid("3d0bccfd-85cc-bbb7-32ef-74500ed50c77"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Tender.View", true, null, null, "Tender.View" },
+                    { new Guid("439721fe-7142-ccc3-e55b-63d639a8f9a5"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Indent.Create", true, null, null, "Indent.Create" },
+                    { new Guid("4af786fa-8324-fbdd-5e66-8f6308a2874e"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Tender.Evaluate", true, null, null, "Tender.Evaluate" },
+                    { new Guid("593e28d2-5014-7026-81e0-d0b498c5cc5a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Warehouse.View", true, null, null, "Warehouse.View" },
+                    { new Guid("59d99406-fa77-512c-96c2-04ec0e579211"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Report.Print", true, null, null, "Report.Print" },
+                    { new Guid("5dd9cf0f-211b-0ead-b79b-f073a991273d"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Admin.ManageSettings", true, null, null, "Admin.ManageSettings" },
+                    { new Guid("6006903b-c5ce-7812-a96e-f7e86730e539"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Tender.ApproveWinner", true, null, null, "Tender.ApproveWinner" },
+                    { new Guid("675c962c-a44e-4aac-54ad-4c3c62f42320"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "PurchaseFile.Edit", true, null, null, "PurchaseFile.Edit" },
+                    { new Guid("6afc6b76-9a9e-e0e4-f489-4bb6ce2c761a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Report.View", true, null, null, "Report.View" },
+                    { new Guid("6eb9c528-4970-1994-66d7-bd3768b67258"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Indent.SendToPurchase", true, null, null, "Indent.SendToPurchase" },
+                    { new Guid("7424c2ca-7028-df48-f183-9a56ee943fcf"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "PurchaseFile.Archive", true, null, null, "PurchaseFile.Archive" },
+                    { new Guid("796da89d-ac5a-2966-d800-da144f76feca"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Item.Edit", true, null, null, "Item.Edit" },
+                    { new Guid("7bfd8226-7d65-2266-950c-dad7ec66bfa1"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Admin.ManageRoles", true, null, null, "Admin.ManageRoles" },
+                    { new Guid("9c752dc9-c777-9dd1-8b40-5b0f0698690b"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Tender.Create", true, null, null, "Tender.Create" },
+                    { new Guid("ac91044f-8fba-3aac-47e8-1d8c69e80072"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Admin.ManageDepartments", true, null, null, "Admin.ManageDepartments" },
+                    { new Guid("b729bfd5-2478-04ce-366c-3b9581242c9a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Item.ActivateDeactivate", true, null, null, "Item.ActivateDeactivate" },
+                    { new Guid("c96f84f9-230b-3db2-d200-56eb90580926"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "PurchaseFile.Create", true, null, null, "PurchaseFile.Create" },
+                    { new Guid("cce440c9-4fd8-147a-57f3-3c35c901317c"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Admin.ManageUsers", true, null, null, "Admin.ManageUsers" },
+                    { new Guid("cf9889f5-70fb-5778-1f13-9494b550f041"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Item.Create", true, null, null, "Item.Create" },
+                    { new Guid("cfd51e9b-aaf4-4cac-d168-b68dbf5b06a1"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Indent.Approve", true, null, null, "Indent.Approve" },
+                    { new Guid("db4f9706-7664-8a19-30db-04693d571e1d"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "PurchaseFile.SendToDepartment", true, null, null, "PurchaseFile.SendToDepartment" },
+                    { new Guid("e87e46f6-e214-cddf-93cf-ec8ca9ecbedf"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Indent.View", true, null, null, "Indent.View" },
+                    { new Guid("ec405465-b1d3-7b08-2885-5eb3e545aae4"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "PurchaseFile.Close", true, null, null, "PurchaseFile.Close" },
+                    { new Guid("f1dd1f5a-1a54-0922-6b34-bb8a88f4a5b3"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "AiAgent.Use", true, null, null, "AiAgent.Use" },
+                    { new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, "Item.View", true, null, null, "Item.View" }
+                });
+
+            migrationBuilder.InsertData(
+                schema: "identity",
+                table: "Roles",
+                columns: new[] { "Id", "ConcurrencyStamp", "Name", "NormalizedName" },
+                values: new object[,]
+                {
+                    { new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f"), "7b3d912a-5331-cda0-cf79-e778655755e0", "WarehouseUser", "WAREHOUSEUSER" },
+                    { new Guid("304d970e-93fc-82d5-ea7e-68bd7be5d96f"), "d3d4afe0-543d-30a2-b539-56e29f143e16", "OrdersUser", "ORDERSUSER" },
+                    { new Guid("317af55d-dd61-bbd7-6290-1ff6508f3f8a"), "e909aae3-45be-48e6-f394-9731ac4bae99", "OrdersManager", "ORDERSMANAGER" },
+                    { new Guid("75694b9e-798f-b74a-f2b7-65adca46674f"), "a62f2dd1-9536-64dd-996c-a7c7b74abea0", "AiAgentUser", "AIAGENTUSER" },
+                    { new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea"), "11b2221a-5862-fa90-3dfa-91a5c45d4fb5", "SystemAdmin", "SYSTEMADMIN" },
+                    { new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c"), "055fbfef-a4e0-9318-fe6c-fdf55420b055", "WarehouseManager", "WAREHOUSEMANAGER" },
+                    { new Guid("84dfd3fc-e85b-d990-896c-f99f7933d3e4"), "4f9d2104-117a-56cd-eb81-5eb1c2457b5d", "ReportViewer", "REPORTVIEWER" },
+                    { new Guid("92db8232-7861-b5b6-fba1-d5a94cfac12e"), "04e96555-9a4b-42ff-9ef0-fbb52ac43225", "TenderCommissionMember", "TENDERCOMMISSIONMEMBER" },
+                    { new Guid("963ff902-7536-ff69-e0a0-cc853740b340"), "ca28d655-4427-c006-a3f8-ff8b1256c99a", "PurchaseExpert", "PURCHASEEXPERT" },
+                    { new Guid("a60291f2-2475-430d-a9eb-c6b0b2222f5a"), "aba91818-c32a-d4ee-1015-8f4a153ecf89", "TenderCommissionManager", "TENDERCOMMISSIONMANAGER" },
+                    { new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625"), "c92b6d1a-cac5-be79-1a0b-58b0cb3ce047", "PurchaseManager", "PURCHASEMANAGER" },
+                    { new Guid("feb60493-d451-b8d4-d9b4-751e8ea5efd0"), "0250f789-1985-58fa-bd0a-6b689591cbc0", "ApplicantUser", "APPLICANTUSER" }
+                });
+
+            migrationBuilder.InsertData(
+                schema: "identity",
+                table: "RolePermissions",
+                columns: new[] { "Id", "CreatedAtUtc", "CreatedBy", "ModifiedAtUtc", "ModifiedBy", "PermissionId", "RoleId" },
+                values: new object[,]
+                {
+                    { new Guid("07d91f9b-12ea-28d1-5aec-0a69c20ef8d9"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6eb9c528-4970-1994-66d7-bd3768b67258"), new Guid("317af55d-dd61-bbd7-6290-1ff6508f3f8a") },
+                    { new Guid("0b705857-c495-5a60-dd05-dc16c979ebaa"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("304d970e-93fc-82d5-ea7e-68bd7be5d96f") },
+                    { new Guid("0c5951b5-b283-e84e-b925-54f035eb8670"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6afc6b76-9a9e-e0e4-f489-4bb6ce2c761a"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("10d1298c-8778-87d1-6446-46d8a86912c7"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("12cd0f68-0518-6473-7d51-8a7ee520a358"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("cf9889f5-70fb-5778-1f13-9494b550f041"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("149930a7-9d52-f270-70d5-f024bdb318f7"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c") },
+                    { new Guid("16dadbe0-a522-1c67-e59e-0191db90c1f5"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("59d99406-fa77-512c-96c2-04ec0e579211"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("19691ace-25ca-e584-e543-c5f0e2220dd0"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("9c752dc9-c777-9dd1-8b40-5b0f0698690b"), new Guid("a60291f2-2475-430d-a9eb-c6b0b2222f5a") },
+                    { new Guid("1d07be2f-7534-fb53-6c00-ffdbae1b707c"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1d35913f-cea9-6fa2-2bb6-17009ea75417"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("1f9aac53-b28e-0081-955f-435f70ead604"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("5dd9cf0f-211b-0ead-b79b-f073a991273d"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("26d56920-2568-4631-db61-6d86f8173f70"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("c96f84f9-230b-3db2-d200-56eb90580926"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("274a7740-ca5a-a289-1748-83c0c4d26291"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("c96f84f9-230b-3db2-d200-56eb90580926"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("2c668c1d-cc88-5bb4-0066-5d2bccb396f1"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("7bfd8226-7d65-2266-950c-dad7ec66bfa1"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("2f85d552-e0e0-d47d-36c5-3300bdbc9ae5"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("439721fe-7142-ccc3-e55b-63d639a8f9a5"), new Guid("304d970e-93fc-82d5-ea7e-68bd7be5d96f") },
+                    { new Guid("323c0e0d-3b1c-affc-af2d-d33c37e354a4"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("db4f9706-7664-8a19-30db-04693d571e1d"), new Guid("963ff902-7536-ff69-e0a0-cc853740b340") },
+                    { new Guid("36b89b35-f4de-9016-8483-d23d412f0293"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("3d0bccfd-85cc-bbb7-32ef-74500ed50c77"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("3a3ccc2b-2d67-5345-ab7b-6652bad3fa16"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("3d333ee0-bc6a-909e-a09b-0a178cc21fc1"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("ac91044f-8fba-3aac-47e8-1d8c69e80072"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("3d5b2d6a-ded3-4d5a-1926-e9d8016928d1"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("4af786fa-8324-fbdd-5e66-8f6308a2874e"), new Guid("a60291f2-2475-430d-a9eb-c6b0b2222f5a") },
+                    { new Guid("4632e241-0cff-b20c-42c6-3b9a24ade606"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6eb9c528-4970-1994-66d7-bd3768b67258"), new Guid("304d970e-93fc-82d5-ea7e-68bd7be5d96f") },
+                    { new Guid("474dbe3d-a76e-abcb-0adf-158bcf51c1b4"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("12ad9300-f80e-f386-070c-c93f0117b66f"), new Guid("75694b9e-798f-b74a-f2b7-65adca46674f") },
+                    { new Guid("4df8011f-13fa-a5b9-ec44-0b9aec67249f"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("9c752dc9-c777-9dd1-8b40-5b0f0698690b"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("521fe02f-4cab-ff19-76ce-ce73aff922d2"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("3d0bccfd-85cc-bbb7-32ef-74500ed50c77"), new Guid("a60291f2-2475-430d-a9eb-c6b0b2222f5a") },
+                    { new Guid("555973ed-906d-1add-1f9f-a4d55bd4a198"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("59d99406-fa77-512c-96c2-04ec0e579211"), new Guid("84dfd3fc-e85b-d990-896c-f99f7933d3e4") },
+                    { new Guid("5bf2d89e-d4d9-3ed4-bfeb-1b2931b81d20"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("02eecd9e-94ae-ef20-8cbf-bf5922f4ccfd"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("5c88768a-a3e4-4712-9916-a04c89921b35"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new Guid("75694b9e-798f-b74a-f2b7-65adca46674f") },
+                    { new Guid("64e86873-6e58-d639-bf54-350b962a6da7"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f") },
+                    { new Guid("695bd8d0-70a3-a3cb-218d-a6d85ba75e8c"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("706d703a-107c-49a6-335c-59d30e68d94d"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("7424c2ca-7028-df48-f183-9a56ee943fcf"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("7116ac0b-5022-16f0-5e37-b8c1857ab200"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("ec405465-b1d3-7b08-2885-5eb3e545aae4"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("71beaa7e-c944-6538-95ab-9f805a636860"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("db4f9706-7664-8a19-30db-04693d571e1d"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("729996c5-50a1-2beb-cca7-4720eec7b160"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("e87e46f6-e214-cddf-93cf-ec8ca9ecbedf"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("737ab60c-dd81-c710-9bfc-0f55112a0d9b"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new Guid("feb60493-d451-b8d4-d9b4-751e8ea5efd0") },
+                    { new Guid("73b01072-e8c1-3405-fffb-7985aa276948"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1d35913f-cea9-6fa2-2bb6-17009ea75417"), new Guid("84dfd3fc-e85b-d990-896c-f99f7933d3e4") },
+                    { new Guid("7413c782-62a1-f66a-6ee8-f9533531d07e"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("e87e46f6-e214-cddf-93cf-ec8ca9ecbedf"), new Guid("304d970e-93fc-82d5-ea7e-68bd7be5d96f") },
+                    { new Guid("74654f7b-ef97-edc0-0a58-74914ea16548"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("4af786fa-8324-fbdd-5e66-8f6308a2874e"), new Guid("92db8232-7861-b5b6-fba1-d5a94cfac12e") },
+                    { new Guid("77d5d332-ec13-75af-7268-2973926911dd"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("b729bfd5-2478-04ce-366c-3b9581242c9a"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("77dc8388-0534-7090-6c0e-499b56313959"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new Guid("963ff902-7536-ff69-e0a0-cc853740b340") },
+                    { new Guid("7c0f93b8-3398-f384-4878-031ec26da04a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1ab75a4b-ef24-8a2a-bc82-9ae054003d86"), new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f") },
+                    { new Guid("7d4949ce-15dc-ba0a-3d83-60143b0af675"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("963ff902-7536-ff69-e0a0-cc853740b340") },
+                    { new Guid("7ecc5277-98d3-60bb-b7c6-17eccd98153b"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("593e28d2-5014-7026-81e0-d0b498c5cc5a"), new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f") },
+                    { new Guid("84f44318-20ec-dff5-26d0-896617fdbbf8"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("439721fe-7142-ccc3-e55b-63d639a8f9a5"), new Guid("feb60493-d451-b8d4-d9b4-751e8ea5efd0") },
+                    { new Guid("87b2fa08-1315-e18f-bc77-930f9b459894"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("3d0bccfd-85cc-bbb7-32ef-74500ed50c77"), new Guid("92db8232-7861-b5b6-fba1-d5a94cfac12e") },
+                    { new Guid("89fd74d7-3de5-1523-0597-b119b9091ddf"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("439721fe-7142-ccc3-e55b-63d639a8f9a5"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("8ae8cef7-3601-4d7d-a3af-b0e0ddfaad83"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1ab75a4b-ef24-8a2a-bc82-9ae054003d86"), new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c") },
+                    { new Guid("8d0ff239-e0aa-47b1-9034-8d8d68169b23"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("cce440c9-4fd8-147a-57f3-3c35c901317c"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("8efe51e8-2a5c-22c5-5883-89f7c9a7132b"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("ec405465-b1d3-7b08-2885-5eb3e545aae4"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("94db112f-921e-5eb7-b597-6c083d81c7e9"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("cfd51e9b-aaf4-4cac-d168-b68dbf5b06a1"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("9695f95b-b2b2-ba51-e37b-b114183ac406"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("db4f9706-7664-8a19-30db-04693d571e1d"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("9907e6d0-dfdd-f9a5-bad1-59ef64884d70"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("317af55d-dd61-bbd7-6290-1ff6508f3f8a") },
+                    { new Guid("9ba35d4b-6a49-1b71-d43c-68bb376a7429"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("675c962c-a44e-4aac-54ad-4c3c62f42320"), new Guid("963ff902-7536-ff69-e0a0-cc853740b340") },
+                    { new Guid("a53fe41d-624e-8ef3-d81c-f4f051238894"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("e87e46f6-e214-cddf-93cf-ec8ca9ecbedf"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("aa991b55-b815-ceaa-7432-b43eb5c89141"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("e87e46f6-e214-cddf-93cf-ec8ca9ecbedf"), new Guid("317af55d-dd61-bbd7-6290-1ff6508f3f8a") },
+                    { new Guid("ad1fc51a-6d69-e6b5-e4a4-61702635f892"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1d35913f-cea9-6fa2-2bb6-17009ea75417"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("ad35c8cf-f283-8045-cba9-a1cf94864bdb"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("593e28d2-5014-7026-81e0-d0b498c5cc5a"), new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c") },
+                    { new Guid("aebafa1b-2765-6f6b-9b97-59155a3e10b3"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("796da89d-ac5a-2966-d800-da144f76feca"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("b06bc847-234d-3938-216d-d5c2e64fc97a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6006903b-c5ce-7812-a96e-f7e86730e539"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("b27d4110-e0cd-3e83-be7f-e369b88bd082"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new Guid("92db8232-7861-b5b6-fba1-d5a94cfac12e") },
+                    { new Guid("b4f8a423-b579-d055-156d-bcf6113bb4e1"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("cfd51e9b-aaf4-4cac-d168-b68dbf5b06a1"), new Guid("317af55d-dd61-bbd7-6290-1ff6508f3f8a") },
+                    { new Guid("b5b9cda3-cf57-a0d6-2d37-265d182bdb08"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("675c962c-a44e-4aac-54ad-4c3c62f42320"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("b6bab265-249d-7952-876d-a66bcdeb4af6"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f1dd1f5a-1a54-0922-6b34-bb8a88f4a5b3"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("bb55f11f-9589-8278-fd8e-3d87bf88a76a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f1dd1f5a-1a54-0922-6b34-bb8a88f4a5b3"), new Guid("75694b9e-798f-b74a-f2b7-65adca46674f") },
+                    { new Guid("bb5a97bf-da2c-b300-ae74-60e4a8a9377a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("f38e8043-d0dc-2620-c7a9-2ce286929560"), new Guid("feb60493-d451-b8d4-d9b4-751e8ea5efd0") },
+                    { new Guid("bdaffd94-7383-32ef-a779-a03abfdbc98f"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("675c962c-a44e-4aac-54ad-4c3c62f42320"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("c3b06465-6522-e459-9d9e-e176eb7127ce"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("e87e46f6-e214-cddf-93cf-ec8ca9ecbedf"), new Guid("feb60493-d451-b8d4-d9b4-751e8ea5efd0") },
+                    { new Guid("c3e15d1f-1a10-1526-bd01-4e9915e6d2b9"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("4af786fa-8324-fbdd-5e66-8f6308a2874e"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("c6e4f088-3989-749e-75a7-e0bb310aa5d3"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("c96f84f9-230b-3db2-d200-56eb90580926"), new Guid("963ff902-7536-ff69-e0a0-cc853740b340") },
+                    { new Guid("c8ef7ae7-3bde-cded-0b4f-fb1849ac5b63"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new Guid("a60291f2-2475-430d-a9eb-c6b0b2222f5a") },
+                    { new Guid("ccdb4e52-960f-c90e-d3cf-7b381ee1f5a4"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("12ad9300-f80e-f386-070c-c93f0117b66f"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("d2aeccac-59ca-9ba2-d182-21649b67f14a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("59d99406-fa77-512c-96c2-04ec0e579211"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("d40b52b5-dbdb-fb70-0e54-11c1fafb7b33"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("7424c2ca-7028-df48-f183-9a56ee943fcf"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("e44465ba-85a1-c759-1de4-36f6116685db"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1edcbcf3-5ff0-1b70-4cb2-ce687a9b6b5b"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("eafc0b0a-128a-bb9e-36ee-503b86dc89ec"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("439721fe-7142-ccc3-e55b-63d639a8f9a5"), new Guid("317af55d-dd61-bbd7-6290-1ff6508f3f8a") },
+                    { new Guid("ee75ae35-ed54-e7d7-b9e4-149b8483cbc0"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6afc6b76-9a9e-e0e4-f489-4bb6ce2c761a"), new Guid("84dfd3fc-e85b-d990-896c-f99f7933d3e4") },
+                    { new Guid("f091826c-8bd6-0371-b40e-3ba110fa234d"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("1ab75a4b-ef24-8a2a-bc82-9ae054003d86"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("f1140413-86a6-93c4-8af2-a6d3999683ff"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6eb9c528-4970-1994-66d7-bd3768b67258"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("f18cfcb3-6ad7-2ce1-b934-d2311c4bafea"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6afc6b76-9a9e-e0e4-f489-4bb6ce2c761a"), new Guid("ae1bb199-f970-51c7-ef1b-26eeff76e625") },
+                    { new Guid("f233f3b7-3cf4-7959-e53c-aa8f519b42d5"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("02eecd9e-94ae-ef20-8cbf-bf5922f4ccfd"), new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c") },
+                    { new Guid("f9eab832-377a-30b2-c357-fb582df0fc6e"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("3d0bccfd-85cc-bbb7-32ef-74500ed50c77"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") },
+                    { new Guid("fa2d2cd3-07bb-ea8f-f181-f9e3951d5b6a"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("e87e46f6-e214-cddf-93cf-ec8ca9ecbedf"), new Guid("963ff902-7536-ff69-e0a0-cc853740b340") },
+                    { new Guid("fa6f00df-3c78-7d8c-5d25-2196792583f5"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("6006903b-c5ce-7812-a96e-f7e86730e539"), new Guid("a60291f2-2475-430d-a9eb-c6b0b2222f5a") },
+                    { new Guid("fcbcb157-0827-5fcf-970a-364ac4eb502b"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), null, null, null, new Guid("593e28d2-5014-7026-81e0-d0b498c5cc5a"), new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea") }
+                });
+
+            migrationBuilder.InsertData(
+                schema: "identity",
+                table: "Users",
+                columns: new[] { "Id", "AccessFailedCount", "ConcurrencyStamp", "Email", "EmailConfirmed", "LockoutEnabled", "LockoutEnd", "NormalizedEmail", "NormalizedUserName", "PasswordHash", "PhoneNumber", "PhoneNumberConfirmed", "SecurityStamp", "TwoFactorEnabled", "UserName", "UserProfileId" },
+                values: new object[] { new Guid("946e2251-f534-9be8-7aa7-e7cc5a303ab7"), 0, "c969acbf-e590-2c52-ffd2-51a1ac68ca21", "admin@petroprocure.local", true, false, null, "ADMIN@PETROPROCURE.LOCAL", "ADMIN", "AQAAAAIAAYagAAAAEI8eafd4qIeAe6gsTyBHPs5F7Ja7t0D/hFgb1Mja6iQgM0KkLXToH/Gtk2XHTwfmVQ==", null, false, "8b21e6ae-25bc-c551-a430-fd8cb7180125", false, "admin", new Guid("ea73b3d2-ada1-3014-e807-0287736b56c8") });
+
+            migrationBuilder.InsertData(
+                schema: "identity",
+                table: "UserRoles",
+                columns: new[] { "RoleId", "UserId" },
+                values: new object[] { new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea"), new Guid("946e2251-f534-9be8-7aa7-e7cc5a303ab7") });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DepartmentMenuItems_DepartmentType",
+                schema: "org",
+                table: "DepartmentMenuItems",
+                column: "DepartmentType");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DepartmentMenuItems_RequiredPermission",
+                schema: "org",
+                table: "DepartmentMenuItems",
+                column: "RequiredPermission");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Permissions_Name",
+                schema: "identity",
+                table: "Permissions",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RoleClaims_RoleId",
+                schema: "identity",
+                table: "RoleClaims",
+                column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RolePermissions_PermissionId",
+                schema: "identity",
+                table: "RolePermissions",
+                column: "PermissionId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RolePermissions_RoleId_PermissionId",
+                schema: "identity",
+                table: "RolePermissions",
+                columns: new[] { "RoleId", "PermissionId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "RoleNameIndex",
+                schema: "identity",
+                table: "Roles",
+                column: "NormalizedName",
+                unique: true,
+                filter: "[NormalizedName] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserClaims_UserId",
+                schema: "identity",
+                table: "UserClaims",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserLogins_UserId",
+                schema: "identity",
+                table: "UserLogins",
+                column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserRoles_RoleId",
+                schema: "identity",
+                table: "UserRoles",
+                column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "EmailIndex",
+                schema: "identity",
+                table: "Users",
+                column: "NormalizedEmail");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Users_UserProfileId",
+                schema: "identity",
+                table: "Users",
+                column: "UserProfileId",
+                unique: true,
+                filter: "[UserProfileId] IS NOT NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "UserNameIndex",
+                schema: "identity",
+                table: "Users",
+                column: "NormalizedUserName",
+                unique: true,
+                filter: "[NormalizedUserName] IS NOT NULL");
+        }
+
+        /// <inheritdoc />
+        protected override void Down(MigrationBuilder migrationBuilder)
+        {
+            migrationBuilder.DropTable(
+                name: "DepartmentMenuItems",
+                schema: "org");
+
+            migrationBuilder.DropTable(
+                name: "RoleClaims",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "RolePermissions",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "UserClaims",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "UserLogins",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "UserRoles",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "UserTokens",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "Permissions",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "Roles",
+                schema: "identity");
+
+            migrationBuilder.DropTable(
+                name: "Users",
+                schema: "identity");
+
+            migrationBuilder.DeleteData(
+                schema: "org",
+                table: "ApplicationUserProfiles",
+                keyColumn: "Id",
+                keyValue: new Guid("ea73b3d2-ada1-3014-e807-0287736b56c8"));
+        }
+    }
+}

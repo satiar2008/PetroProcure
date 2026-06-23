@@ -1,0 +1,87 @@
+@page "/profile"
+@rendermode InteractiveServer
+@inject IAuthService Auth
+@inject ISnackbar Snackbar
+
+<PageTitle>پروفایل کاربری</PageTitle>
+<PageHeader Title="پروفایل کاربری" Subtitle="مدیریت رمز عبور و نشست‌های فعال" />
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <SectionCard Title="اطلاعات کاربر">
+            <SummaryItem Label="نام کاربری" Value="@(Auth.CurrentUser?.UserName ?? "-")" />
+            <SummaryItem Label="نام نمایشی" Value="@(Auth.CurrentUser?.DisplayName ?? "-")" />
+            <SummaryItem Label="ایمیل" Value="@(Auth.CurrentUser?.Email ?? "-")" />
+            <SummaryItem Label="نقش‌ها" Value="@string.Join("، ", Auth.CurrentUser?.Roles ?? [])" />
+        </SectionCard>
+    </MudItem>
+    <MudItem xs="12" md="6">
+        <SectionCard Title="تغییر رمز عبور">
+            <MudTextField @bind-Value="_currentPassword" Label="رمز فعلی" InputType="InputType.Password" />
+            <MudTextField @bind-Value="_newPassword" Label="رمز جدید" InputType="InputType.Password" Class="mt-3" />
+            <MudButton Class="mt-4" Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="ChangePassword">
+                تغییر رمز
+            </MudButton>
+        </SectionCard>
+    </MudItem>
+    <MudItem xs="12">
+        <SectionCard Title="نشست‌های کاربری" Subtitle="مدیریت نشست‌ها و refresh tokenهای فعال">
+            @if (_loadingSessions) { <MudProgressLinear Indeterminate="true" /> }
+            else if (_sessions.Count == 0) { <EmptyState Title="نشستی یافت نشد" Description="نشست فعالی برای نمایش وجود ندارد." /> }
+            else
+            {
+                <MudTable Items="_sessions" Dense="true">
+                    <HeaderContent><MudTh>ایجاد</MudTh><MudTh>انقضا</MudTh><MudTh>وضعیت</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudTd>
+                        <MudTd>@context.ExpiresAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudTd>
+                        <MudTd><StatusChip Text="@(context.IsActive ? "فعال" : "لغوشده/منقضی")" Color="@(context.IsActive ? Color.Success : Color.Default)" /></MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            <MudButton Class="mt-4" Variant="Variant.Outlined" Color="Color.Error" OnClick="RevokeCurrent">
+                لغو نشست فعلی و خروج
+            </MudButton>
+        </SectionCard>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private string? _currentPassword, _newPassword;
+    private bool _busy, _loadingSessions = true;
+    private List<UserSessionDto> _sessions = [];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await LoadSessions();
+        StateHasChanged();
+    }
+
+    private async Task LoadSessions()
+    {
+        _loadingSessions = true;
+        try { _sessions = await Auth.GetSessionsAsync(); }
+        catch { _sessions = []; }
+        finally { _loadingSessions = false; }
+    }
+
+    private async Task ChangePassword()
+    {
+        if (string.IsNullOrWhiteSpace(_currentPassword) || string.IsNullOrWhiteSpace(_newPassword))
+        {
+            Snackbar.Add("رمز فعلی و رمز جدید الزامی است.", Severity.Warning);
+            return;
+        }
+        _busy = true;
+        var result = await Auth.ChangePasswordAsync(_currentPassword, _newPassword);
+        _busy = false;
+        Snackbar.Add(result.Succeeded ? "رمز عبور تغییر کرد." : result.Error ?? "تغییر رمز ناموفق بود.",
+            result.Succeeded ? Severity.Success : Severity.Error);
+    }
+
+    private async Task RevokeCurrent()
+    {
+        await Auth.LogoutAsync();
+    }
+}

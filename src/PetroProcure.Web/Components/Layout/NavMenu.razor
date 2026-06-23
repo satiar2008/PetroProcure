@@ -1,0 +1,35 @@
+@inject IUserAccessContext Access
+
+<div class="drawer-header">
+    <MudText Typo="Typo.overline">پنل فعال</MudText>
+    <DepartmentBadge Title="@Access.CurrentDepartment.Title" Icon="@Access.CurrentDepartment.Icon" />
+</div>
+
+<MudNavMenu Class="nav-menu">
+    <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home">نمای کلی</MudNavLink>
+    <MudText Typo="Typo.caption" Class="nav-section-title">عملیات واحد</MudText>
+    @foreach (var item in VisibleDepartmentItems)
+    {
+        <MudNavLink Href="@item.Route" Match="NavLinkMatch.Prefix" Icon="@item.Icon">@item.Title</MudNavLink>
+    }
+    <MudText Typo="Typo.caption" Class="nav-section-title">ابزارهای مشترک</MudText>
+    @foreach (var item in SharedItems)
+    {
+        <MudNavLink Href="@item.Route" Match="NavLinkMatch.Prefix" Icon="@item.Icon">@item.Title</MudNavLink>
+    }
+</MudNavMenu>
+
+<div class="drawer-footer">
+    <MudPaper Outlined="true" Class="support-card">
+        <MudIcon Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Primary" />
+        <div><strong>راهنمای سامانه</strong><small>نسخه آزمایشی ۰.۱</small></div>
+    </MudPaper>
+</div>
+
+@code {
+    private IEnumerable<NavigationAccess> VisibleDepartmentItems =>
+        NavigationAccessPolicy.VisibleForDepartment(
+            Access.NavigationItems, Access.CurrentDepartment.Key, Access.HasPermission);
+    private IEnumerable<NavigationAccess> SharedItems =>
+        NavigationAccessPolicy.VisibleShared(Access.NavigationItems, Access.HasPermission);
+}

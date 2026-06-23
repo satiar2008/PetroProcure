@@ -1,0 +1,19 @@
+<MudDialog>
+<DialogContent><MudForm @ref="_form">
+    <MudTextField @bind-Value="_code" Label="کد گروه عمومی" Required="true"
+                  Validation="@((Func<string,string?>)ValidateCode)" Variant="Variant.Outlined" Disabled="@IsEdit" />
+    <MudTextField @bind-Value="_description" Label="شرح عمومی کالا" Required="true"
+                  RequiredError="شرح عمومی کالا الزامی است" Variant="Variant.Outlined" Class="mt-3" />
+</MudForm></DialogContent>
+<DialogActions><MudButton OnClick="Cancel">انصراف</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">ذخیره</MudButton></DialogActions>
+</MudDialog>
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; }=default!;
+    [Parameter] public MescGeneralGroupDto? Model { get; set; }
+    private MudForm? _form; private string _code=""; private string _description="";
+    private bool IsEdit=>Model is not null;
+    protected override void OnInitialized(){if(Model is not null){_code=Model.Code;_description=Model.GeneralDescription;}}
+    private static string? ValidateCode(string value)=>value?.Length==6&&value.All(char.IsDigit)?null:"کد گروه عمومی باید دقیقاً ۶ رقم باشد.";
+    private async Task Save(){await _form!.Validate();if(!_form.IsValid)return;Dialog.Close(DialogResult.Ok((_code,_description)));}
+    private void Cancel()=>Dialog.Cancel();
+}

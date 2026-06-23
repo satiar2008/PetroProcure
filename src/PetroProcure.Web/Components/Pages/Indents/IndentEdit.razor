@@ -1,0 +1,21 @@
+@page "/orders/indents/{Id:guid}/edit"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+<PageTitle>ویرایش تقاضای خرید</PageTitle>
+<PageHeader Title="ویرایش تقاضای خرید" Subtitle="مدیریت اقلام پیش‌نویس" />
+@if(_loading){<LoadingOverlay Visible="true" />}
+else if(_indent is null){<EmptyState Title="تقاضا یافت نشد" Description="اطلاعات تقاضا قابل دریافت نیست." />}
+else if(!IndentUiPolicy.CanEdit(_indent.Status,Access.HasPermission)){<EmptyState Title="این تقاضا قابل ویرایش نیست" Description="تنها تقاضای پیش‌نویس با مجوز ایجاد قابل ویرایش است."><Action><MudButton Href="@($"/orders/indents/{Id}")">بازگشت به جزئیات</MudButton></Action></EmptyState>}
+else{
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined">Backend فعلی ویرایش عنوان و شرح سربرگ را ارائه نمی‌کند؛ مدیریت اقلام پیش‌نویس در دسترس است.</MudAlert>
+<MudPaper Class="form-panel mt-4" Elevation="0"><MescItemSelector Value="_selected" ValueChanged="Select" /><MudGrid Class="mt-2"><MudItem xs="12" md="3"><MudNumericField T="decimal" @bind-Value="_quantity" Label="مقدار" Min="0.01m" /></MudItem><MudItem xs="12" md="5"><MudTextField @bind-Value="_technical" Label="شرح فنی" /></MudItem><MudItem xs="12" md="2"><MudDatePicker @bind-Date="_required" Label="تاریخ نیاز" /></MudItem><MudItem xs="12" md="2"><MudButton FullWidth="true" Variant="Variant.Filled" Color="Color.Primary" OnClick="Add">افزودن</MudButton></MudItem></MudGrid></MudPaper>
+<MudTable Items="_indent.Items" Dense="true" Class="mt-4"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح عمومی</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>مقدار</MudTh><MudTh></MudTh></HeaderContent><RowTemplate><MudTd>@context.MescCode</MudTd><MudTd>@context.GeneralDescription</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.RequestedQuantity</MudTd><MudTd><MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="@(()=>Remove(context.Id))" /></MudTd></RowTemplate></MudTable>}
+@code{
+[Parameter]public Guid Id{get;set;}private IndentDto?_indent;private bool _loading=true;private MescItemDto?_selected;private decimal _quantity=1;private string?_technical;private DateTime?_required;
+protected override async Task OnParametersSetAsync(){_loading=true;try{_indent=await Api.GetIndentAsync(Id);}finally{_loading=false;}}
+private Task Select(MescItemDto? item){_selected=item;return Task.CompletedTask;}
+private async Task Add(){if(_selected is null)return;await Api.AddIndentItemAsync(Id,new(_selected.Id,FakeDirectory.UnitId(_selected.UnitOfMeasure),_quantity,_technical,_required.HasValue?DateOnly.FromDateTime(_required.Value):null));_indent=await Api.GetIndentAsync(Id);_selected=null;}
+private async Task Remove(Guid itemId){await Api.RemoveIndentItemAsync(Id,itemId);_indent=await Api.GetIndentAsync(Id);}
+}

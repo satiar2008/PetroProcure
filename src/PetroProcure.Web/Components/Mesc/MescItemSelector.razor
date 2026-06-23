@@ -1,0 +1,31 @@
+@inject IPetroProcureApiClient Api
+<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+    <MudTextField @bind-Value="_term" Label="جستجوی کد یا شرح کالا" Immediate="true" Disabled="@Disabled"
+                  Variant="Variant.Outlined" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                  OnKeyUp="Search" Required="@Required" RequiredError="انتخاب قلم کالا الزامی است" />
+    @if (_loading) { <MudProgressLinear Indeterminate="true" /> }
+    @foreach (var item in _results)
+    {
+        <MudList T="MescItemDto" Dense="true">
+            <MudListItem OnClick="@(()=>Select(item))">
+                <MudText><MescCodeDisplay Code="@item.Code" /> @item.SpecificDescription</MudText>
+                <MudText Typo="Typo.caption">@item.GeneralGroupCode — @item.GeneralDescription</MudText>
+            </MudListItem>
+        </MudList>
+    }
+    @if (Value is not null)
+    {
+        <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="mt-2">
+            قلم انتخاب‌شده: <strong>@MescUiPolicy.GetItemDisplayText(Value)</strong>
+        </MudAlert>
+    }
+</MudPaper>
+@code {
+    [Parameter] public MescItemDto? Value { get; set; }
+    [Parameter] public EventCallback<MescItemDto?> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    private string _term = ""; private bool _loading; private List<MescItemDto> _results = [];
+    private async Task Search(KeyboardEventArgs _){if(_term.Trim().Length<2){_results=[];return;}_loading=true;try{_results=await Api.SearchMescItemsAsync(_term);}finally{_loading=false;}}
+    private async Task Select(MescItemDto item){Value=item;_results=[];await ValueChanged.InvokeAsync(item);}
+}

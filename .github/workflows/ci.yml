@@ -1,0 +1,32 @@
+name: build-and-test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Configure DevExpress feed
+        if: ${{ secrets.DEVEXPRESS_NUGET_URL != '' }}
+        run: dotnet nuget add source "${{ secrets.DEVEXPRESS_NUGET_URL }}" --name DevExpress
+      - name: Restore
+        run: dotnet restore PetroProcure.sln
+      - name: Build
+        run: dotnet build PetroProcure.sln --configuration Release --no-restore
+      - name: Test
+        run: dotnet test PetroProcure.sln --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'

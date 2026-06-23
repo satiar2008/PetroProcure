@@ -1,0 +1,26 @@
+@page "/purchase"
+@page "/orders"
+@page "/warehouse"
+@page "/applicant"
+@page "/tender-commission"
+@page "/reports"
+@page "/ai"
+@inject NavigationManager Navigation
+<PageTitle>@Title</PageTitle>
+<PageHeader Title="@Title" Subtitle="@Subtitle">
+    <Actions><DepartmentBadge Title="@Title" Icon="@Icon" /></Actions>
+</PageHeader>
+<DashboardOverview Department="@Title" />
+@code {
+    private string Path => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+    private string Title => Path switch {
+        "purchase" => "داشبورد واحد خرید", "orders" => "سفارشات و کنترل موجودی", "warehouse" => "داشبورد انبار",
+        "applicant" => "داشبورد متقاضی", "tender-commission" => "کمیسیون مناقصه", "admin" => "مدیریت سامانه",
+        "reports" => "گزارش‌های مدیریتی", "ai" => "دستیار هوشمند پتروپروکیور", _ => "داشبورد" };
+    private string Subtitle => "نمای کلی شاخص‌ها، وظایف و فعالیت‌های جاری";
+    private string Icon => Path switch {
+        "purchase" => Icons.Material.Filled.ShoppingCart, "orders" => Icons.Material.Filled.Inventory2,
+        "warehouse" => Icons.Material.Filled.Warehouse, "applicant" => Icons.Material.Filled.PersonPin,
+        "tender-commission" => Icons.Material.Filled.Gavel, "admin" => Icons.Material.Filled.AdminPanelSettings,
+        "reports" => Icons.Material.Filled.Assessment, "ai" => Icons.Material.Filled.AutoAwesome, _ => Icons.Material.Filled.Dashboard };
+}

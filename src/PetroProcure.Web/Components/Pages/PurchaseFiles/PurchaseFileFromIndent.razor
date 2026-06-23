@@ -1,0 +1,24 @@
+@page "/purchase/files/from-indent/{IndentId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@if(_loading){<LoadingOverlay Visible="true" />}
+else if(_indent is null){<EmptyState Icon="@Icons.Material.Filled.ReceiptLong" Title="درخواست خرید یافت نشد" Description="Indent مورد نظر وجود ندارد یا قابل دسترسی نیست." />}
+else{
+<PageTitle>ایجاد پرونده از درخواست @_indent.IndentNumber</PageTitle>
+<PageHeader Title="ایجاد پرونده از درخواست خرید" Subtitle="@($"شماره درخواست: {_indent.IndentNumber}")" />
+<MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-4">تمام اقلام با شرح‌های Snapshot به پرونده خرید منتقل می‌شوند.</MudAlert>
+<MudPaper Class="form-panel" Elevation="0"><MudGrid><MudItem xs="12" md="8"><MudText Typo="Typo.h6">@_indent.Title</MudText><MudText Typo="Typo.body2">@(_indent.Description??"بدون شرح")</MudText></MudItem><MudItem xs="12" md="4"><MudSelect T="PurchaseFilePriority" @bind-Value="_priority" Label="اولویت پرونده" Variant="Variant.Outlined">@foreach(var p in Enum.GetValues<PurchaseFilePriority>()){<MudSelectItem Value="@p">@PurchaseFileList.PriorityText(p)</MudSelectItem>}</MudSelect></MudItem></MudGrid></MudPaper>
+@foreach(var group in Groups){<MudPaper Class="item-group" Elevation="0"><div class="group-header"><div><strong>@group.Key.Code</strong><span>@group.Key.Description</span></div><MudChip T="string" Size="Size.Small">@group.Count() قلم</MudChip></div><MudTable Items="group" Dense="true" Elevation="0"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>کد عمومی</MudTh><MudTh>شرح عمومی</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>واحد</MudTh><MudTh>مقدار</MudTh></HeaderContent><RowTemplate><MudTd>@context.MescCode</MudTd><MudTd>@context.MescGeneralGroupCode</MudTd><MudTd>@context.GeneralDescription</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.UnitOfMeasureId.ToString()[^1]</MudTd><MudTd>@context.RequestedQuantity</MudTd></RowTemplate></MudTable></MudPaper>}
+<div class="form-actions"><MudButton Href="/orders">انصراف</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CheckCircle" Disabled="_saving" OnClick="CreateAsync">تأیید و ایجاد پرونده</MudButton></div>
+}
+<LoadingOverlay Visible="_saving" Text="در حال ایجاد پرونده از درخواست خرید..." />
+@code{
+    [Parameter]public Guid IndentId{get;set;} private IndentDto? _indent;private bool _loading=true,_saving;private PurchaseFilePriority _priority=PurchaseFilePriority.Normal;
+    private IEnumerable<IGrouping<(string Code,string Description),IndentItemDto>> Groups=>_indent?.Items.GroupBy(x=>(x.MescGeneralGroupCode,x.GeneralDescription))??[];
+    protected override async Task OnParametersSetAsync(){_loading=true;try{_indent=await Api.GetIndentAsync(IndentId);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
+    private async Task CreateAsync(){_saving=true;try{var file=await Api.CreateFromIndentAsync(IndentId,new(DateTime.Now.Year,FakeDirectory.PurchaseDepartmentId,null,_priority));Snackbar.Add("پرونده خرید با موفقیت ایجاد شد.",Severity.Success);Navigation.NavigateTo($"/purchase/files/{file.Id}");}catch(Exception ex){Snackbar.Add("ایجاد پرونده ناموفق بود: "+ex.Message,Severity.Error);}finally{_saving=false;}}
+}
+

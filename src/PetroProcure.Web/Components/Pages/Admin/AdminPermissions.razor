@@ -1,0 +1,42 @@
+@page "/admin/permissions"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+<PageTitle>مجوزها</PageTitle>
+<PageHeader Title="مجوزهای سامانه" Subtitle="فهرست خواندنی مجوزها به تفکیک ماژول" />
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <EmptyState Title="دریافت مجوزها ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else
+{
+    <MudExpansionPanels MultiExpansion="true">
+        @foreach (var group in AdminUiPolicy.GroupPermissions(_permissions))
+        {
+            <MudExpansionPanel Text="@group.Key">
+                <MudTable Items="group.Value" Dense="true">
+                    <HeaderContent><MudTh>کد مجوز</MudTh><MudTh>شرح</MudTh><MudTh>وضعیت</MudTh></HeaderContent>
+                    <RowTemplate><MudTd>@context.Name</MudTd><MudTd>@context.Description</MudTd><MudTd><StatusChip Text="@(context.IsActive ? "فعال" : "غیرفعال")" Color="@(context.IsActive ? Color.Success : Color.Default)" /></MudTd></RowTemplate>
+                </MudTable>
+            </MudExpansionPanel>
+        }
+    </MudExpansionPanels>
+}
+@code {
+    private List<PermissionDto> _permissions = [];
+    private bool _loading = true;
+    private string? _error;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!AdminUiPolicy.CanManageRoles(Access.HasPermission)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load(); StateHasChanged();
+    }
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { _permissions = await Api.GetPermissionsAsync(); }
+        catch (Exception ex) { _error = "امکان دریافت مجوزها وجود ندارد."; Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _loading = false; }
+    }
+}

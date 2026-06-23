@@ -1,0 +1,70 @@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject IAuthService Auth
+@inject NavigationManager Navigation
+
+<CascadingAuthenticationState>
+    @if (!_initialized)
+    {
+        <LoadingOverlay Visible="true" Text="در حال بررسی نشست کاربری..." />
+    }
+    else
+    {
+        <Router AppAssembly="typeof(Program).Assembly" OnNavigateAsync="OnNavigateAsync">
+            <Found Context="routeData">
+                @if (RequiresAuthentication() && Auth.CurrentUser is null)
+                {
+                    <RedirectToLogin />
+                }
+                else
+                {
+                    <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                        <NotAuthorized>
+                            <RedirectToLogin />
+                        </NotAuthorized>
+                    </AuthorizeRouteView>
+                    <FocusOnNavigate RouteData="routeData" Selector="h1" />
+                }
+            </Found>
+        </Router>
+    }
+</CascadingAuthenticationState>
+
+@code {
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await Auth.InitializeAsync();
+        _initialized = true;
+        await EnsureAuthorizedPath();
+        StateHasChanged();
+    }
+
+    private async Task OnNavigateAsync(Microsoft.AspNetCore.Components.Routing.NavigationContext context)
+    {
+        if (!_initialized || IsPublic(context.Path)) return;
+        if (!await Auth.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(context.Path)}");
+        }
+    }
+
+    private async Task EnsureAuthorizedPath()
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (!IsPublic(path) && !await Auth.IsAuthenticatedAsync())
+            Navigation.NavigateTo($"/login?returnUrl={Uri.EscapeDataString(path)}");
+    }
+
+    private static bool IsPublic(string path) =>
+        path.StartsWith("login", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("logout", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("access-denied", StringComparison.OrdinalIgnoreCase);
+
+    private bool RequiresAuthentication()
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+        return !IsPublic(path);
+    }
+}

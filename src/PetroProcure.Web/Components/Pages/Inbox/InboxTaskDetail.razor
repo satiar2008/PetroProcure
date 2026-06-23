@@ -1,0 +1,39 @@
+@page "/inbox/tasks/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject IAuthService Auth
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+<PageTitle>جزئیات کار کارتابل</PageTitle>
+<PageHeader Title="@(_detail?.Task.Title??"جزئیات کار")" Subtitle="بررسی ارتباط، سابقه گردش و اقدامات مجاز سرور" />
+@if(_loading){<LoadingOverlay Visible="true" />}
+else if(_error is not null||_detail is null){<EmptyState Title="کار قابل نمایش نیست" Description="@(_error??"کار یافت نشد.")"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState>}
+else{
+<MudGrid><MudItem xs="12" md="7"><MudPaper Class="form-panel" Elevation="0">
+<MudText Typo="Typo.h6">خلاصه کار</MudText><MudText Class="mt-3">@(_detail.Task.Description??"بدون شرح")</MudText>
+<MudGrid Class="mt-2"><MudItem xs="6">@Info("نوع",InboxUiPolicy.EntityType(_detail.Task))</MudItem><MudItem xs="6">@Info("وضعیت",InboxUiPolicy.StatusText(_detail.Task.Status))</MudItem><MudItem xs="6">@Info("واحد مسئول",FakeDirectory.DepartmentName(_detail.Task.AssignedDepartmentId))</MudItem><MudItem xs="6">@Info("مهلت",_detail.Task.DueDate?.ToString("yyyy/MM/dd")??"—")</MudItem></MudGrid>
+<div class="report-actions mt-4"><MudButton Href="@InboxUiPolicy.RelatedLink(_detail.Task)" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.OpenInNew">مشاهده سند مرتبط</MudButton>
+@if(CanAssignSelf){<MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="AssignSelf">اختصاص به من</MudButton>}
+@if(CanComplete){<MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="Complete">تکمیل کار</MudButton>}</div>
+</MudPaper></MudItem>
+<MudItem xs="12" md="5"><MudPaper Class="form-panel" Elevation="0"><MudText Typo="Typo.h6">اقدامات مجاز</MudText>
+@if(_actionsLoading){<MudProgressLinear Indeterminate="true" />}else if(_detail.Task.PurchaseFileId.HasValue&&_actions.Count==0){<EmptyState Title="اقدام دیگری مجاز نیست" Description="ماتریس گردش کار برای وضعیت فعلی اقدامی برنگردانده است." />}
+else{<div class="d-flex flex-column gap-2 mt-3">@foreach(var action in _actions){<MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(()=>Execute(action))">@action.Title</MudButton>}</div>}
+</MudPaper></MudItem></MudGrid>
+<MudPaper Class="data-panel mt-4" Elevation="0"><MudText Typo="Typo.h6">خط زمانی گردش کار</MudText>
+@if(_detail.Timeline.Count==0){<EmptyState Title="هنوز اقدامی ثبت نشده است" Description="با اجرای گردش کار، سوابق در این بخش نمایش داده می‌شود." />}
+else{<MudTimeline TimelinePosition="TimelinePosition.Alternate">@foreach(var step in _detail.Timeline){<MudTimelineItem Color="Color.Primary"><ItemContent><MudPaper Class="pa-3" Outlined="true"><strong>@step.ActionName</strong><MudText Typo="Typo.body2">@FakeDirectory.DepartmentName(step.FromDepartmentId) ← @FakeDirectory.DepartmentName(step.ToDepartmentId)</MudText><MudText Typo="Typo.caption">@step.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudText>@if(!string.IsNullOrWhiteSpace(step.Comment)){<MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@step.Comment</MudAlert>}</MudPaper></ItemContent></MudTimelineItem>}</MudTimeline>}</MudPaper>}
+@code{
+[Parameter]public Guid Id{get;set;}private InboxTaskDetailDto?_detail;private List<WorkflowActionDto>_actions=[];private bool _loading=true,_actionsLoading;private string?_error;private Guid UserId=>Auth.CurrentUser?.Id??Guid.Empty;
+private bool CanAssignSelf=>_detail is not null&&InboxUiPolicy.CanAssignToSelf(_detail.Task,UserId,Access.HasPermission);
+private bool CanComplete=>_detail is not null&&InboxUiPolicy.CanComplete(_detail.Task,UserId,Access.HasPermission);
+protected override async Task OnParametersSetAsync(){if(!InboxUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();}
+private async Task Load(){_loading=true;_error=null;try{_detail=await Api.GetInboxTaskAsync(Id);await LoadActions();}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+private async Task LoadActions(){_actions=[];if(_detail?.Task.PurchaseFileId is not Guid fileId)return;_actionsLoading=true;try{_actions=await Api.GetAllowedWorkflowActionsAsync(fileId);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_actionsLoading=false;}}
+private async Task AssignSelf(){try{await Api.AssignInboxTaskToSelfAsync(Id);Snackbar.Add("کار به شما اختصاص یافت.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private async Task Complete(){var d=await Dialog.ShowAsync<ConfirmDialog>("تکمیل کار",new DialogParameters{{"Message","کار تکمیل شود؟"},{"ConfirmColor",Color.Success}});var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.CompleteInboxTaskAsync(Id);Snackbar.Add("کار تکمیل شد.",Severity.Success);Navigation.NavigateTo("/inbox/my");}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private async Task Execute(WorkflowActionDto action){var d=await Dialog.ShowAsync<WorkflowActionDialog>("اجرای اقدام",new DialogParameters{{"Action",action}});var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.ExecuteWorkflowActionAsync(_detail!.Task.PurchaseFileId!.Value,new(action.Code,r.Data as string));Snackbar.Add("اقدام گردش کار اجرا شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private RenderFragment Info(string label,string value)=>@<MudPaper Class="pa-2" Outlined="true"><MudText Typo="Typo.caption">@label</MudText><strong>@value</strong></MudPaper>;
+}

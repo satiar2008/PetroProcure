@@ -1,0 +1,4 @@
+<MudChip T="string" Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small">
+    <span dir="ltr">@Code</span>
+</MudChip>
+@code { [Parameter, EditorRequired] public string Code { get; set; } = ""; }

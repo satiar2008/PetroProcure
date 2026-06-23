@@ -1,0 +1,23 @@
+@page "/inbox/department"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject IAuthService Auth
+@inject IDialogService Dialog
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+<PageTitle>کارتابل واحد</PageTitle>
+<PageHeader Title="کارتابل واحد" Subtitle="کارهای در انتظار واحد سازمانی انتخاب‌شده" />
+<MudPaper Class="filter-panel" Elevation="0"><div class="d-flex align-center gap-3"><MudSelect T="Guid" Value="Access.CurrentDepartment.Id" ValueChanged="SwitchDepartment" Label="واحد سازمانی" Style="min-width:280px">@foreach(var d in Access.Departments){<MudSelectItem Value="@d.Id">@d.Title</MudSelectItem>}</MudSelect><MudSpacer />@if(Access.Departments.Count>1){<DepartmentBadge DepartmentName="@Access.CurrentDepartment.Title" />}</div></MudPaper>
+@if(_loading){<LoadingOverlay Visible="true" />}else if(_error is not null){<EmptyState Title="خطا در دریافت کارتابل واحد" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState>}else{<MudPaper Class="data-panel" Elevation="0"><InboxTaskTable Tasks="_rows" CanAssignSelf="CanAssignSelf" CanAssignOther="@(_=>InboxUiPolicy.CanAssignOther(Access.HasPermission))" CanComplete="CanComplete" AssignSelf="AssignSelf" AssignOther="AssignOther" Complete="Complete" /></MudPaper>}
+@code{
+private List<InboxTaskRow>_rows=[];private bool _loading=true;private string?_error;private Guid UserId=>Auth.CurrentUser?.Id??Guid.Empty;
+protected override async Task OnAfterRenderAsync(bool first){if(!first)return;if(!InboxUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();StateHasChanged();}
+private async Task SwitchDepartment(Guid id){var d=Access.Departments.FirstOrDefault(x=>x.Id==id);if(d is null)return;Access.SwitchDepartment(d.Key);await Load();}
+private async Task Load(){if(Access.CurrentDepartment.Id==Guid.Empty){_error="واحد سازمانی برای کاربر تعریف نشده است.";_loading=false;return;}_loading=true;_error=null;try{var tasks=await Api.GetDepartmentInboxTasksAsync(Access.CurrentDepartment.Id);_rows=tasks.Select(x=>new InboxTaskRow(x,x.PurchaseFileId?.ToString()[..8]??x.IndentId?.ToString()[..8])).ToList();}catch(Exception ex){_error="شما به این کارتابل دسترسی ندارید یا سرویس در دسترس نیست.";Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
+private bool CanAssignSelf(InboxTaskDto task)=>InboxUiPolicy.CanAssignToSelf(task,UserId,Access.HasPermission);
+private bool CanComplete(InboxTaskDto task)=>InboxUiPolicy.CanComplete(task,UserId,Access.HasPermission);
+private async Task AssignSelf(InboxTaskDto task){try{await Api.AssignInboxTaskToSelfAsync(task.Id);Snackbar.Add("کار به شما اختصاص یافت.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private async Task AssignOther(InboxTaskDto task){try{var users=(await Api.GetUsersAsync()).Where(x=>x.DepartmentIds.Contains(task.AssignedDepartmentId)).ToArray();var d=await Dialog.ShowAsync<AssignInboxTaskDialog>("اختصاص کار به کاربر",new DialogParameters{{"Users",users}});var r=await d.Result;if(r?.Canceled!=false||r.Data is not Guid userId)return;await Api.AssignInboxTaskAsync(task.Id,userId);Snackbar.Add("کار به کاربر انتخاب‌شده اختصاص یافت.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private async Task Complete(InboxTaskDto task){var d=await Dialog.ShowAsync<ConfirmDialog>("تکمیل کار",new DialogParameters{{"Message","کار تکمیل شود؟"},{"ConfirmColor",Color.Success}});var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.CompleteInboxTaskAsync(task.Id);Snackbar.Add("کار تکمیل شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+}

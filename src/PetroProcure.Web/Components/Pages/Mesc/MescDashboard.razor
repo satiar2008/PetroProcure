@@ -1,0 +1,26 @@
+@page "/orders/mesc"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+<PageTitle>کاتالوگ MESC</PageTitle>
+<PageHeader Title="کاتالوگ MESC" Subtitle="مدیریت گروه‌های عمومی و اقلام کالای پالایشگاه" />
+@if(_loading){<LoadingOverlay Visible="true" />}
+else if(_error is not null){<EmptyState Title="دریافت اطلاعات ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState>}
+else{
+<MudGrid>
+    @Card("گروه‌های عمومی",_groups.Count,Icons.Material.Filled.AccountTree)
+    @Card("اقلام فعال",_items.Count(x=>x.IsActive),Icons.Material.Filled.CheckCircle)
+    @Card("اقلام غیرفعال",_items.Count(x=>!x.IsActive),Icons.Material.Filled.PauseCircle)
+</MudGrid>
+<MudPaper Class="form-panel mt-4" Elevation="0"><MudText Typo="Typo.h6">آخرین اقلام ثبت‌شده</MudText>
+<MudTable Items="_items.TakeLast(5).Reverse()" Dense="true"><HeaderContent><MudTh>کد</MudTh><MudTh>شرح عمومی</MudTh><MudTh>شرح اختصاصی</MudTh></HeaderContent>
+<RowTemplate><MudTd><MescCodeDisplay Code="@context.Code" /></MudTd><MudTd>@context.GeneralDescription</MudTd><MudTd>@context.SpecificDescription</MudTd></RowTemplate></MudTable></MudPaper>
+<div class="report-actions mt-4"><MudButton Href="/orders/mesc/groups" Variant="Variant.Filled" Color="Color.Primary">گروه‌های عمومی</MudButton><MudButton Href="/orders/mesc/items" Variant="Variant.Outlined">اقلام کالا</MudButton><MudButton Href="/orders/mesc/grouped" Variant="Variant.Outlined">نمای گروه‌بندی‌شده</MudButton></div>}
+@code{
+private List<MescGeneralGroupDto>_groups=[];private List<MescItemDto>_items=[];private bool _loading=true;private string?_error;
+protected override async Task OnAfterRenderAsync(bool firstRender){if(!firstRender)return;if(!MescUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();StateHasChanged();}
+private async Task Load(){_loading=true;_error=null;try{var g=Api.GetMescGroupsAsync(true);var i=Api.GetMescItemsAsync(true);await Task.WhenAll(g,i);_groups=await g;_items=await i;}catch(Exception ex){_error="ارتباط با سرویس کاتالوگ برقرار نشد.";Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
+private RenderFragment Card(string title,int value,string icon)=>@<MudItem xs="12" md="4"><MudPaper Class="metric-card" Elevation="0"><MudIcon Icon="@icon" Color="Color.Primary"/><div><MudText Typo="Typo.caption">@title</MudText><MudText Typo="Typo.h4">@value</MudText></div></MudPaper></MudItem>;
+}

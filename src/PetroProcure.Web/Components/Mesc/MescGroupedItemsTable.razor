@@ -1,0 +1,19 @@
+@foreach (var group in Groups.OrderBy(x => x.GeneralGroupCode))
+{
+    <MudExpansionPanels Class="mb-2">
+        <MudExpansionPanel>
+            <TitleContent>
+                <div class="d-flex align-center gap-3"><MescCodeDisplay Code="@group.GeneralGroupCode" />
+                    <strong>@group.GeneralDescription</strong><MudChip T="string" Size="Size.Small">@group.Items.Count قلم</MudChip></div>
+            </TitleContent>
+            <ChildContent>
+                <MudTable Items="group.Items" Dense="true" Elevation="0">
+                    <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>واحد</MudTh><MudTh>وضعیت</MudTh></HeaderContent>
+                    <RowTemplate><MudTd><MescCodeDisplay Code="@context.Code" /></MudTd><MudTd>@context.SpecificDescription</MudTd>
+                    <MudTd>@context.UnitOfMeasure</MudTd><MudTd>@(context.IsActive?"فعال":"غیرفعال")</MudTd></RowTemplate>
+                </MudTable>
+            </ChildContent>
+        </MudExpansionPanel>
+    </MudExpansionPanels>
+}
+@code { [Parameter, EditorRequired] public IReadOnlyList<MescItemGroupedDto> Groups { get; set; } = []; }

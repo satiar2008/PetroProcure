@@ -1,0 +1,55 @@
+@page "/admin/settings"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>تنظیمات سیستم</PageTitle>
+<PageHeader Title="تنظیمات سیستم" Subtitle="مدیریت تنظیمات قابل تغییر سامانه" />
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <RetryPanel Message="@_error" OnRetry="Load" /> }
+else
+{
+    <SectionCard Title="افزودن یا ویرایش تنظیم">
+        <MudGrid>
+            <MudItem xs="12" md="3"><MudTextField @bind-Value="_key" Label="کلید" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_value" Label="مقدار" /></MudItem>
+            <MudItem xs="12" md="3"><MudTextField @bind-Value="_description" Label="شرح" /></MudItem>
+            <MudItem xs="12" md="2"><MudSwitch @bind-Value="_isSecret" Label="محرمانه" /></MudItem>
+        </MudGrid>
+        <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">ذخیره</MudButton>
+    </SectionCard>
+    <MudPaper Class="data-panel mt-4" Elevation="0">
+        <MudTable Items="_settings" Dense="true">
+            <HeaderContent><MudTh>کلید</MudTh><MudTh>مقدار</MudTh><MudTh>شرح</MudTh><MudTh>محرمانه</MudTh><MudTh></MudTh></HeaderContent>
+            <RowTemplate><MudTd>@context.Key</MudTd><MudTd>@(context.IsSecret ? "●●●●●" : context.Value)</MudTd><MudTd>@context.Description</MudTd><MudTd>@(context.IsSecret ? "بله" : "خیر")</MudTd><MudTd><MudButton Size="Size.Small" OnClick="@(() => Edit(context))">ویرایش</MudButton></MudTd></RowTemplate>
+        </MudTable>
+    </MudPaper>
+}
+
+@code {
+    private List<SystemSettingDto> _settings = [];
+    private bool _loading = true, _isSecret;
+    private string? _error, _key, _value, _description;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!AdminUiPolicy.CanManageSettings(Access.HasPermission)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load(); StateHasChanged();
+    }
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { _settings = await Api.GetSystemSettingsAsync(); }
+        catch { _error = "دریافت تنظیمات ناموفق بود."; }
+        finally { _loading = false; }
+    }
+    private void Edit(SystemSettingDto setting) { _key = setting.Key; _value = setting.Value; _description = setting.Description; _isSecret = setting.IsSecret; }
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_key)) { Snackbar.Add("کلید تنظیم الزامی است.", Severity.Warning); return; }
+        try { await Api.UpdateSystemSettingAsync(_key, new(_value, _description, _isSecret)); Snackbar.Add("تنظیم ذخیره شد.", Severity.Success); _key = _value = _description = null; _isSecret = false; await Load(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

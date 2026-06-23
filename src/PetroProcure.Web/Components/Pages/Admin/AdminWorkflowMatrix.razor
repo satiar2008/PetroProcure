@@ -1,0 +1,76 @@
+@page "/admin/workflow-matrix"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+<PageTitle>ماتریس گردش کار</PageTitle>
+<PageHeader Title="ماتریس گردش کار" Subtitle="تعریف‌های مجاز انتقال وضعیت و واحد در پرونده خرید" />
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <EmptyState Title="دریافت ماتریس ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else
+{
+    <MudPaper Class="data-panel" Elevation="0">
+        <MudTable Items="_actions" Dense="true" Hover="true">
+            <HeaderContent><MudTh>کد</MudTh><MudTh>عنوان</MudTh><MudTh>از واحد</MudTh><MudTh>به واحد</MudTh><MudTh>از وضعیت</MudTh><MudTh>به وضعیت</MudTh><MudTh>مجوز لازم</MudTh><MudTh>فعال</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.Code</MudTd>
+                <MudTd>@context.Title</MudTd>
+                <MudTd>@context.FromDepartmentType</MudTd>
+                <MudTd>@(context.ToDepartmentType?.ToString() ?? "-")</MudTd>
+                <MudTd>@context.FromStatus</MudTd>
+                <MudTd>@context.ToStatus</MudTd>
+                <MudTd>@context.RequiredPermission</MudTd>
+                <MudTd><MudIcon Icon="@(context.IsActive ? Icons.Material.Filled.CheckCircle : Icons.Material.Filled.Block)" Color="@(context.IsActive ? Color.Success : Color.Default)" /></MudTd>
+                <MudTd><MudButton Size="Size.Small" OnClick="@(() => BeginEdit(context))">ویرایش</MudButton><MudButton Size="Size.Small" Color="@(context.IsActive ? Color.Error : Color.Success)" OnClick="@(() => Toggle(context))">@(context.IsActive ? "غیرفعال" : "فعال")</MudButton></MudTd>
+            </RowTemplate>
+        </MudTable>
+    </MudPaper>
+    @if (_editing is not null)
+    {
+        <SectionCard Title="ویرایش اقدام گردش کار" Class="form-panel mt-4">
+            <MudTextField @bind-Value="_title" Label="عنوان" />
+            <MudTextField @bind-Value="_permission" Label="مجوز لازم" Class="mt-3" />
+            <MudSwitch @bind-Value="_requiresComment" Label="توضیحات الزامی" Color="Color.Primary" />
+            <MudSwitch @bind-Value="_isActive" Label="فعال" Color="Color.Success" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">ذخیره</MudButton>
+            <MudButton Variant="Variant.Text" OnClick="@(() => _editing = null)">انصراف</MudButton>
+        </SectionCard>
+    }
+}
+@code {
+    private List<WorkflowActionDefinitionDto> _actions = [];
+    private WorkflowActionDefinitionDto? _editing;
+    private bool _loading = true;
+    private string? _error, _title, _permission;
+    private bool _requiresComment, _isActive;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!AdminUiPolicy.CanManageSettings(Access.HasPermission)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load(); StateHasChanged();
+    }
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { _actions = await Api.GetWorkflowActionDefinitionsAsync(); }
+        catch (Exception ex) { _error = "امکان دریافت ماتریس گردش کار وجود ندارد."; Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _loading = false; }
+    }
+    private void BeginEdit(WorkflowActionDefinitionDto action)
+    {
+        _editing = action; _title = action.Title; _permission = action.RequiredPermission;
+        _requiresComment = action.RequiresComment; _isActive = action.IsActive;
+    }
+    private async Task Save()
+    {
+        if (_editing is null || string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_permission)) return;
+        try { await Api.UpdateWorkflowActionDefinitionAsync(_editing.Id, new(_title, _permission, _requiresComment, _isActive)); Snackbar.Add("اقدام گردش کار ذخیره شد.", Severity.Success); _editing = null; await Load(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+    private async Task Toggle(WorkflowActionDefinitionDto action)
+    {
+        try { await Api.SetWorkflowActionDefinitionActiveAsync(action.Id, !action.IsActive); Snackbar.Add("وضعیت اقدام تغییر کرد.", Severity.Success); await Load(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}

@@ -1,0 +1,16 @@
+@inject ILookupCacheService Lookups
+
+<span>@_name</span>
+
+@code {
+    [Parameter] public Guid? DepartmentId { get; set; }
+    [Parameter] public string Fallback { get; set; } = "واحد نامشخص";
+    private string _name = "در حال دریافت...";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _name = DepartmentId.HasValue
+            ? await Lookups.GetDepartmentNameAsync(DepartmentId)
+            : Fallback;
+    }
+}

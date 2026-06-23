@@ -1,0 +1,96 @@
+@page "/admin/roles"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+<PageTitle>مدیریت نقش‌ها</PageTitle>
+<PageHeader Title="نقش‌ها" Subtitle="مشاهده و تخصیص مجوزهای هر نقش" />
+@if (_loading) { <LoadingOverlay Visible="true" /> }
+else if (_error is not null) { <EmptyState Title="دریافت نقش‌ها ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="data-panel" Elevation="0">
+                <div class="d-flex gap-2 mb-3">
+                    <MudTextField @bind-Value="_roleName" Label="نام نقش" />
+                    <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveRole">@(_selectedRoleForEdit is null ? "ایجاد" : "ذخیره")</MudButton>
+                    @if (_selectedRoleForEdit is not null) { <MudButton Variant="Variant.Text" OnClick="CancelRoleEdit">انصراف</MudButton> }
+                </div>
+                <MudTable Items="_roles" Dense="true" Hover="true">
+                    <HeaderContent><MudTh>نقش</MudTh><MudTh>تعداد مجوز</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.Permissions.Count</MudTd>
+                        <MudTd><MudButton Size="Size.Small" OnClick="@(() => SelectRole(context))">مجوزها</MudButton><MudButton Size="Size.Small" OnClick="@(() => BeginRoleEdit(context))">ویرایش</MudButton></MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="form-panel" Elevation="0">
+                @if (_selectedRole is null) { <EmptyState Title="نقشی انتخاب نشده" Description="برای مشاهده یا تغییر مجوزها یک نقش را انتخاب کنید." /> }
+                else
+                {
+                    <MudText Typo="Typo.h6">مجوزهای نقش @_selectedRole.Name</MudText>
+                    <MudSelect T="Guid" MultiSelection="true" @bind-SelectedValues="_selectedPermissionIds" Label="مجوزها">
+                        @foreach (var permission in _permissions)
+                        {
+                            <MudSelectItem Value="@permission.Id">@permission.Name - @permission.Description</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudButton Class="mt-3" Variant="Variant.Filled" Color="Color.Primary" OnClick="SavePermissions">ذخیره مجوزها</MudButton>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+@code {
+    private List<RoleDto> _roles = [];
+    private List<PermissionDto> _permissions = [];
+    private RoleDto? _selectedRole;
+    private RoleDto? _selectedRoleForEdit;
+    private IEnumerable<Guid> _selectedPermissionIds = [];
+    private bool _loading = true;
+    private string? _error, _roleName;
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!AdminUiPolicy.CanManageRoles(Access.HasPermission)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load(); StateHasChanged();
+    }
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { var roles = Api.GetRolesAsync(); var permissions = Api.GetPermissionsAsync(); await Task.WhenAll(roles, permissions); _roles = await roles; _permissions = await permissions; }
+        catch (Exception ex) { _error = "امکان دریافت نقش‌ها وجود ندارد."; Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _loading = false; }
+    }
+    private void SelectRole(RoleDto role)
+    {
+        _selectedRole = role;
+        _selectedPermissionIds = _permissions.Where(permission => role.Permissions.Contains(permission.Name)).Select(permission => permission.Id).ToArray();
+    }
+    private async Task SavePermissions()
+    {
+        if (_selectedRole is null) return;
+        try { await Api.AssignRolePermissionsAsync(_selectedRole.Id, new(_selectedPermissionIds.ToArray())); Snackbar.Add("مجوزهای نقش ذخیره شد.", Severity.Success); await Load(); _selectedRole = _roles.FirstOrDefault(role => role.Id == _selectedRole.Id); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+    private void BeginRoleEdit(RoleDto role) { _selectedRoleForEdit = role; _roleName = role.Name; }
+    private void CancelRoleEdit() { _selectedRoleForEdit = null; _roleName = null; }
+    private async Task SaveRole()
+    {
+        if (string.IsNullOrWhiteSpace(_roleName)) { Snackbar.Add("نام نقش الزامی است.", Severity.Warning); return; }
+        try
+        {
+            if (_selectedRoleForEdit is null) await Api.CreateRoleAsync(new(_roleName));
+            else await Api.UpdateRoleAsync(_selectedRoleForEdit.Id, new(_roleName));
+            Snackbar.Add("نقش ذخیره شد.", Severity.Success);
+            CancelRoleEdit();
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+}
