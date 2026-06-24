@@ -16,9 +16,6 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
-      - name: Configure DevExpress feed
-        if: ${{ secrets.DEVEXPRESS_NUGET_URL != '' }}
-        run: dotnet nuget add source "${{ secrets.DEVEXPRESS_NUGET_URL }}" --name DevExpress
       - name: Restore
         run: dotnet restore PetroProcure.sln
       - name: Build
