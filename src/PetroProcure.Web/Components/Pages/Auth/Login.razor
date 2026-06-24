@@ -1,4 +1,4 @@
-@page "/login"
+﻿@page "/login"
 @layout PetroProcure.Web.Components.Layout.AuthLayout
 @inject IAuthService Auth
 @inject NavigationManager Navigation
@@ -6,23 +6,27 @@
 <PageTitle>ورود به پتروپروکیور</PageTitle>
 
 <div class="login-page">
-    <div class="login-orb login-orb-one"></div>
-    <div class="login-orb login-orb-two"></div>
+    <div class="login-motion" aria-hidden="true">
+        <span class="motion-track motion-track-one"></span>
+        <span class="motion-track motion-track-two"></span>
+        <span class="motion-node motion-node-one"></span>
+        <span class="motion-node motion-node-two"></span>
+    </div>
 
     <MudPaper Class="login-shell" Elevation="0">
         <section class="login-hero">
             <div class="login-brand">
-                <MudAvatar Class="login-logo" Size="Size.Large">PP</MudAvatar>
+                <img class="login-brand-logo" src="/logo/logo.png" alt="PetroProcure" />
                 <div>
                     <MudText Typo="Typo.h5" Class="login-brand-title">پتروپروکیور</MudText>
-                    <MudText Typo="Typo.body2" Class="login-brand-subtitle">سامانه یکپارچه تدارکات، خرید و گردش‌کار پالایشگاه</MudText>
+                    <MudText Typo="Typo.body1" Class="login-brand-subtitle">سامانه یکپارچه تدارکات، خرید و گردش‌کار پالایشگاه</MudText>
                 </div>
             </div>
 
             <div class="login-hero-copy">
                 <MudText Typo="Typo.h3" Class="login-hero-title">مدیریت امن پرونده‌های خرید</MudText>
                 <MudText Typo="Typo.body1" Class="login-hero-text">
-                    از کاتالوگ MESC و تقاضای خرید تا پرونده خرید، اسناد، کارتابل، گزارش‌ها و ارزیابی هوشمند؛ همه در یک محیط سازمانی کنترل‌شده.
+                    از کاتالوگ MESC و تقاضای خرید تا پرونده، اسناد، کارتابل و گزارش‌ها؛ همه چیز در یک محیط کنترل‌شده و قابل پیگیری.
                 </MudText>
             </div>
 
@@ -33,33 +37,33 @@
             </div>
         </section>
 
-        <section class="login-card">
+        <section class="login-card animated-card">
             <div class="login-card-heading">
                 <MudText Typo="Typo.h5">ورود به سامانه</MudText>
                 <MudText Typo="Typo.body2">برای ادامه، اطلاعات حساب سازمانی خود را وارد کنید.</MudText>
             </div>
 
-        <MudForm @ref="_form">
-            <MudTextField @bind-Value="_userName" Label="نام کاربری یا ایمیل"
-                          Immediate="true"
-                          Required="true" RequiredError="نام کاربری یا ایمیل الزامی است"
-                          Variant="Variant.Outlined" Adornment="Adornment.Start"
-                          AdornmentIcon="@Icons.Material.Filled.PersonOutline" />
-            <MudTextField @bind-Value="_password" Label="رمز عبور" InputType="InputType.Password"
-                          Immediate="true"
-                          Required="true" RequiredError="رمز عبور الزامی است"
-                          Variant="Variant.Outlined" Class="mt-4"
-                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock" />
-            <MudCheckBox @bind-Value="_rememberMe" Label="مرا به خاطر بسپار" Class="mt-2" />
-            @if (!string.IsNullOrWhiteSpace(_error))
-            {
-                <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-3">@_error</MudAlert>
-            }
-            <MudButton FullWidth="true" Color="Color.Primary" Variant="Variant.Filled"
-                       Size="Size.Large" Class="login-submit" Disabled="_busy" OnClick="LoginAsync">
-                @(_busy ? "در حال ورود..." : "ورود به سامانه")
-            </MudButton>
-        </MudForm>
+            <MudForm @ref="_form">
+                <MudTextField @bind-Value="_userName" Label="نام کاربری یا ایمیل"
+                              Immediate="true"
+                              Required="true" RequiredError="نام کاربری یا ایمیل الزامی است"
+                              Variant="Variant.Outlined" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.PersonOutline" />
+                <MudTextField @bind-Value="_password" Label="رمز عبور" InputType="InputType.Password"
+                              Immediate="true"
+                              Required="true" RequiredError="رمز عبور الزامی است"
+                              Variant="Variant.Outlined" Class="mt-4"
+                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock" />
+                <MudCheckBox @bind-Value="_rememberMe" Label="مرا به خاطر بسپار" Class="mt-2" />
+                @if (!string.IsNullOrWhiteSpace(_error))
+                {
+                    <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-3">@_error</MudAlert>
+                }
+                <MudButton FullWidth="true" Color="Color.Primary" Variant="Variant.Filled"
+                           Size="Size.Large" Class="login-submit" Disabled="_busy" OnClick="LoginAsync">
+                    @(_busy ? "در حال ورود..." : "ورود به سامانه")
+                </MudButton>
+            </MudForm>
 
             <div class="login-footer-note">
                 <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" />
@@ -79,7 +83,7 @@
     private bool _busy;
 
     private static RenderFragment Feature(string icon, string text) =>
-        @<div class="login-feature">
+        @<div class="login-feature animated-card">
             <MudIcon Icon="@icon" />
             <span>@text</span>
         </div>;

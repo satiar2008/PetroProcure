@@ -43,6 +43,20 @@ public static class ApplicationPermissions
     public const string TenderEvaluate = "Tender.Evaluate";
     public const string TenderApproveWinner = "Tender.ApproveWinner";
 
+    public const string CommissionView = "Commission.View";
+    public const string CommissionCreate = "Commission.Create";
+    public const string CommissionEdit = "Commission.Edit";
+    public const string CommissionSchedule = "Commission.Schedule";
+    public const string CommissionStart = "Commission.Start";
+    public const string CommissionComplete = "Commission.Complete";
+    public const string CommissionApprove = "Commission.Approve";
+    public const string CommissionCancel = "Commission.Cancel";
+    public const string CommissionManageMembers = "Commission.ManageMembers";
+    public const string CommissionManageAgenda = "Commission.ManageAgenda";
+    public const string CommissionManageMinutes = "Commission.ManageMinutes";
+    public const string CommissionManageDecisions = "Commission.ManageDecisions";
+    public const string CommissionManageDocuments = "Commission.ManageDocuments";
+
     public const string SupplierView = "Supplier.View";
     public const string SupplierCreate = "Supplier.Create";
     public const string SupplierEdit = "Supplier.Edit";
@@ -122,6 +136,19 @@ public static class ApplicationPermissions
         TenderManageDocuments,
         TenderEvaluate,
         TenderApproveWinner,
+        CommissionView,
+        CommissionCreate,
+        CommissionEdit,
+        CommissionSchedule,
+        CommissionStart,
+        CommissionComplete,
+        CommissionApprove,
+        CommissionCancel,
+        CommissionManageMembers,
+        CommissionManageAgenda,
+        CommissionManageMinutes,
+        CommissionManageDecisions,
+        CommissionManageDocuments,
         SupplierView,
         SupplierCreate,
         SupplierEdit,

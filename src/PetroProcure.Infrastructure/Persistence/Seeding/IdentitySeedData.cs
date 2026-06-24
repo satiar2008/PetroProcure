@@ -145,6 +145,7 @@ public static class IdentitySeedData
                 ApplicationPermissions.TenderSelectWinner,
                 ApplicationPermissions.TenderClose,
                 ApplicationPermissions.TenderManageDocuments,
+                ApplicationPermissions.CommissionView,
                 ApplicationPermissions.ReportView,
                 ApplicationPermissions.ReportPrint,
                 ApplicationPermissions.ReportExportPdf
@@ -175,7 +176,8 @@ public static class IdentitySeedData
                 ApplicationPermissions.TenderManageItems,
                 ApplicationPermissions.TenderManageParticipants,
                 ApplicationPermissions.TenderReceiveBid,
-                ApplicationPermissions.TenderCompareBids
+                ApplicationPermissions.TenderCompareBids,
+                ApplicationPermissions.CommissionView
             ],
             [ApplicationRoles.OrdersManager] =
             [
@@ -239,6 +241,19 @@ public static class IdentitySeedData
                 ApplicationPermissions.TenderSelectWinner,
                 ApplicationPermissions.TenderEvaluate,
                 ApplicationPermissions.TenderApproveWinner,
+                ApplicationPermissions.CommissionView,
+                ApplicationPermissions.CommissionCreate,
+                ApplicationPermissions.CommissionEdit,
+                ApplicationPermissions.CommissionSchedule,
+                ApplicationPermissions.CommissionStart,
+                ApplicationPermissions.CommissionComplete,
+                ApplicationPermissions.CommissionApprove,
+                ApplicationPermissions.CommissionCancel,
+                ApplicationPermissions.CommissionManageMembers,
+                ApplicationPermissions.CommissionManageAgenda,
+                ApplicationPermissions.CommissionManageMinutes,
+                ApplicationPermissions.CommissionManageDecisions,
+                ApplicationPermissions.CommissionManageDocuments,
                 ApplicationPermissions.PurchaseFileView,
                 ApplicationPermissions.SupplierView,
                 ApplicationPermissions.SupplierEvaluate,
@@ -253,6 +268,9 @@ public static class IdentitySeedData
                 ApplicationPermissions.TenderEvaluateCommercial,
                 ApplicationPermissions.TenderCompareBids,
                 ApplicationPermissions.TenderEvaluate,
+                ApplicationPermissions.CommissionView,
+                ApplicationPermissions.CommissionManageMinutes,
+                ApplicationPermissions.CommissionManageDecisions,
                 ApplicationPermissions.PurchaseFileView
             ],
             [ApplicationRoles.ReportViewer] =

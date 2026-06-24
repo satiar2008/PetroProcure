@@ -1,4 +1,5 @@
-@inherits LayoutComponentBase
+﻿@inherits LayoutComponentBase
+@implements IDisposable
 @inject IUserAccessContext Access
 @inject NavigationManager Navigation
 @inject IAuthService Auth
@@ -9,72 +10,77 @@
 <MudSnackbarProvider />
 
 <MudRTLProvider RightToLeft="true">
-<MudLayout>
-    <MudAppBar Elevation="0" Class="app-bar">
-        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="ToggleDrawer" />
-        <div class="brand-block">
-            <MudAvatar Color="Color.Primary" Variant="Variant.Filled" Size="Size.Medium">PP</MudAvatar>
-            <div>
-                <MudText Typo="Typo.subtitle1" Class="brand-title">پتروپروکیور</MudText>
-                <MudText Typo="Typo.caption" Class="brand-subtitle">سامانه یکپارچه تدارکات و خرید</MudText>
+    <MudLayout>
+        <MudAppBar Elevation="0" Class="app-bar">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" OnClick="ToggleDrawer" />
+            <div class="brand-block">
+                <img class="brand-logo" src="/logo/logo.png" alt="PetroProcure" />
+                <div class="brand-copy">
+                    <MudText Typo="Typo.subtitle1" Class="brand-title">پتروپروکیور</MudText>
+                    <MudText Typo="Typo.caption" Class="brand-subtitle">مدیریت خرید پالایشگاه</MudText>
+                </div>
             </div>
-        </div>
-        <MudSpacer />
-        @if (Access.Panels.Count > 1)
-        {
-            <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+            <MudSpacer />
+            @if (Access.Panels.Count > 1)
+            {
+                <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Text" Color="Color.Inherit"
+                                   StartIcon="@Icons.Material.Filled.Apartment"
+                                   EndIcon="@Icons.Material.Filled.ExpandMore">
+                            @Access.CurrentPanel.Title
+                        </MudButton>
+                    </ActivatorContent>
+                    <ChildContent>
+                        @foreach (var panel in Access.Panels)
+                        {
+                            <MudMenuItem Icon="@panel.Icon" OnClick="@(() => SwitchPanel(panel))">
+                                @panel.Title
+                            </MudMenuItem>
+                        }
+                    </ChildContent>
+                </MudMenu>
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.NotificationsNone" Color="Color.Inherit" />
+            <MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
                 <ActivatorContent>
-                    <MudButton Variant="Variant.Text" Color="Color.Inherit"
-                               StartIcon="@Icons.Material.Filled.Apartment"
-                               EndIcon="@Icons.Material.Filled.ExpandMore">
-                        @Access.CurrentPanel.Title
+                    <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="profile-button">
+                        <MudAvatar Size="Size.Small" Class="profile-avatar">م‌ا</MudAvatar>
+                        <span class="profile-copy">
+                            <strong>@Access.DisplayName</strong>
+                            <small>@Access.RoleTitle</small>
+                        </span>
+                        <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" />
                     </MudButton>
                 </ActivatorContent>
                 <ChildContent>
-                    @foreach (var panel in Access.Panels)
-                    {
-                        <MudMenuItem Icon="@panel.Icon" OnClick="@(() => SwitchPanel(panel))">
-                            @panel.Title
-                        </MudMenuItem>
-                    }
+                    <MudMenuItem Href="/profile" Icon="@Icons.Material.Filled.PersonOutline">پروفایل کاربری</MudMenuItem>
+                    <MudMenuItem Icon="@Icons.Material.Filled.Settings">تنظیمات</MudMenuItem>
+                    <MudDivider />
+                    <MudMenuItem Href="/logout" Icon="@Icons.Material.Filled.Logout">خروج از سامانه</MudMenuItem>
                 </ChildContent>
             </MudMenu>
-        }
-        <MudIconButton Icon="@Icons.Material.Filled.NotificationsNone" Color="Color.Inherit" />
-        <MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
-            <ActivatorContent>
-                <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="profile-button">
-                    <MudAvatar Size="Size.Small" Color="Color.Secondary">م‌ا</MudAvatar>
-                    <span class="profile-copy">
-                        <strong>@Access.DisplayName</strong>
-                        <small>@Access.RoleTitle</small>
-                    </span>
-                    <MudIcon Icon="@Icons.Material.Filled.ExpandMore" Size="Size.Small" />
-                </MudButton>
-            </ActivatorContent>
-            <ChildContent>
-                <MudMenuItem Href="/profile" Icon="@Icons.Material.Filled.PersonOutline">پروفایل کاربری</MudMenuItem>
-                <MudMenuItem Icon="@Icons.Material.Filled.Settings">تنظیمات</MudMenuItem>
-                <MudDivider />
-                <MudMenuItem Href="/logout" Icon="@Icons.Material.Filled.Logout">خروج از سامانه</MudMenuItem>
-            </ChildContent>
-        </MudMenu>
-    </MudAppBar>
+        </MudAppBar>
 
-    <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Responsive" Elevation="1"
-               Breakpoint="Breakpoint.Md" Class="app-drawer">
-        <NavMenu />
-    </MudDrawer>
+        <MudDrawer @bind-Open="_drawerOpen" Variant="DrawerVariant.Responsive" Elevation="1"
+                   Breakpoint="Breakpoint.Md" Class="app-drawer">
+            <NavMenu />
+        </MudDrawer>
 
-    <MudMainContent Class="main-content">
-        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="content-container">
-            <div class="breadcrumb-bar">
-                <MudBreadcrumbs Items="_breadcrumbs" Separator="/" />
+        <MudMainContent Class="main-content">
+            <div class="ambient-background" aria-hidden="true">
+                <span class="ambient-line ambient-line-one"></span>
+                <span class="ambient-line ambient-line-two"></span>
+                <span class="ambient-grid"></span>
             </div>
-            @Body
-        </MudContainer>
-    </MudMainContent>
-</MudLayout>
+            <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge" Class="content-container">
+                <div class="breadcrumb-bar">
+                    <MudBreadcrumbs Items="_breadcrumbs" Separator="/" />
+                </div>
+                @Body
+            </MudContainer>
+        </MudMainContent>
+    </MudLayout>
 </MudRTLProvider>
 
 <div id="blazor-error-ui" data-nosnippet>
@@ -90,32 +96,42 @@
         {
             Primary = "#0B6B69",
             Secondary = "#D69B2D",
-            Background = "#F4F7F8",
+            Background = "#F3F7F6",
             Surface = "#FFFFFF",
-            AppbarBackground = "#083F46",
+            AppbarBackground = "#073F3A",
             AppbarText = "#FFFFFF",
             DrawerBackground = "#FFFFFF",
             TextPrimary = "#19343A",
             TextSecondary = "#60777C"
         },
-        Typography = new Typography { Default = new DefaultTypography { FontFamily = ["Vazirmatn", "Tahoma", "sans-serif"] } },
-        LayoutProperties = new LayoutProperties { DefaultBorderRadius = "10px", DrawerWidthLeft = "280px" }
+        Typography = new Typography { Default = new DefaultTypography { FontFamily = ["vazirmatn-regular", "Tahoma", "sans-serif"] } },
+        LayoutProperties = new LayoutProperties { DefaultBorderRadius = "10px", DrawerWidthLeft = "292px" }
     };
-    private List<BreadcrumbItem> _breadcrumbs = [new("خانه", href: "/"), new("داشبورد", href: null, disabled: true)];
+    private List<BreadcrumbItem> _breadcrumbs = [new("خانه", href: null, disabled: true)];
+
     protected override void OnInitialized()
     {
         Access.Changed += OnAccessChanged;
         Navigation.LocationChanged += OnLocationChanged;
         UpdateBreadcrumbs();
     }
+
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
     private void SwitchPanel(DepartmentAccess panel)
     {
         Access.SwitchPanel(panel.Key);
         Navigation.NavigateTo(panel.Route);
     }
+
     private void OnAccessChanged() => InvokeAsync(StateHasChanged);
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) { UpdateBreadcrumbs(); InvokeAsync(StateHasChanged); }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        UpdateBreadcrumbs();
+        InvokeAsync(StateHasChanged);
+    }
+
     private void UpdateBreadcrumbs()
     {
         var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
@@ -126,20 +142,13 @@
             "purchase/files" => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("پرونده‌های خرید", null)),
             var p when p.StartsWith("purchase/files/") => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("پرونده‌های خرید", "/purchase/files"), ("جزئیات پرونده", null)),
             "purchase/inquiries" => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("استعلام‌ها", null)),
-            "purchase/inquiries/create" => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("استعلام‌ها", "/purchase/inquiries"), ("ایجاد استعلام", null)),
-            var p when p.StartsWith("purchase/inquiries/") => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("استعلام‌ها", "/purchase/inquiries"), ("جزئیات استعلام", null)),
             "purchase/suppliers" => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("تأمین‌کنندگان", null)),
-            "purchase/suppliers/create" => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("تأمین‌کنندگان", "/purchase/suppliers"), ("ایجاد تأمین‌کننده", null)),
-            "purchase/suppliers/categories" => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("تأمین‌کنندگان", "/purchase/suppliers"), ("دسته‌بندی‌ها", null)),
-            var p when p.StartsWith("purchase/suppliers/") => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("تأمین‌کنندگان", "/purchase/suppliers"), ("جزئیات تأمین‌کننده", null)),
             "orders" => Crumbs(("خانه", "/"), ("سفارشات و کنترل موجودی", null)),
             "orders/mesc" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", null)),
             "orders/mesc/groups" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", "/orders/mesc"), ("گروه‌های عمومی", null)),
             "orders/mesc/items" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", "/orders/mesc"), ("اقلام کالا", null)),
             "orders/mesc/grouped" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", "/orders/mesc"), ("نمای گروه‌بندی", null)),
             "orders/indents" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("تقاضاهای خرید", null)),
-            "orders/indents/create" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("تقاضاهای خرید", "/orders/indents"), ("ایجاد تقاضا", null)),
-            var p when p.StartsWith("orders/indents/") => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("تقاضاهای خرید", "/orders/indents"), ("جزئیات تقاضا", null)),
             "inbox/my" => Crumbs(("خانه", "/"), ("کارتابل", null), ("کارتابل من", null)),
             "inbox/department" => Crumbs(("خانه", "/"), ("کارتابل", null), ("کارتابل واحد", null)),
             var p when p.StartsWith("inbox/tasks/") => Crumbs(("خانه", "/"), ("کارتابل", "/inbox/my"), ("جزئیات کار", null)),
@@ -168,6 +177,7 @@
         "admin/audit-log" => "گزارش ممیزی",
         _ => "مدیریت"
     };
+
     public void Dispose()
     {
         Access.Changed -= OnAccessChanged;

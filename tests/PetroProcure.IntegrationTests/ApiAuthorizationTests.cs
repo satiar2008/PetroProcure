@@ -23,6 +23,9 @@ using PetroProcure.Contracts.V1.Identity;
 using PetroProcure.Contracts.V1.Suppliers;
 using PetroProcure.Contracts.V1.Inquiry;
 using PetroProcure.Contracts.V1.Orders;
+using PetroProcure.Contracts.V1.Commission;
+using PetroProcure.Contracts.V1.Common;
+using PetroProcure.Contracts.V1.Tenders;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Orders;
 
@@ -296,6 +299,58 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
         var detail = await viewer.GetFromJsonAsync<IndentDto>($"/api/indents/{SeedDataIds.SampleIndentId}");
         Assert.Equal(IndentSourceType.Manual, detail!.SourceType);
         Assert.False(string.IsNullOrWhiteSpace(detail.SourceDisplayText));
+    }
+
+    [Fact]
+    public async Task UserWithoutCommissionViewCannotListSessions()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.TenderView);
+        var response = await client.GetAsync("/api/commission/sessions");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserWithCommissionViewCanListSessions()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.CommissionView);
+        var response = await client.GetAsync("/api/commission/sessions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.Content.ReadFromJsonAsync<PagedResult<TenderCommissionSessionSummaryDto>>();
+        Assert.NotNull(page);
+    }
+
+    [Fact]
+    public async Task UserWithoutCommissionCreateCannotCreateSession()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.CommissionView);
+        var response = await client.PostAsJsonAsync("/api/commission/sessions",
+            new CreateCommissionSessionRequest(Guid.NewGuid(), "Forbidden session", DateTime.UtcNow, null, null));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateCommissionSessionFromTender()
+    {
+        var tenderCreator = factory.CreateAuthenticatedClient(ApplicationPermissions.TenderCreate,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var tenderResponse = await tenderCreator.PostAsJsonAsync("/api/tenders",
+            new CreateTenderRequest(SeedDataIds.SamplePurchaseFileId, "Tender for commission",
+                TenderType.LimitedTender, DateTime.UtcNow.AddDays(7), DateTime.UtcNow.AddDays(8), null));
+        Assert.Equal(HttpStatusCode.Created, tenderResponse.StatusCode);
+        var tender = await tenderResponse.Content.ReadFromJsonAsync<TenderDetailDto>();
+
+        var commissionCreator = factory.CreateAuthenticatedClient(ApplicationPermissions.CommissionCreate,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var response = await commissionCreator.PostAsJsonAsync($"/api/commission/sessions/from-tender/{tender!.Tender.Id}",
+            new CreateCommissionSessionFromTenderRequest("Commission session", DateTime.UtcNow.AddDays(1),
+                "Meeting room", null, [], [new AddAgendaItemRequest(1, "Review bids", null, null, null)]));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var session = await response.Content.ReadFromJsonAsync<TenderCommissionSessionDetailDto>();
+        Assert.Equal(tender.Tender.Id, session!.Session.TenderId);
+        Assert.Equal(SeedDataIds.SamplePurchaseFileId, session.Session.PurchaseFileId);
+        Assert.Equal(IdentitySeedData.DefaultAdminUserId, session.Session.CreatedByUserId);
+        Assert.Single(session.AgendaItems);
     }
 
     private sealed record IndentCreatedResponse(Guid Id, Guid CreatedByUserId);

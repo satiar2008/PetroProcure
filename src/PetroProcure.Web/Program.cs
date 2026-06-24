@@ -1,4 +1,4 @@
-using PetroProcure.Web.Components;
+﻿using PetroProcure.Web.Components;
 using System.Globalization;
 using MudBlazor.Services;
 using PetroProcure.Web.Services;
@@ -100,3 +100,4 @@ static string ResolveApiBaseUrl(IConfiguration configuration, IHostEnvironment e
         ? "https://localhost:7008"
         : "https+http://api";
 }
+

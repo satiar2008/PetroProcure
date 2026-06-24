@@ -1,0 +1,219 @@
+@page "/tender-commission/sessions/from-tender/{TenderId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد جلسه از مناقصه</PageTitle>
+<PageHeader Title="ایجاد جلسه کمیسیون از مناقصه" Subtitle="تشکیل جلسه کمیسیون بر اساس پرونده مناقصه انتخاب‌شده" />
+
+<DataStateView TItem="TenderItemDto" Loading="_loading" Error="_error" Retry="Load">
+@if (_tender is not null)
+{
+    <MudGrid>
+        <MudItem xs="12" lg="8">
+            <MudPaper Class="form-panel" Elevation="0">
+                <MudText Typo="Typo.h6">@_tender.Tender.TenderNumber — @_tender.Tender.Title</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">پرونده خرید: @(_tender.Tender.PurchaseFileNumber ?? "—")</MudText>
+                <MudDivider Class="my-3" />
+                <MudGrid>
+                    <MudItem xs="12" md="4">@Info("وضعیت مناقصه", TenderUiPolicy.StatusText(_tender.Tender.Status))</MudItem>
+                    <MudItem xs="12" md="4">@Info("تعداد اقلام", _tender.Items.Count.ToString())</MudItem>
+                    <MudItem xs="12" md="4">@Info("تعداد پیشنهادها", _tender.Bids.Count.ToString())</MudItem>
+                </MudGrid>
+
+                <MudForm @ref="_form" Class="mt-4">
+                    <MudGrid>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_title" Label="عنوان جلسه" Required="true" RequiredError="عنوان جلسه الزامی است." />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudDatePicker @bind-Date="_sessionDate" Label="تاریخ جلسه" Required="true" RequiredError="تاریخ جلسه الزامی است." />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_location" Label="محل برگزاری" />
+                        </MudItem>
+                        <MudItem xs="12" md="6">
+                            <MudTextField @bind-Value="_description" Label="توضیحات" />
+                        </MudItem>
+                    </MudGrid>
+                </MudForm>
+
+                <MudText Typo="Typo.h6" Class="mt-5">پیشنهادهای ثبت‌شده</MudText>
+                @if (_tender.Bids.Count == 0)
+                {
+                    <EmptyState Title="پیشنهادی ثبت نشده" Description="جلسه قابل ایجاد است، اما تصمیم برنده نیازمند پیشنهاد معتبر خواهد بود." />
+                }
+                else
+                {
+                    <MudTable Items="_tender.Bids" Dense="true">
+                        <HeaderContent>
+                            <MudTh>تأمین‌کننده</MudTh>
+                            <MudTh>شماره پیشنهاد</MudTh>
+                            <MudTh>مبلغ نهایی</MudTh>
+                            <MudTh>امتیاز نهایی</MudTh>
+                            <MudTh>وضعیت</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@(context.SupplierName ?? "—")</MudTd>
+                            <MudTd>@(context.BidNumber ?? "—")</MudTd>
+                            <MudTd>@(context.FinalAmount?.ToString("N0") ?? "—")</MudTd>
+                            <MudTd>@(context.FinalScore?.ToString("N2") ?? "—")</MudTd>
+                            <MudTd>@context.Status</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" lg="4">
+            <MudPaper Class="form-panel" Elevation="0">
+                <MudText Typo="Typo.h6">اعضای اولیه</MudText>
+                <MudSelect T="Guid" @bind-Value="_memberUserId" Label="کاربر" Class="mt-2">
+                    @foreach (var user in _users)
+                    {
+                        <MudSelectItem Value="@user.Id">@user.Name</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudSelect T="TenderCommissionMemberRole" @bind-Value="_memberRole" Label="نقش" Class="mt-2">
+                    @foreach (var role in Enum.GetValues<TenderCommissionMemberRole>())
+                    {
+                        <MudSelectItem Value="@role">@CommissionUiPolicy.RoleText(role)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton Class="mt-2" Variant="Variant.Outlined" OnClick="AddMember" Disabled="@(_memberUserId == Guid.Empty)">افزودن عضو</MudButton>
+                @foreach (var member in _members)
+                {
+                    <MudChip T="string" Class="ma-1">@MemberTitle(member)</MudChip>
+                }
+
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.h6">دستور جلسه اولیه</MudText>
+                <MudTextField @bind-Value="_agendaTitle" Label="عنوان دستور جلسه" />
+                <MudTextField @bind-Value="_agendaDescription" Label="شرح" Lines="2" />
+                <MudButton Class="mt-2" Variant="Variant.Outlined" OnClick="AddAgenda" Disabled="@string.IsNullOrWhiteSpace(_agendaTitle)">افزودن دستور جلسه</MudButton>
+                @foreach (var agenda in _agendaItems)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@agenda.OrderNo. @agenda.Title</MudAlert>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+
+    <div class="form-actions">
+        <MudButton Variant="Variant.Text" Href="@($"/purchase/tenders/{TenderId}")">بازگشت به مناقصه</MudButton>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" OnClick="Save">ایجاد جلسه کمیسیون</MudButton>
+    </div>
+}
+</DataStateView>
+
+@code {
+    [Parameter] public Guid TenderId { get; set; }
+
+    private MudForm? _form;
+    private TenderDetailDto? _tender;
+    private bool _loading = true;
+    private bool _saving;
+    private string? _error;
+    private string _title = "";
+    private string? _description;
+    private DateTime? _sessionDate = DateTime.Today;
+    private string? _location;
+    private List<LookupDto> _users = [];
+    private List<AddCommissionMemberRequest> _members = [];
+    private List<AddAgendaItemRequest> _agendaItems = [];
+    private Guid _memberUserId;
+    private TenderCommissionMemberRole _memberRole = TenderCommissionMemberRole.Member;
+    private string? _agendaTitle;
+    private string? _agendaDescription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(CommissionUiPolicy.Create))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _tender = await Api.GetTenderAsync(TenderId);
+            if (_tender is null)
+            {
+                _error = "مناقصه یافت نشد.";
+                return;
+            }
+
+            _title = string.IsNullOrWhiteSpace(_title) ? $"جلسه کمیسیون {_tender.Tender.TenderNumber}" : _title;
+            _users = await Api.GetUserLookupsAsync();
+            _memberUserId = _users.FirstOrDefault()?.Id ?? Guid.Empty;
+            if (_agendaItems.Count == 0)
+                _agendaItems.Add(new AddAgendaItemRequest(1, "بررسی پیشنهادها و تصمیم کمیسیون", null, null, null));
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private RenderFragment Info(string label, string value) =>
+        @<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.caption">@label</MudText>
+            <MudText><strong>@value</strong></MudText>
+        </MudPaper>;
+
+    private void AddMember()
+    {
+        if (_memberUserId == Guid.Empty || _members.Any(x => x.UserId == _memberUserId)) return;
+        _members.Add(new AddCommissionMemberRequest(_memberUserId, _memberRole));
+    }
+
+    private void AddAgenda()
+    {
+        if (string.IsNullOrWhiteSpace(_agendaTitle)) return;
+        _agendaItems.Add(new AddAgendaItemRequest(_agendaItems.Count + 1, _agendaTitle.Trim(), _agendaDescription, null, null));
+        _agendaTitle = _agendaDescription = null;
+    }
+
+    private string MemberTitle(AddCommissionMemberRequest member)
+    {
+        var user = _users.FirstOrDefault(x => x.Id == member.UserId)?.Name ?? "کاربر";
+        return $"{user} — {CommissionUiPolicy.RoleText(member.Role)}";
+    }
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid || !_sessionDate.HasValue) return;
+
+        _saving = true;
+        try
+        {
+            var detail = await Api.CreateCommissionSessionFromTenderAsync(TenderId,
+                new CreateCommissionSessionFromTenderRequest(_title, _sessionDate.Value, _location,
+                    _description, _members.ToArray(), _agendaItems.ToArray()));
+            Snackbar.Add("جلسه کمیسیون از مناقصه ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/tender-commission/sessions/{detail.Session.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

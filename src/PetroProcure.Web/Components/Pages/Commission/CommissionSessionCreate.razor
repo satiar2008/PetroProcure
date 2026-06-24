@@ -1,0 +1,167 @@
+@page "/tender-commission/sessions/create"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد جلسه کمیسیون</PageTitle>
+<PageHeader Title="ایجاد جلسه کمیسیون" Subtitle="ثبت جلسه رسمی کمیسیون مناقصه و اتصال آن به یک مناقصه" />
+
+<MudGrid>
+    <MudItem xs="12" lg="8">
+        <MudPaper Class="form-panel" Elevation="0">
+            <MudForm @ref="_form">
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudSelect T="Guid" @bind-Value="_tenderId" Label="مناقصه" Required="true" RequiredError="انتخاب مناقصه الزامی است.">
+                            @foreach (var tender in _tenders)
+                            {
+                                <MudSelectItem Value="@tender.Id">@tender.TenderNumber — @tender.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_title" Label="عنوان جلسه" Required="true" RequiredError="عنوان جلسه الزامی است." />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudDatePicker @bind-Date="_sessionDate" Label="تاریخ جلسه" Required="true" RequiredError="تاریخ جلسه الزامی است." />
+                    </MudItem>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_location" Label="محل برگزاری" />
+                    </MudItem>
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_description" Label="توضیحات" Lines="4" />
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" lg="4">
+        <MudPaper Class="form-panel" Elevation="0">
+            <MudText Typo="Typo.h6">اعضا و دستور جلسه اولیه</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">این موارد بعد از ایجاد جلسه به صورت خودکار اضافه می‌شوند.</MudText>
+
+            <MudDivider Class="my-3" />
+            <MudSelect T="Guid" @bind-Value="_memberUserId" Label="کاربر">
+                @foreach (var user in _users)
+                {
+                    <MudSelectItem Value="@user.Id">@user.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="TenderCommissionMemberRole" @bind-Value="_memberRole" Label="نقش" Class="mt-2">
+                @foreach (var role in Enum.GetValues<TenderCommissionMemberRole>())
+                {
+                    <MudSelectItem Value="@role">@CommissionUiPolicy.RoleText(role)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudButton Class="mt-2" Variant="Variant.Outlined" OnClick="AddInitialMember" Disabled="@(_memberUserId == Guid.Empty)">افزودن عضو</MudButton>
+            @foreach (var member in _members)
+            {
+                <MudChip T="string" Class="ma-1">@MemberTitle(member)</MudChip>
+            }
+
+            <MudDivider Class="my-3" />
+            <MudTextField @bind-Value="_agendaTitle" Label="عنوان دستور جلسه" />
+            <MudTextField @bind-Value="_agendaDescription" Label="شرح دستور جلسه" Lines="2" />
+            <MudButton Class="mt-2" Variant="Variant.Outlined" OnClick="AddInitialAgenda" Disabled="@string.IsNullOrWhiteSpace(_agendaTitle)">افزودن دستور جلسه</MudButton>
+            @foreach (var agenda in _agendaItems)
+            {
+                <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">@agenda.OrderNo. @agenda.Title</MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+<div class="form-actions">
+    <MudButton Variant="Variant.Text" Href="/tender-commission/sessions">انصراف</MudButton>
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" OnClick="Save">ثبت جلسه</MudButton>
+</div>
+
+@code {
+    private MudForm? _form;
+    private bool _saving;
+    private string _title = "";
+    private string? _description;
+    private DateTime? _sessionDate = DateTime.Today;
+    private string? _location;
+    private Guid _tenderId;
+    private List<TenderSummaryDto> _tenders = [];
+    private List<LookupDto> _users = [];
+    private List<AddCommissionMemberRequest> _members = [];
+    private List<AddAgendaItemRequest> _agendaItems = [];
+    private Guid _memberUserId;
+    private TenderCommissionMemberRole _memberRole = TenderCommissionMemberRole.Member;
+    private string? _agendaTitle;
+    private string? _agendaDescription;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(CommissionUiPolicy.Create))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+
+        try
+        {
+            _tenders = (await Api.GetTendersAsync(new TenderListRequest(PageSize: 100))).Items.ToList();
+            _tenderId = _tenders.FirstOrDefault()?.Id ?? Guid.Empty;
+            _users = await Api.GetUserLookupsAsync();
+            _memberUserId = _users.FirstOrDefault()?.Id ?? Guid.Empty;
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+
+    private void AddInitialMember()
+    {
+        if (_memberUserId == Guid.Empty || _members.Any(x => x.UserId == _memberUserId)) return;
+        _members.Add(new AddCommissionMemberRequest(_memberUserId, _memberRole));
+    }
+
+    private void AddInitialAgenda()
+    {
+        if (string.IsNullOrWhiteSpace(_agendaTitle)) return;
+        _agendaItems.Add(new AddAgendaItemRequest(_agendaItems.Count + 1, _agendaTitle.Trim(), _agendaDescription, null, null));
+        _agendaTitle = _agendaDescription = null;
+    }
+
+    private string MemberTitle(AddCommissionMemberRequest member)
+    {
+        var user = _users.FirstOrDefault(x => x.Id == member.UserId)?.Name ?? "کاربر";
+        return $"{user} — {CommissionUiPolicy.RoleText(member.Role)}";
+    }
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid || _tenderId == Guid.Empty || !_sessionDate.HasValue) return;
+
+        _saving = true;
+        try
+        {
+            var detail = await Api.CreateCommissionSessionAsync(new CreateCommissionSessionRequest(
+                _tenderId, _title, _sessionDate.Value, _location, _description));
+
+            foreach (var member in _members)
+                await Api.AddCommissionMemberAsync(detail.Session.Id, member);
+            foreach (var agenda in _agendaItems)
+                await Api.AddCommissionAgendaItemAsync(detail.Session.Id, agenda);
+
+            Snackbar.Add("جلسه کمیسیون ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/tender-commission/sessions/{detail.Session.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

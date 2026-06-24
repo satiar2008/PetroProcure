@@ -129,6 +129,7 @@ app.MapSupplierEndpoints();
 app.MapInquiryEndpoints();
 app.MapOrdersEndpoints();
 app.MapTenderEndpoints();
+app.MapCommissionEndpoints();
 
 app.MapDefaultEndpoints();
 

@@ -13,6 +13,7 @@ using PetroProcure.Contracts.V1.Suppliers;
 using PetroProcure.Contracts.V1.Inquiry;
 using PetroProcure.Contracts.V1.Orders;
 using PetroProcure.Contracts.V1.Tenders;
+using PetroProcure.Contracts.V1.Commission;
 using PetroProcure.Web.Services.Auth;
 
 namespace PetroProcure.Web.Services.Api;
@@ -144,6 +145,23 @@ public interface IPetroProcureApiClient
     Task<TenderEvaluationDto> AddTenderEvaluationAsync(Guid id, AddTenderEvaluationRequest request, CancellationToken ct = default);
     Task<TenderComparisonDto?> GetTenderComparisonAsync(Guid id, CancellationToken ct = default);
     Task SelectTenderWinnerAsync(Guid id, SelectTenderWinnerRequest request, CancellationToken ct = default);
+    Task<PagedResult<TenderCommissionSessionSummaryDto>> GetCommissionSessionsAsync(CommissionSessionListRequest request, CancellationToken ct = default);
+    Task<TenderCommissionSessionDetailDto?> GetCommissionSessionAsync(Guid id, CancellationToken ct = default);
+    Task<List<TenderCommissionSessionSummaryDto>> GetTenderCommissionSessionsAsync(Guid tenderId, CancellationToken ct = default);
+    Task<List<TenderCommissionSessionSummaryDto>> GetPurchaseFileCommissionSessionsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<TenderCommissionSessionDetailDto> CreateCommissionSessionAsync(CreateCommissionSessionRequest request, CancellationToken ct = default);
+    Task<TenderCommissionSessionDetailDto> CreateCommissionSessionFromTenderAsync(Guid tenderId, CreateCommissionSessionFromTenderRequest request, CancellationToken ct = default);
+    Task ChangeCommissionSessionStatusAsync(Guid id, string action, object? body = null, CancellationToken ct = default);
+    Task<TenderCommissionMemberDto> AddCommissionMemberAsync(Guid sessionId, AddCommissionMemberRequest request, CancellationToken ct = default);
+    Task<TenderCommissionMemberDto> UpdateCommissionMemberAsync(Guid sessionId, Guid memberId, UpdateCommissionMemberRequest request, CancellationToken ct = default);
+    Task RemoveCommissionMemberAsync(Guid sessionId, Guid memberId, CancellationToken ct = default);
+    Task<TenderCommissionAgendaItemDto> AddCommissionAgendaItemAsync(Guid sessionId, AddAgendaItemRequest request, CancellationToken ct = default);
+    Task<TenderCommissionAgendaItemDto> UpdateCommissionAgendaItemAsync(Guid sessionId, Guid agendaItemId, UpdateAgendaItemRequest request, CancellationToken ct = default);
+    Task<TenderCommissionMinuteDto> AddCommissionMinuteAsync(Guid sessionId, AddCommissionMinuteRequest request, CancellationToken ct = default);
+    Task<TenderCommissionMinuteDto> UpdateCommissionMinuteAsync(Guid sessionId, Guid minuteId, UpdateCommissionMinuteRequest request, CancellationToken ct = default);
+    Task<TenderCommissionDecisionDto> AddCommissionDecisionAsync(Guid sessionId, AddCommissionDecisionRequest request, CancellationToken ct = default);
+    Task<TenderCommissionDecisionDto> ApproveCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken ct = default);
+    Task<TenderCommissionDecisionDto> RejectCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken ct = default);
 }
 
 public sealed class PetroProcureApiClient(
@@ -664,6 +682,114 @@ public sealed class PetroProcureApiClient(
         GetJsonAsync<TenderComparisonDto>($"/api/tenders/{id}/comparison", ct);
     public async Task SelectTenderWinnerAsync(Guid id, SelectTenderWinnerRequest request, CancellationToken ct = default)
     { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/select-winner", request, ct); await Ensure(response, ct); }
+
+    public async Task<PagedResult<TenderCommissionSessionSummaryDto>> GetCommissionSessionsAsync(CommissionSessionListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["SearchTerm"] = r.SearchTerm,
+            ["SessionNumber"] = r.SessionNumber,
+            ["TenderNumber"] = r.TenderNumber,
+            ["PurchaseFileNumber"] = r.PurchaseFileNumber,
+            ["Status"] = r.Status?.ToString(),
+            ["SessionDateFrom"] = r.SessionDateFrom?.ToString("O"),
+            ["SessionDateTo"] = r.SessionDateTo?.ToString("O"),
+            ["MemberUserId"] = r.MemberUserId?.ToString(),
+            ["SortBy"] = r.SortBy,
+            ["SortDescending"] = r.SortDescending.ToString(),
+            ["PageNumber"] = r.PageNumber.ToString(),
+            ["PageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/commission/sessions?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<TenderCommissionSessionSummaryDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public Task<TenderCommissionSessionDetailDto?> GetCommissionSessionAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<TenderCommissionSessionDetailDto>($"/api/commission/sessions/{id}", ct);
+
+    public async Task<List<TenderCommissionSessionSummaryDto>> GetTenderCommissionSessionsAsync(Guid tenderId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<TenderCommissionSessionSummaryDto>>($"/api/tenders/{tenderId}/commission-sessions", ct) ?? [];
+
+    public async Task<List<TenderCommissionSessionSummaryDto>> GetPurchaseFileCommissionSessionsAsync(Guid purchaseFileId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<TenderCommissionSessionSummaryDto>>($"/api/purchase-files/{purchaseFileId}/commission-sessions", ct) ?? [];
+
+    public async Task<TenderCommissionSessionDetailDto> CreateCommissionSessionAsync(CreateCommissionSessionRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/commission/sessions", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionSessionDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionSessionDetailDto> CreateCommissionSessionFromTenderAsync(Guid tenderId, CreateCommissionSessionFromTenderRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/from-tender/{tenderId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionSessionDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task ChangeCommissionSessionStatusAsync(Guid id, string action, object? body = null, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/{id}/{action}", body ?? new { }, ct);
+        await Ensure(response, ct);
+    }
+
+    public async Task<TenderCommissionMemberDto> AddCommissionMemberAsync(Guid sessionId, AddCommissionMemberRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/{sessionId}/members", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionMemberDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionMemberDto> UpdateCommissionMemberAsync(Guid sessionId, Guid memberId, UpdateCommissionMemberRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/commission/sessions/{sessionId}/members/{memberId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionMemberDto>(cancellationToken: ct))!;
+    }
+
+    public async Task RemoveCommissionMemberAsync(Guid sessionId, Guid memberId, CancellationToken ct = default)
+    {
+        var response = await Client().DeleteAsync($"/api/commission/sessions/{sessionId}/members/{memberId}", ct); await Ensure(response, ct);
+    }
+
+    public async Task<TenderCommissionAgendaItemDto> AddCommissionAgendaItemAsync(Guid sessionId, AddAgendaItemRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/{sessionId}/agenda", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionAgendaItemDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionAgendaItemDto> UpdateCommissionAgendaItemAsync(Guid sessionId, Guid agendaItemId, UpdateAgendaItemRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/commission/sessions/{sessionId}/agenda/{agendaItemId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionAgendaItemDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionMinuteDto> AddCommissionMinuteAsync(Guid sessionId, AddCommissionMinuteRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/{sessionId}/minutes", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionMinuteDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionMinuteDto> UpdateCommissionMinuteAsync(Guid sessionId, Guid minuteId, UpdateCommissionMinuteRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/commission/sessions/{sessionId}/minutes/{minuteId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionMinuteDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionDecisionDto> AddCommissionDecisionAsync(Guid sessionId, AddCommissionDecisionRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/{sessionId}/decisions", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionDecisionDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionDecisionDto> ApproveCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/{sessionId}/decisions/{decisionId}/approve", new ApproveCommissionDecisionRequest(), ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionDecisionDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderCommissionDecisionDto> RejectCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/commission/sessions/{sessionId}/decisions/{decisionId}/reject", new RejectCommissionDecisionRequest(), ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderCommissionDecisionDto>(cancellationToken: ct))!;
+    }
 
     private sealed record IndentReference(Guid IndentId);
 

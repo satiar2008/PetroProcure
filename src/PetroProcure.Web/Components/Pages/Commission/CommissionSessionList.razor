@@ -1,0 +1,215 @@
+@page "/tender-commission/sessions"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>جلسات کمیسیون</PageTitle>
+<PageHeader Title="جلسات کمیسیون مناقصه" Subtitle="مدیریت جلسات رسمی کمیسیون، صورتجلسه‌ها و تصمیمات مناقصه">
+    <Actions>
+        @if (CommissionUiPolicy.CanCreate(Access.HasPermission))
+        {
+            <MudButton Href="/tender-commission/sessions/create" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add">
+                ایجاد جلسه
+            </MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="3">
+            <MudTextField @bind-Value="_search" Label="جستجو" Immediate="true" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudTextField @bind-Value="_tenderNumber" Label="شماره مناقصه" Immediate="true" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudTextField @bind-Value="_purchaseFileNumber" Label="شماره پرونده خرید" Immediate="true" />
+        </MudItem>
+        <MudItem xs="12" md="2">
+            <MudSelect T="TenderCommissionSessionStatus?" @bind-Value="_status" Label="وضعیت" Clearable="true">
+                @foreach (var status in Enum.GetValues<TenderCommissionSessionStatus>())
+                {
+                    <MudSelectItem T="TenderCommissionSessionStatus?" Value="@status">@CommissionUiPolicy.StatusText(status)</MudSelectItem>
+                }
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-end gap-2">
+            <MudButton OnClick="ApplyFilters" Variant="Variant.Filled" Color="Color.Primary">اعمال فیلتر</MudButton>
+            <MudButton OnClick="Clear" Variant="Variant.Text">پاک‌سازی</MudButton>
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudDatePicker @bind-Date="_dateFrom" Label="از تاریخ جلسه" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudDatePicker @bind-Date="_dateTo" Label="تا تاریخ جلسه" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="string" @bind-Value="_sortBy" Label="مرتب‌سازی">
+                <MudSelectItem Value="@("SessionDate")">تاریخ جلسه</MudSelectItem>
+                <MudSelectItem Value="@("CreatedAt")">تاریخ ایجاد</MudSelectItem>
+                <MudSelectItem Value="@("SessionNumber")">شماره جلسه</MudSelectItem>
+                <MudSelectItem Value="@("Status")">وضعیت</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="3" Class="d-flex align-center">
+            <MudSwitch @bind-Value="_sortDescending" Color="Color.Primary" Label="نزولی" />
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+<DataStateView TItem="TenderCommissionSessionSummaryDto" Loading="_loading" Error="_error" Items="_items" EmptyTitle="جلسه‌ای یافت نشد" EmptyDescription="هنوز جلسه‌ای برای کمیسیون ثبت نشده یا فیلترها نتیجه‌ای ندارند." Retry="Load">
+    <MudTable Items="_items" Dense="true" Hover="true">
+        <HeaderContent>
+            <MudTh>شماره جلسه</MudTh>
+            <MudTh>مناقصه</MudTh>
+            <MudTh>پرونده خرید</MudTh>
+            <MudTh>عنوان</MudTh>
+            <MudTh>وضعیت</MudTh>
+            <MudTh>تاریخ جلسه</MudTh>
+            <MudTh>اعضا</MudTh>
+            <MudTh>تصمیمات</MudTh>
+            <MudTh>عملیات</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.SessionNumber</MudTd>
+            <MudTd>@(context.TenderNumber ?? "—")</MudTd>
+            <MudTd>@(context.PurchaseFileNumber ?? "—")</MudTd>
+            <MudTd>@context.Title</MudTd>
+            <MudTd><StatusChip Text="@CommissionUiPolicy.StatusText(context.Status)" Color="@CommissionUiPolicy.StatusColor(context.Status)" /></MudTd>
+            <MudTd><DateDisplay Value="@context.SessionDate" IncludeTime="true" /></MudTd>
+            <MudTd>@context.MemberCount</MudTd>
+            <MudTd>@context.DecisionCount</MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Href="@($"/tender-commission/sessions/{context.Id}")">مشاهده</MudButton>
+                @if (CommissionUiPolicy.CanStart(context.Status, Access.HasPermission))
+                {
+                    <MudButton Size="Size.Small" Color="Color.Primary" OnClick='@(() => ChangeStatus(context.Id, "start", "جلسه شروع شد."))'>شروع</MudButton>
+                }
+                @if (CommissionUiPolicy.CanComplete(context.Status, Access.HasPermission))
+                {
+                    <MudButton Size="Size.Small" Color="Color.Secondary" OnClick='@(() => ChangeStatus(context.Id, "complete", "جلسه تکمیل شد."))'>تکمیل</MudButton>
+                }
+                @if (CommissionUiPolicy.CanApprove(context.Status, Access.HasPermission))
+                {
+                    <MudButton Size="Size.Small" Color="Color.Success" OnClick='@(() => ChangeStatus(context.Id, "approve", "جلسه تأیید شد."))'>تأیید</MudButton>
+                }
+                @if (CommissionUiPolicy.CanCancel(context.Status, Access.HasPermission))
+                {
+                    <MudButton Size="Size.Small" Color="Color.Error" OnClick='@(() => ChangeStatus(context.Id, "cancel", "جلسه لغو شد.", new CancelCommissionSessionRequest("لغو از فهرست جلسات")))'>لغو</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+
+    <div class="d-flex justify-space-between align-center mt-3">
+        <MudText Typo="Typo.caption">صفحه @_pageNumber از @_totalPages — @_totalCount رکورد</MudText>
+        <div class="d-flex gap-2">
+            <MudButton Variant="Variant.Outlined" Disabled="@(_pageNumber <= 1 || _loading)" OnClick="PreviousPage">قبلی</MudButton>
+            <MudButton Variant="Variant.Outlined" Disabled="@(_pageNumber >= _totalPages || _loading)" OnClick="NextPage">بعدی</MudButton>
+        </div>
+    </div>
+</DataStateView>
+
+@code {
+    private bool _loading = true;
+    private string? _error, _search, _tenderNumber, _purchaseFileNumber;
+    private TenderCommissionSessionStatus? _status;
+    private DateTime? _dateFrom, _dateTo;
+    private string _sortBy = "SessionDate";
+    private bool _sortDescending = true;
+    private int _pageNumber = 1;
+    private const int PageSize = 20;
+    private long _totalCount;
+    private int _totalPages = 1;
+    private List<TenderCommissionSessionSummaryDto> _items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(CommissionUiPolicy.View))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var result = await Api.GetCommissionSessionsAsync(new CommissionSessionListRequest(
+                SearchTerm: _search,
+                TenderNumber: _tenderNumber,
+                PurchaseFileNumber: _purchaseFileNumber,
+                Status: _status,
+                SessionDateFrom: _dateFrom,
+                SessionDateTo: _dateTo,
+                SortBy: _sortBy,
+                SortDescending: _sortDescending,
+                PageNumber: _pageNumber,
+                PageSize: PageSize));
+
+            _items = result.Items.ToList();
+            _totalCount = result.TotalCount;
+            _totalPages = Math.Max(1, result.TotalPages);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        _pageNumber = 1;
+        await Load();
+    }
+
+    private async Task Clear()
+    {
+        _search = _tenderNumber = _purchaseFileNumber = null;
+        _status = null;
+        _dateFrom = _dateTo = null;
+        _sortBy = "SessionDate";
+        _sortDescending = true;
+        await ApplyFilters();
+    }
+
+    private async Task PreviousPage()
+    {
+        if (_pageNumber <= 1) return;
+        _pageNumber--;
+        await Load();
+    }
+
+    private async Task NextPage()
+    {
+        if (_pageNumber >= _totalPages) return;
+        _pageNumber++;
+        await Load();
+    }
+
+    private async Task ChangeStatus(Guid id, string action, string successMessage, object? body = null)
+    {
+        try
+        {
+            await Api.ChangeCommissionSessionStatusAsync(id, action, body);
+            Snackbar.Add(successMessage, Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

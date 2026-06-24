@@ -1,0 +1,555 @@
+@page "/tender-commission/sessions/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>جزئیات جلسه کمیسیون</PageTitle>
+<PageHeader Title="@(_detail?.Session.SessionNumber ?? "جلسه کمیسیون")" Subtitle="@(_detail?.Session.Title ?? "در حال دریافت اطلاعات")">
+    <Actions>
+        @if (_detail is not null && Access.HasPermission(CommissionUiPolicy.Schedule) && _detail.Session.Status == TenderCommissionSessionStatus.Draft)
+        {
+            <MudButton Color="Color.Info" Variant="Variant.Outlined" OnClick="Schedule">زمان‌بندی</MudButton>
+        }
+        @if (_detail is not null && CommissionUiPolicy.CanStart(_detail.Session.Status, Access.HasPermission))
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="StartSession">شروع جلسه</MudButton>
+        }
+        @if (_detail is not null && CommissionUiPolicy.CanComplete(_detail.Session.Status, Access.HasPermission))
+        {
+            <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="CompleteSession">تکمیل جلسه</MudButton>
+        }
+        @if (_detail is not null && CommissionUiPolicy.CanApprove(_detail.Session.Status, Access.HasPermission))
+        {
+            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ApproveSession">تأیید جلسه</MudButton>
+        }
+        @if (_detail is not null && CommissionUiPolicy.CanCancel(_detail.Session.Status, Access.HasPermission))
+        {
+            <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="Cancel">لغو جلسه</MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<DataStateView TItem="TenderCommissionMemberDto" Loading="_loading" Error="_error" Retry="Load">
+@if (_detail is not null)
+{
+    <MudTabs Rounded="true" PanelClass="pa-4">
+        <MudTabPanel Text="خلاصه" Icon="@Icons.Material.Filled.Info">
+            <MudGrid>
+                <MudItem xs="12" md="3">@Info("شماره جلسه", _detail.Session.SessionNumber)</MudItem>
+                <MudItem xs="12" md="3">
+                    <MudPaper Class="pa-3" Elevation="0" Outlined="true">
+                        <MudText Typo="Typo.caption">وضعیت</MudText>
+                        <StatusChip Text="@CommissionUiPolicy.StatusText(_detail.Session.Status)" Color="@CommissionUiPolicy.StatusColor(_detail.Session.Status)" />
+                    </MudPaper>
+                </MudItem>
+                <MudItem xs="12" md="3">@DateInfo("تاریخ جلسه", _detail.Session.SessionDate)</MudItem>
+                <MudItem xs="12" md="3">@Info("محل برگزاری", _detail.Session.Location ?? "—")</MudItem>
+                <MudItem xs="12" md="6">
+                    <MudAlert Severity="Severity.Info">
+                        مناقصه:
+                        <MudLink Href="@($"/purchase/tenders/{_detail.Session.TenderId}")">@(_detail.Session.TenderNumber ?? "مشاهده مناقصه")</MudLink>
+                    </MudAlert>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudAlert Severity="Severity.Info">
+                        پرونده خرید:
+                        <MudLink Href="@($"/purchase/files/{_detail.Session.PurchaseFileId}")">@(_detail.Session.PurchaseFileNumber ?? "مشاهده پرونده خرید")</MudLink>
+                    </MudAlert>
+                </MudItem>
+                <MudItem xs="12" md="3">@DateInfo("ایجاد", _detail.Session.CreatedAt)</MudItem>
+                <MudItem xs="12" md="3">@DateInfo("شروع", _detail.Session.StartedAt)</MudItem>
+                <MudItem xs="12" md="3">@DateInfo("تکمیل", _detail.Session.CompletedAt)</MudItem>
+                <MudItem xs="12" md="3">@DateInfo("تأیید", _detail.Session.ApprovedAt)</MudItem>
+                <MudItem xs="12">@Info("توضیحات", _detail.Session.Description ?? "—")</MudItem>
+                @if (_detail.Session.Status == TenderCommissionSessionStatus.Cancelled)
+                {
+                    <MudItem xs="12"><MudAlert Severity="Severity.Error">علت لغو: @(_detail.Session.CancellationReason ?? "ثبت نشده")</MudAlert></MudItem>
+                }
+            </MudGrid>
+        </MudTabPanel>
+
+        <MudTabPanel Text="اعضا" Icon="@Icons.Material.Filled.Groups">
+            @if (Access.HasPermission(CommissionUiPolicy.ManageMembers) && IsEditable)
+            {
+                <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+                    <MudGrid>
+                        <MudItem xs="12" md="5">
+                            <MudSelect T="Guid" @bind-Value="_memberUserId" Label="کاربر">
+                                @foreach (var user in _users)
+                                {
+                                    <MudSelectItem Value="@user.Id">@user.Name</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudSelect T="TenderCommissionMemberRole" @bind-Value="_memberRole" Label="نقش">
+                                @foreach (var role in Enum.GetValues<TenderCommissionMemberRole>())
+                                {
+                                    <MudSelectItem Value="@role">@CommissionUiPolicy.RoleText(role)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="3" Class="d-flex align-end">
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@(_memberUserId == Guid.Empty || _busy)" OnClick="AddMember">افزودن عضو</MudButton>
+                        </MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+
+            <MudTable Items="_detail.Members" Dense="true">
+                <HeaderContent>
+                    <MudTh>نام</MudTh>
+                    <MudTh>نقش</MudTh>
+                    <MudTh>حضور</MudTh>
+                    <MudTh>رأی</MudTh>
+                    <MudTh>یادداشت رأی</MudTh>
+                    <MudTh>عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.FullNameSnapshot</MudTd>
+                    <MudTd>@CommissionUiPolicy.RoleText(context.Role)</MudTd>
+                    <MudTd>@CommissionUiPolicy.AttendanceText(context.AttendanceStatus)</MudTd>
+                    <MudTd>@(context.VoteStatus?.ToString() ?? "—")</MudTd>
+                    <MudTd>@(context.VoteNote ?? "—")</MudTd>
+                    <MudTd>
+                        @if (Access.HasPermission(CommissionUiPolicy.ManageMembers) && IsEditable)
+                        {
+                            <MudButton Size="Size.Small" OnClick="@(() => SetMemberAttendance(context, TenderCommissionAttendanceStatus.Present))">حاضر</MudButton>
+                            <MudButton Size="Size.Small" OnClick="@(() => SetMemberAttendance(context, TenderCommissionAttendanceStatus.Absent))">غایب</MudButton>
+                            <MudButton Size="Size.Small" OnClick="@(() => SetMemberVote(context, TenderCommissionVoteStatus.Approve))">موافق</MudButton>
+                            <MudButton Size="Size.Small" OnClick="@(() => SetMemberVote(context, TenderCommissionVoteStatus.Reject))">مخالف</MudButton>
+                            <MudButton Size="Size.Small" OnClick="@(() => SetMemberVote(context, TenderCommissionVoteStatus.Abstain))">ممتنع</MudButton>
+                            <MudButton Size="Size.Small" Color="Color.Error" OnClick="@(() => RemoveMember(context.Id))">حذف</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+            <MudAlert Severity="Severity.Info" Class="mt-3">در هر جلسه فقط یک رئیس کمیسیون و یک دبیر مجاز است.</MudAlert>
+        </MudTabPanel>
+
+        <MudTabPanel Text="دستور جلسه" Icon="@Icons.Material.Filled.FormatListNumberedRtl">
+            @if (Access.HasPermission(CommissionUiPolicy.ManageAgenda) && IsEditable)
+            {
+                <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+                    <MudGrid>
+                        <MudItem xs="12" md="2"><MudNumericField @bind-Value="_agendaOrderNo" Label="ردیف" Min="1" /></MudItem>
+                        <MudItem xs="12" md="4"><MudTextField @bind-Value="_agendaTitle" Label="عنوان" /></MudItem>
+                        <MudItem xs="12" md="4"><MudTextField @bind-Value="_agendaDescription" Label="شرح" /></MudItem>
+                        <MudItem xs="12" md="2" Class="d-flex align-end"><MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@string.IsNullOrWhiteSpace(_agendaTitle)" OnClick="AddAgenda">افزودن</MudButton></MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+
+            <MudTable Items="_detail.AgendaItems.OrderBy(x => x.OrderNo)" Dense="true">
+                <HeaderContent>
+                    <MudTh>ردیف</MudTh>
+                    <MudTh>عنوان</MudTh>
+                    <MudTh>شرح</MudTh>
+                    <MudTh>وضعیت</MudTh>
+                    <MudTh>یادداشت</MudTh>
+                    <MudTh>عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.OrderNo</MudTd>
+                    <MudTd>@context.Title</MudTd>
+                    <MudTd>@(context.Description ?? "—")</MudTd>
+                    <MudTd>@CommissionUiPolicy.AgendaStatusText(context.Status)</MudTd>
+                    <MudTd>@(context.Notes ?? "—")</MudTd>
+                    <MudTd>
+                        @if (Access.HasPermission(CommissionUiPolicy.ManageAgenda) && IsEditable)
+                        {
+                            <MudButton Size="Size.Small" OnClick="@(() => SetAgendaStatus(context, TenderCommissionAgendaStatus.Discussed))">بررسی‌شده</MudButton>
+                            <MudButton Size="Size.Small" OnClick="@(() => SetAgendaStatus(context, TenderCommissionAgendaStatus.Deferred))">موکول</MudButton>
+                            <MudButton Size="Size.Small" OnClick="@(() => SetAgendaStatus(context, TenderCommissionAgendaStatus.Closed))">بسته</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+
+        <MudTabPanel Text="صورتجلسه" Icon="@Icons.Material.Filled.Article">
+            @if (Access.HasPermission(CommissionUiPolicy.ManageMinutes) && IsEditable)
+            {
+                <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+                    <MudSelect T="Guid?" @bind-Value="_minuteAgendaItemId" Label="دستور جلسه مرتبط" Clearable="true">
+                        @foreach (var agenda in _detail.AgendaItems.OrderBy(x => x.OrderNo))
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)agenda.Id)">@agenda.OrderNo — @agenda.Title</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_minuteText" Label="متن صورتجلسه" Lines="4" Class="mt-2" />
+                    <MudButton Class="mt-2" Variant="Variant.Filled" Color="Color.Primary" Disabled="@string.IsNullOrWhiteSpace(_minuteText)" OnClick="AddMinute">ثبت صورتجلسه</MudButton>
+                </MudPaper>
+            }
+
+            @if (_detail.Minutes.Count == 0)
+            {
+                <EmptyState Title="صورتجلسه‌ای ثبت نشده" Description="برای تأیید جلسه، حداقل یک صورتجلسه یا تصمیم لازم است." />
+            }
+            else
+            {
+                @foreach (var minute in _detail.Minutes)
+                {
+                    <MudPaper Class="pa-3 mb-2" Elevation="0" Outlined="true">
+                        @if (_editingMinuteId == minute.Id)
+                        {
+                            <MudTextField @bind-Value="_editingMinuteText" Label="متن صورتجلسه" Lines="4" />
+                            <div class="d-flex gap-2 mt-2">
+                                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => SaveMinute(minute.Id))">ذخیره</MudButton>
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="CancelMinuteEdit">انصراف</MudButton>
+                            </div>
+                        }
+                        else
+                        {
+                            <MudText>@minute.Text</MudText>
+                            @if (Access.HasPermission(CommissionUiPolicy.ManageMinutes) && IsEditable)
+                            {
+                                <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => StartMinuteEdit(minute))">ویرایش</MudButton>
+                            }
+                        }
+                        <MudText Typo="Typo.caption" Color="Color.Secondary"><DateDisplay Value="@minute.CreatedAt" IncludeTime="true" /></MudText>
+                    </MudPaper>
+                }
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="تصمیمات" Icon="@Icons.Material.Filled.TaskAlt">
+            @if (Access.HasPermission(CommissionUiPolicy.ManageDecisions) && IsEditable)
+            {
+                <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+                    <MudGrid>
+                        <MudItem xs="12" md="4">
+                            <MudSelect T="TenderCommissionDecisionType" @bind-Value="_decisionType" Label="نوع تصمیم">
+                                @foreach (var type in Enum.GetValues<TenderCommissionDecisionType>())
+                                {
+                                    <MudSelectItem Value="@type">@CommissionUiPolicy.DecisionTypeText(type)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="4">
+                            <MudSelect T="Guid?" @bind-Value="_decisionBidId" Label="پیشنهاد منتخب" Clearable="true">
+                                @foreach (var bid in TenderBids)
+                                {
+                                    <MudSelectItem T="Guid?" Value="@((Guid?)bid.Id)">@((bid.SupplierName ?? "تأمین‌کننده") + " — " + (bid.BidNumber ?? "بدون شماره"))</MudSelectItem>
+                                }
+                            </MudSelect>
+                        </MudItem>
+                        <MudItem xs="12" md="4"><MudTextField @bind-Value="_decisionReason" Label="علت" /></MudItem>
+                        <MudItem xs="12"><MudTextField @bind-Value="_decisionText" Label="متن تصمیم" Lines="3" /></MudItem>
+                        <MudItem xs="12"><MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@string.IsNullOrWhiteSpace(_decisionText)" OnClick="AddDecision">ثبت تصمیم</MudButton></MudItem>
+                    </MudGrid>
+                </MudPaper>
+            }
+
+            @if (_detail.Decisions.Count == 0)
+            {
+                <EmptyState Title="تصمیمی ثبت نشده" Description="تصمیمات کمیسیون بعد از ثبت در این بخش نمایش داده می‌شوند." />
+            }
+            else
+            {
+                @foreach (var group in CommissionUiPolicy.GroupDecisions(_detail.Decisions))
+                {
+                    <MudExpansionPanel Text="@($"{group.Title} — {group.Decisions.Count} تصمیم")" Expanded="true">
+                        <MudTable Items="group.Decisions" Dense="true">
+                            <HeaderContent>
+                                <MudTh>متن تصمیم</MudTh>
+                                <MudTh>وضعیت</MudTh>
+                                <MudTh>علت</MudTh>
+                                <MudTh>پیشنهاد منتخب</MudTh>
+                                <MudTh>تاریخ</MudTh>
+                                <MudTh>عملیات</MudTh>
+                            </HeaderContent>
+                            <RowTemplate>
+                                <MudTd>@context.DecisionText</MudTd>
+                                <MudTd>@CommissionUiPolicy.DecisionStatusText(context.Status)</MudTd>
+                                <MudTd>@(context.Reason ?? "—")</MudTd>
+                                <MudTd>@BidTitle(context.SelectedTenderBidId)</MudTd>
+                                <MudTd><DateDisplay Value="@context.CreatedAt" IncludeTime="true" /></MudTd>
+                                <MudTd>
+                                    @if (Access.HasPermission(CommissionUiPolicy.ManageDecisions) && context.Status == TenderCommissionDecisionStatus.Draft)
+                                    {
+                                        <MudButton Size="Size.Small" Color="Color.Success" OnClick="@(() => ApproveDecision(context.Id))">تأیید</MudButton>
+                                        <MudButton Size="Size.Small" Color="Color.Error" OnClick="@(() => RejectDecision(context.Id))">رد</MudButton>
+                                    }
+                                </MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    </MudExpansionPanel>
+                }
+            }
+            <MudAlert Severity="Severity.Warning" Class="mt-3">تصمیم نهایی انسانی است؛ سیستم و AI فقط ابزار ثبت، کنترل و تحلیل کمکی هستند.</MudAlert>
+        </MudTabPanel>
+
+        <MudTabPanel Text="پیوست‌ها" Icon="@Icons.Material.Filled.AttachFile">
+            @if (_detail.Attachments.Count == 0)
+            {
+                <EmptyState Title="پیوستی ثبت نشده" Description="اتصال کامل پیوست‌های کمیسیون به مخزن اسناد پرونده خرید در گام بعدی تکمیل می‌شود." />
+            }
+            else
+            {
+                <MudTable Items="_detail.Attachments" Dense="true">
+                    <HeaderContent><MudTh>نوع سند</MudTh><MudTh>نام فایل</MudTh><MudTh>تاریخ بارگذاری</MudTh><MudTh>شرح</MudTh></HeaderContent>
+                    <RowTemplate><MudTd>@context.DocumentType</MudTd><MudTd>@(context.OriginalFileName ?? "—")</MudTd><MudTd><DateDisplay Value="@context.UploadedAt" /></MudTd><MudTd>@(context.Description ?? "—")</MudTd></RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link">
+            <MudGrid>
+                <MudItem xs="12" md="6">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">مناقصه مرتبط</MudText>
+                            <MudText>@(_detail.Session.TenderNumber ?? "—")</MudText>
+                        </MudCardContent>
+                        <MudCardActions><MudButton Href="@($"/purchase/tenders/{_detail.Session.TenderId}")">مشاهده مناقصه</MudButton></MudCardActions>
+                    </MudCard>
+                </MudItem>
+                <MudItem xs="12" md="6">
+                    <MudCard>
+                        <MudCardContent>
+                            <MudText Typo="Typo.h6">پرونده خرید مرتبط</MudText>
+                            <MudText>@(_detail.Session.PurchaseFileNumber ?? "—")</MudText>
+                        </MudCardContent>
+                        <MudCardActions><MudButton Href="@($"/purchase/files/{_detail.Session.PurchaseFileId}")">مشاهده پرونده خرید</MudButton></MudCardActions>
+                    </MudCard>
+                </MudItem>
+            </MudGrid>
+        </MudTabPanel>
+    </MudTabs>
+}
+</DataStateView>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private TenderCommissionSessionDetailDto? _detail;
+    private TenderDetailDto? _tender;
+    private List<LookupDto> _users = [];
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+    private Guid _memberUserId;
+    private TenderCommissionMemberRole _memberRole = TenderCommissionMemberRole.Member;
+    private int _agendaOrderNo = 1;
+    private string? _agendaTitle;
+    private string? _agendaDescription;
+    private Guid? _minuteAgendaItemId;
+    private string? _minuteText;
+    private Guid? _editingMinuteId;
+    private string? _editingMinuteText;
+    private TenderCommissionDecisionType _decisionType = TenderCommissionDecisionType.Other;
+    private Guid? _decisionBidId;
+    private string? _decisionText;
+    private string? _decisionReason;
+    private string _cancelReason = "لغو از رابط کاربری";
+
+    private bool IsEditable => _detail?.Session.Status is not TenderCommissionSessionStatus.Approved
+        and not TenderCommissionSessionStatus.Cancelled;
+    private IReadOnlyList<TenderBidDto> TenderBids => _tender?.Bids ?? Array.Empty<TenderBidDto>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(CommissionUiPolicy.View))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _detail = await Api.GetCommissionSessionAsync(Id);
+            if (_detail is null)
+            {
+                _error = "جلسه کمیسیون یافت نشد.";
+                return;
+            }
+
+            _tender = await Api.GetTenderAsync(_detail.Session.TenderId);
+            _users = await Api.GetUserLookupsAsync();
+            _memberUserId = _users.FirstOrDefault()?.Id ?? Guid.Empty;
+            _agendaOrderNo = Math.Max(1, (_detail.AgendaItems.Any() ? _detail.AgendaItems.Max(x => x.OrderNo) : 0) + 1);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private RenderFragment Info(string label, string value) =>
+        @<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.caption">@label</MudText>
+            <MudText><strong>@value</strong></MudText>
+        </MudPaper>;
+
+    private RenderFragment DateInfo(string label, DateTime? value) =>
+        @<MudPaper Class="pa-3" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.caption">@label</MudText>
+            <MudText><strong><DateDisplay Value="@value" IncludeTime="true" /></strong></MudText>
+        </MudPaper>;
+
+    private async Task Schedule()
+    {
+        if (_detail is null) return;
+        await ChangeStatus("schedule", "جلسه زمان‌بندی شد.",
+            new ScheduleCommissionSessionRequest(_detail.Session.SessionDate, _detail.Session.Location));
+    }
+
+    private Task StartSession() => ChangeStatus("start", "جلسه شروع شد.");
+    private Task CompleteSession() => ChangeStatus("complete", "جلسه تکمیل شد.");
+    private Task ApproveSession() => ChangeStatus("approve", "جلسه تأیید شد.");
+
+    private async Task ChangeStatus(string action, string successMessage, object? body = null)
+    {
+        if (_detail is null) return;
+        _busy = true;
+        try
+        {
+            await Api.ChangeCommissionSessionStatusAsync(_detail.Session.Id, action, body);
+            Snackbar.Add(successMessage, Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task Cancel() => await ChangeStatus("cancel", "جلسه لغو شد.", new CancelCommissionSessionRequest(_cancelReason));
+
+    private async Task AddMember()
+    {
+        if (_detail is null || _memberUserId == Guid.Empty) return;
+        await Execute(async () => { await Api.AddCommissionMemberAsync(_detail.Session.Id, new AddCommissionMemberRequest(_memberUserId, _memberRole)); }, "عضو به جلسه اضافه شد.");
+    }
+
+    private async Task SetMemberAttendance(TenderCommissionMemberDto member, TenderCommissionAttendanceStatus status)
+    {
+        if (_detail is null) return;
+        await Execute(async () => { await Api.UpdateCommissionMemberAsync(_detail.Session.Id, member.Id,
+            new UpdateCommissionMemberRequest(member.Role, status, member.VoteStatus, member.VoteNote)); }, "وضعیت حضور عضو به‌روزرسانی شد.");
+    }
+
+    private async Task SetMemberVote(TenderCommissionMemberDto member, TenderCommissionVoteStatus vote)
+    {
+        if (_detail is null) return;
+        await Execute(async () => { await Api.UpdateCommissionMemberAsync(_detail.Session.Id, member.Id,
+            new UpdateCommissionMemberRequest(member.Role, member.AttendanceStatus, vote, member.VoteNote)); }, "رأی عضو ثبت شد.");
+    }
+
+    private async Task RemoveMember(Guid memberId)
+    {
+        if (_detail is null) return;
+        await Execute(async () => { await Api.RemoveCommissionMemberAsync(_detail.Session.Id, memberId); }, "عضو از جلسه حذف شد.");
+    }
+
+    private async Task AddAgenda()
+    {
+        if (_detail is null || string.IsNullOrWhiteSpace(_agendaTitle)) return;
+        await Execute(async () => { await Api.AddCommissionAgendaItemAsync(_detail.Session.Id,
+            new AddAgendaItemRequest(_agendaOrderNo, _agendaTitle.Trim(), _agendaDescription, null, null)); }, "دستور جلسه اضافه شد.");
+        _agendaTitle = _agendaDescription = null;
+    }
+
+    private async Task SetAgendaStatus(TenderCommissionAgendaItemDto agenda, TenderCommissionAgendaStatus status)
+    {
+        if (_detail is null) return;
+        await Execute(async () => { await Api.UpdateCommissionAgendaItemAsync(_detail.Session.Id, agenda.Id,
+            new UpdateAgendaItemRequest(agenda.OrderNo, agenda.Title, agenda.Description, status, agenda.Notes)); }, "وضعیت دستور جلسه به‌روزرسانی شد.");
+    }
+
+    private async Task AddMinute()
+    {
+        if (_detail is null || string.IsNullOrWhiteSpace(_minuteText)) return;
+        await Execute(async () => { await Api.AddCommissionMinuteAsync(_detail.Session.Id,
+            new AddCommissionMinuteRequest(_minuteAgendaItemId, _minuteText.Trim())); }, "صورتجلسه ثبت شد.");
+        _minuteText = null;
+        _minuteAgendaItemId = null;
+    }
+
+    private void StartMinuteEdit(TenderCommissionMinuteDto minute)
+    {
+        _editingMinuteId = minute.Id;
+        _editingMinuteText = minute.Text;
+    }
+
+    private void CancelMinuteEdit()
+    {
+        _editingMinuteId = null;
+        _editingMinuteText = null;
+    }
+
+    private async Task SaveMinute(Guid minuteId)
+    {
+        if (_detail is null || string.IsNullOrWhiteSpace(_editingMinuteText)) return;
+        await Execute(async () => { await Api.UpdateCommissionMinuteAsync(_detail.Session.Id, minuteId,
+            new UpdateCommissionMinuteRequest(_editingMinuteText.Trim())); }, "صورتجلسه ویرایش شد.");
+        CancelMinuteEdit();
+    }
+
+    private async Task AddDecision()
+    {
+        if (_detail is null || string.IsNullOrWhiteSpace(_decisionText)) return;
+        var supplierId = _tender?.Bids.FirstOrDefault(x => x.Id == _decisionBidId)?.SupplierId;
+        await Execute(async () => { await Api.AddCommissionDecisionAsync(_detail.Session.Id,
+            new AddCommissionDecisionRequest(_decisionType, _decisionBidId, supplierId, _decisionText.Trim(), _decisionReason)); }, "تصمیم کمیسیون ثبت شد.");
+        _decisionText = _decisionReason = null;
+        _decisionBidId = null;
+        _decisionType = TenderCommissionDecisionType.Other;
+    }
+
+    private async Task ApproveDecision(Guid decisionId)
+    {
+        if (_detail is null) return;
+        await Execute(async () => { await Api.ApproveCommissionDecisionAsync(_detail.Session.Id, decisionId); }, "تصمیم تأیید شد.");
+    }
+
+    private async Task RejectDecision(Guid decisionId)
+    {
+        if (_detail is null) return;
+        await Execute(async () => { await Api.RejectCommissionDecisionAsync(_detail.Session.Id, decisionId); }, "تصمیم رد شد.");
+    }
+
+    private async Task Execute(Func<Task> action, string successMessage)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            Snackbar.Add(successMessage, Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private string BidTitle(Guid? bidId)
+    {
+        if (!bidId.HasValue) return "—";
+        var bid = _tender?.Bids.FirstOrDefault(x => x.Id == bidId);
+        return bid is null ? "پیشنهاد منتخب" : $"{bid.SupplierName ?? "تأمین‌کننده"} — {bid.BidNumber ?? "بدون شماره"}";
+    }
+}

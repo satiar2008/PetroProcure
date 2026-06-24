@@ -1,7 +1,27 @@
-@page "/"
+﻿@page "/"
 @inject IUserAccessContext Access
+
 <PageTitle>پتروپروکیور</PageTitle>
-<PageHeader Title="@($"سلام، {Access.DisplayName}")" Subtitle="خلاصه وضعیت عملیات تدارکات امروز">
-    <Actions><MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add">پرونده خرید جدید</MudButton></Actions>
-</PageHeader>
+
+<section class="home-hero animated-card">
+    <div class="home-hero-copy">
+        <MudText Typo="Typo.overline" Class="hero-eyebrow">مرکز عملیات خرید پالایشگاه</MudText>
+        <MudText Typo="Typo.h3" Class="hero-title">سلام، @Access.DisplayName</MudText>
+        <MudText Typo="Typo.body1" Class="hero-text">
+            وضعیت پرونده‌های خرید، تقاضاها، کارتابل و گزارش‌های عملیاتی امروز را در یک نمای متمرکز دنبال کنید.
+        </MudText>
+        <div class="hero-actions">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Href="/purchase/files/create">
+                پرونده خرید جدید
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.Inbox" Href="/inbox/my">
+                مشاهده کارتابل من
+            </MudButton>
+        </div>
+    </div>
+    <div class="home-hero-brand">
+        <img src="/logo/logo.png" alt="PetroProcure" />
+    </div>
+</section>
+
 <DashboardOverview Department="@Access.CurrentPanel.Title" />

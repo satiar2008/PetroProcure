@@ -63,8 +63,46 @@
         else { <MudTable Items="_comparison.Suppliers" Dense="true"><HeaderContent><MudTh>تأمین‌کننده</MudTh><MudTh>مبلغ نهایی</MudTh><MudTh>تحویل</MudTh><MudTh>پرداخت</MudTh><MudTh>امتیاز نهایی</MudTh><MudTh>برنده</MudTh><MudTh>عملیات</MudTh></HeaderContent><RowTemplate><MudTd>@context.SupplierName</MudTd><MudTd>@context.FinalAmount</MudTd><MudTd>@context.DeliveryTerms</MudTd><MudTd>@context.PaymentTerms</MudTd><MudTd>@context.FinalScore</MudTd><MudTd>@(context.IsSelected ? "بله" : "—")</MudTd><MudTd>@if(Access.HasPermission(TenderUiPolicy.SelectWinner) && !context.IsSelected){<MudButton Size="Size.Small" OnClick="@(()=>SelectWinner(context.TenderBidId))">انتخاب برنده</MudButton>}</MudTd></RowTemplate></MudTable> }
         <MudAlert Severity="Severity.Warning" Class="mt-3">تحلیل و مقایسه صرفاً ابزار کمکی است؛ تصمیم نهایی با انسان/کمیسیون مجاز است.</MudAlert>
     </MudTabPanel>
+    <MudTabPanel Text="جلسات کمیسیون" Icon="@Icons.Material.Filled.Groups">
+        <div class="d-flex justify-space-between align-center mb-3">
+            <MudText Typo="Typo.h6">جلسات کمیسیون مرتبط با این مناقصه</MudText>
+            @if (Access.HasPermission(CommissionUiPolicy.Create))
+            {
+                <MudButton Href="@($"/tender-commission/sessions/from-tender/{Id}")" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add">ایجاد جلسه کمیسیون</MudButton>
+            }
+        </div>
+        @if (_commissionLoading)
+        {
+            <MudProgressLinear Indeterminate="true" />
+        }
+        else if (!string.IsNullOrWhiteSpace(_commissionError))
+        {
+            <RetryPanel Message="@_commissionError" OnRetry="LoadCommissionSessions" />
+        }
+        else if (_commissionSessions.Count == 0)
+        {
+            <EmptyState Title="جلسه‌ای ثبت نشده" Description="برای این مناقصه هنوز جلسه کمیسیون ایجاد نشده است." />
+        }
+        else
+        {
+            <MudTable Items="_commissionSessions" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>شماره جلسه</MudTh><MudTh>عنوان</MudTh><MudTh>وضعیت</MudTh><MudTh>تاریخ جلسه</MudTh><MudTh>اعضا</MudTh><MudTh>تصمیمات</MudTh><MudTh>عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.SessionNumber</MudTd>
+                    <MudTd>@context.Title</MudTd>
+                    <MudTd><StatusChip Text="@CommissionUiPolicy.StatusText(context.Status)" Color="@CommissionUiPolicy.StatusColor(context.Status)" /></MudTd>
+                    <MudTd><DateDisplay Value="@context.SessionDate" IncludeTime="true" /></MudTd>
+                    <MudTd>@context.MemberCount</MudTd>
+                    <MudTd>@context.DecisionCount</MudTd>
+                    <MudTd><MudButton Size="Size.Small" Href="@($"/tender-commission/sessions/{context.Id}")">مشاهده</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
     <MudTabPanel Text="اسناد" Icon="@Icons.Material.Filled.AttachFile"><EmptyState Title="اسناد مناقصه" Description="اتصال کامل به مخزن اسناد در فاز بعدی توسعه داده می‌شود." /></MudTabPanel>
-    <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link"><MudAlert Severity="Severity.Info">پرونده خرید و استعلام مبنا از تب خلاصه قابل مشاهده هستند. اتصال به جلسات کمیسیون، قرارداد و سفارش خرید در فازهای بعدی انجام می‌شود.</MudAlert></MudTabPanel>
+    <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link"><MudAlert Severity="Severity.Info">پرونده خرید، استعلام مبنا و جلسات کمیسیون از تب‌های همین صفحه قابل مشاهده هستند. اتصال به قرارداد و سفارش خرید در فازهای بعدی انجام می‌شود.</MudAlert></MudTabPanel>
 </MudTabs>
 }
 </DataStateView>
@@ -74,15 +112,37 @@
     private TenderDetailDto? _detail;
     private TenderComparisonDto? _comparison;
     private SupplierLookupDto? _supplier;
+    private List<TenderCommissionSessionSummaryDto> _commissionSessions = [];
     private bool _loading = true;
+    private bool _commissionLoading;
     private string? _error;
+    private string? _commissionError;
 
     protected override async Task OnInitializedAsync()
     {
         if (!Access.HasPermission(TenderUiPolicy.View)) { Navigation.NavigateTo("/access-denied"); return; }
         await Load();
     }
-    private async Task Load(){_loading=true;_error=null;try{_detail=await Api.GetTenderAsync(Id);}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _detail = await Api.GetTenderAsync(Id);
+            await LoadCommissionSessions();
+        }
+        catch(Exception ex){_error=ex.Message;}
+        finally{_loading=false;}
+    }
+    private async Task LoadCommissionSessions()
+    {
+        _commissionLoading = true;
+        _commissionError = null;
+        try { _commissionSessions = (await Api.GetTenderCommissionSessionsAsync(Id)).ToList(); }
+        catch(Exception ex) { _commissionError = ex.Message; }
+        finally { _commissionLoading = false; }
+    }
     private RenderFragment Info(string label,string value)=>@<MudPaper Class="pa-3" Elevation="0" Outlined="true"><MudText Typo="Typo.caption">@label</MudText><MudText><strong>@value</strong></MudText></MudPaper>;
     private RenderFragment DateInfo(string label,DateTime? value)=>@<MudPaper Class="pa-3" Elevation="0" Outlined="true"><MudText Typo="Typo.caption">@label</MudText><MudText><strong><DateDisplay Value="@value" /></strong></MudText></MudPaper>;
     private async Task Publish(){try{await Api.PublishTenderAsync(Id);Snackbar.Add("مناقصه منتشر شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}

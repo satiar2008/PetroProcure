@@ -1,9 +1,14 @@
-@inject IUserAccessContext Access
+﻿@inject IUserAccessContext Access
 @implements IDisposable
 
 <div class="drawer-header">
-    <MudText Typo="Typo.overline">پنل فعال</MudText>
-    <DepartmentBadge Title="@Access.CurrentPanel.Title" Icon="@Access.CurrentPanel.Icon" />
+    <div class="drawer-brand">
+        <img class="drawer-logo" src="/logo/logo.png" alt="PetroProcure" />
+        <div>
+            <MudText Typo="Typo.overline">پنل فعال</MudText>
+            <DepartmentBadge Title="@Access.CurrentPanel.Title" Icon="@Access.CurrentPanel.Icon" />
+        </div>
+    </div>
 </div>
 
 <MudNavMenu Class="nav-menu">
@@ -21,7 +26,7 @@
 </MudNavMenu>
 
 <div class="drawer-footer">
-    <MudPaper Outlined="true" Class="support-card">
+    <MudPaper Outlined="true" Class="support-card animated-card">
         <MudIcon Icon="@Icons.Material.Filled.HelpOutline" Color="Color.Primary" />
         <div><strong>راهنمای سامانه</strong><small>نسخه آزمایشی ۰.۱</small></div>
     </MudPaper>
