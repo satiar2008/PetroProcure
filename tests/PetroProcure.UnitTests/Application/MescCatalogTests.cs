@@ -35,8 +35,8 @@ public sealed class MescCatalogTests
     {
         var repository = new FakeRepository();
         repository.ItemDtos.AddRange(
-            new MescItemDto(Guid.NewGuid(), "1234560001", "123456", "Pipe fittings", "Pipe", "M", true),
-            new MescItemDto(Guid.NewGuid(), "1234560002", "123456", "Pipe fittings", "Elbow", "EA", true));
+            new MescItemDto(Guid.NewGuid(), "1234560001", "123456", "Pipe fittings", "Pipe", "M", Guid.NewGuid(), true),
+            new MescItemDto(Guid.NewGuid(), "1234560002", "123456", "Pipe fittings", "Elbow", "EA", Guid.NewGuid(), true));
 
         var result = await new MescQueryHandler(repository)
             .Handle(new GetMescItemsGroupedByGeneralCodeQuery());
@@ -51,8 +51,8 @@ public sealed class MescCatalogTests
     {
         var repository = new FakeRepository();
         repository.ItemDtos.AddRange(
-            new MescItemDto(Guid.NewGuid(), "1234560001", "123456", "Pipe fittings", "Active pipe", "M", true),
-            new MescItemDto(Guid.NewGuid(), "1234560002", "123456", "Pipe fittings", "Inactive pipe", "M", false));
+            new MescItemDto(Guid.NewGuid(), "1234560001", "123456", "Pipe fittings", "Active pipe", "M", Guid.NewGuid(), true),
+            new MescItemDto(Guid.NewGuid(), "1234560002", "123456", "Pipe fittings", "Inactive pipe", "M", Guid.NewGuid(), false));
         var handler = new MescQueryHandler(repository);
 
         var defaultResult = await handler.Handle(new SearchMescItemsQuery("pipe"));
@@ -81,6 +81,8 @@ public sealed class MescCatalogTests
             Task.FromResult(Groups.SingleOrDefault(group => group.Code == code));
         public Task<MescItem?> FindItemAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(Items.SingleOrDefault(item => item.Id == id));
+        public Task<Guid> ResolveUnitOfMeasureIdAsync(string unitOfMeasure, CancellationToken cancellationToken) =>
+            Task.FromResult(Guid.Parse("20000000-0000-0000-0000-000000000001"));
         public Task AddGeneralGroupAsync(MescGeneralGroup group, CancellationToken cancellationToken)
         {
             Groups.Add(group);

@@ -7,6 +7,8 @@ public sealed class Indent : AuditableEntity<Guid>
 {
     private readonly List<IndentItem> _items = [];
 
+    private Indent() : base(Guid.Empty) { }
+
     public Indent(
         Guid id,
         string indentNumber,
@@ -17,7 +19,11 @@ public sealed class Indent : AuditableEntity<Guid>
         Guid requestingDepartmentId,
         Guid? applicantDepartmentId,
         Guid createdByUserId,
-        string? description = null)
+        string? description = null,
+        IndentSourceType? sourceType = null,
+        Guid? sourceMaterialNeedId = null,
+        Guid? sourceShortageAlertId = null,
+        string? sourceDescription = null)
         : base(id)
     {
         if (indentNumber != BuildIndentNumber(yearPart, typeDigit, sequence))
@@ -35,6 +41,11 @@ public sealed class Indent : AuditableEntity<Guid>
         CreatedAt = DateTime.UtcNow;
         Status = IndentStatus.Draft;
         Description = description?.Trim();
+        SourceType = sourceType ?? DefaultSourceType(IndentType);
+        SourceMaterialNeedId = sourceMaterialNeedId;
+        SourceShortageAlertId = sourceShortageAlertId;
+        SourceDescription = sourceDescription?.Trim();
+        ValidateSource();
     }
 
     public string IndentNumber { get; private set; }
@@ -49,6 +60,10 @@ public sealed class Indent : AuditableEntity<Guid>
     public DateTime CreatedAt { get; private set; }
     public IndentStatus Status { get; private set; }
     public string? Description { get; private set; }
+    public IndentSourceType SourceType { get; private set; }
+    public Guid? SourceMaterialNeedId { get; private set; }
+    public Guid? SourceShortageAlertId { get; private set; }
+    public string? SourceDescription { get; private set; }
     public IReadOnlyCollection<IndentItem> Items => _items.AsReadOnly();
 
     public static string BuildIndentNumber(int yearPart, int typeDigit, int sequence)
@@ -107,6 +122,39 @@ public sealed class Indent : AuditableEntity<Guid>
     {
         EnsureStatus(IndentStatus.Approved);
         Status = IndentStatus.SentToPurchaseDepartment;
+    }
+
+    public Guid? SourceReferenceId => SourceType switch
+    {
+        IndentSourceType.MaterialNeed => SourceMaterialNeedId,
+        IndentSourceType.ShortageAlert => SourceShortageAlertId,
+        _ => null
+    };
+
+    public string SourceDisplayText => SourceType switch
+    {
+        IndentSourceType.Manual => "دستی",
+        IndentSourceType.DirectPurchase => "خرید مستقیم",
+        IndentSourceType.SystemGenerated => "سیستمی",
+        IndentSourceType.MaterialNeed => string.IsNullOrWhiteSpace(SourceDescription) ? "نیاز کالا" : $"نیاز کالا - {SourceDescription}",
+        IndentSourceType.ShortageAlert => string.IsNullOrWhiteSpace(SourceDescription) ? "هشدار کمبود" : $"هشدار کمبود - {SourceDescription}",
+        IndentSourceType.ApplicantNeed => "نیاز متقاضی",
+        _ => "سایر"
+    };
+
+    private static IndentSourceType DefaultSourceType(IndentType indentType) => indentType switch
+    {
+        IndentType.DirectPurchase => IndentSourceType.DirectPurchase,
+        IndentType.SystemGenerated => IndentSourceType.SystemGenerated,
+        _ => IndentSourceType.Manual
+    };
+
+    private void ValidateSource()
+    {
+        if (SourceType == IndentSourceType.MaterialNeed && SourceMaterialNeedId is null)
+            throw new InvalidOperationException("Material need source id is required.");
+        if (SourceType == IndentSourceType.ShortageAlert && SourceShortageAlertId is null)
+            throw new InvalidOperationException("Shortage alert source id is required.");
     }
 
     private void EnsureDraft() => EnsureStatus(IndentStatus.Draft);

@@ -28,6 +28,10 @@ public sealed record IndentDto(
     DateTime CreatedAt,
     IndentStatus Status,
     string? Description,
+    IndentSourceType SourceType,
+    string? SourceDescription,
+    Guid? SourceReferenceId,
+    string SourceDisplayText,
     IReadOnlyList<IndentItemDto> Items);
 
 public sealed record IndentListDto(
@@ -38,7 +42,11 @@ public sealed record IndentListDto(
     Guid RequestingDepartmentId,
     IndentStatus Status,
     DateTime CreatedAt,
-    int ItemCount);
+    int ItemCount,
+    IndentSourceType SourceType,
+    string? SourceDescription,
+    Guid? SourceReferenceId,
+    string SourceDisplayText);
 
 public sealed record IndentItemsGroupedDto(
     string MescGeneralGroupCode,
@@ -51,4 +59,5 @@ public sealed record MescItemSnapshot(
     string GeneralGroupCode,
     string GeneralDescription,
     string SpecificDescription,
+    Guid UnitOfMeasureId,
     bool IsActive);

@@ -12,7 +12,7 @@ public static class ContractMappings
     public static MescGeneralGroupDto ToContract(this Application.Mesc.MescGeneralGroupDto dto) =>
         new(dto.Id, dto.Code, dto.GeneralDescription, dto.IsActive);
     public static MescItemDto ToContract(this Application.Mesc.MescItemDto dto) =>
-        new(dto.Id, dto.Code, dto.GeneralGroupCode, dto.GeneralDescription, dto.SpecificDescription, dto.UnitOfMeasure, dto.IsActive);
+        new(dto.Id, dto.Code, dto.GeneralGroupCode, dto.GeneralDescription, dto.SpecificDescription, dto.UnitOfMeasure, dto.UnitOfMeasureId, dto.IsActive);
     public static MescItemGroupedDto ToContract(this Application.Mesc.MescItemGroupedDto dto) =>
         new(dto.GeneralGroupCode, dto.GeneralDescription, dto.Items.Select(ToContract).ToArray());
 
@@ -22,9 +22,11 @@ public static class ContractMappings
     public static IndentDto ToContract(this Application.Indents.IndentDto dto) =>
         new(dto.Id, dto.IndentNumber, dto.YearPart, dto.TypeDigit, dto.Sequence, dto.IndentType, dto.Title,
             dto.RequestingDepartmentId, dto.ApplicantDepartmentId, dto.CreatedByUserId, dto.CreatedAt,
-            dto.Status, dto.Description, dto.Items.Select(ToContract).ToArray());
+            dto.Status, dto.Description, dto.SourceType, dto.SourceDescription, dto.SourceReferenceId,
+            dto.SourceDisplayText, dto.Items.Select(ToContract).ToArray());
     public static IndentSummaryDto ToContract(this Application.Indents.IndentListDto dto) =>
-        new(dto.Id, dto.IndentNumber, dto.IndentType, dto.Title, dto.RequestingDepartmentId, dto.Status, dto.CreatedAt, dto.ItemCount);
+        new(dto.Id, dto.IndentNumber, dto.IndentType, dto.Title, dto.RequestingDepartmentId, dto.Status,
+            dto.CreatedAt, dto.ItemCount, dto.SourceType, dto.SourceDescription, dto.SourceReferenceId, dto.SourceDisplayText);
     public static IndentGroupedItemsDto ToContract(this Application.Indents.IndentItemsGroupedDto dto) =>
         new(dto.MescGeneralGroupCode, dto.GeneralDescription, dto.Items.Select(ToContract).ToArray());
 

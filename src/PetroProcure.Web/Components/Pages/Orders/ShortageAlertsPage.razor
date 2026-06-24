@@ -18,10 +18,11 @@
 else
 {
     <MudTable Items="_alerts" Dense="true" Hover="true" GroupBy="_groupDefinition">
-        <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>موجودی</MudTh><MudTh>نقطه سفارش</MudTh><MudTh>کمبود</MudTh><MudTh>وضعیت</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+        <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>موجودی</MudTh><MudTh>نقطه سفارش</MudTh><MudTh>کمبود</MudTh><MudTh>وضعیت</MudTh><MudTh>تقاضای مرتبط</MudTh><MudTh>عملیات</MudTh></HeaderContent>
         <RowTemplate>
             <MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.CurrentStock</MudTd><MudTd>@context.ReorderPoint</MudTd><MudTd>@context.ShortageQuantity</MudTd>
             <MudTd>@OrdersUiPolicy.AlertStatusText(context.Status)</MudTd>
+            <MudTd>@if(context.RelatedIndentId.HasValue){<MudLink Href="@($"/orders/indents/{context.RelatedIndentId}")">مشاهده Indent</MudLink>}else{<span>—</span>}</MudTd>
             <MudTd>
                 @if (Access.HasPermission(OrdersUiPolicy.ConvertShortageToIndent) && context.Status is ShortageAlertStatus.Open or ShortageAlertStatus.InProgress)
                 {
@@ -34,7 +35,7 @@ else
             </MudTd>
         </RowTemplate>
         <GroupHeaderTemplate>
-            <MudTh colspan="7">@context.Key</MudTh>
+            <MudTh colspan="8">@context.Key</MudTh>
         </GroupHeaderTemplate>
         <NoRecordsContent><EmptyState Title="هشدار کمبود وجود ندارد" /></NoRecordsContent>
     </MudTable>

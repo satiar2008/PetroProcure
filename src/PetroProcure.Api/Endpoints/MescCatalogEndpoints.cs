@@ -37,12 +37,12 @@ public static class MescCatalogEndpoints
         items.MapPost("/", Execute(async (CreateMescItemRequest request, MescCommandHandler handler, CancellationToken ct) =>
         {
             var result = await handler.Handle(new CreateMescItemCommand(
-                request.Code, request.SpecificDescription, request.UnitOfMeasure, request.GeneralDescription), ct);
+                request.Code, request.SpecificDescription, request.UnitOfMeasure, request.GeneralDescription, request.UnitOfMeasureId), ct);
             return Results.Created($"/api/mesc/items/{result.Code}", result.ToContract());
         })).RequirePermission(ApplicationPermissions.ItemCreate);
         items.MapPut("/{id:guid}", Execute(async (Guid id, UpdateMescItemRequest request, MescCommandHandler handler, CancellationToken ct) =>
             Results.Ok((await handler.Handle(new UpdateMescItemCommand(
-                id, request.Code, request.SpecificDescription, request.UnitOfMeasure, request.GeneralDescription), ct)).ToContract())))
+                id, request.Code, request.SpecificDescription, request.UnitOfMeasure, request.GeneralDescription, request.UnitOfMeasureId), ct)).ToContract())))
             .RequirePermission(ApplicationPermissions.ItemEdit);
         items.MapPost("/{id:guid}/activate", Execute(async (Guid id, MescCommandHandler handler, CancellationToken ct) =>
         {

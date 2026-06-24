@@ -13,6 +13,7 @@ public sealed record MescItemDto(
     string GeneralDescription,
     string SpecificDescription,
     string UnitOfMeasure,
+    Guid UnitOfMeasureId,
     bool IsActive);
 
 public sealed record MescItemGroupedDto(

@@ -245,6 +245,12 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
         var convert = await converter.PostAsJsonAsync($"/api/orders/material-needs/{need.Id}/convert-to-indent",
             new ConvertMaterialNeedToIndentRequest(97, 3, "Converted need"));
         Assert.Equal(HttpStatusCode.OK, convert.StatusCode);
+        var reference = await convert.Content.ReadFromJsonAsync<IndentReferenceResponse>();
+        var viewer = factory.CreateAuthenticatedClient(ApplicationPermissions.IndentView);
+        var detail = await viewer.GetFromJsonAsync<IndentDto>($"/api/indents/{reference!.IndentId}");
+        Assert.Equal(IndentSourceType.MaterialNeed, detail!.SourceType);
+        Assert.Equal(need.Id, detail.SourceReferenceId);
+        Assert.Contains("نیاز کالا", detail.SourceDisplayText);
     }
 
     [Fact]
@@ -276,9 +282,24 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
         var convert = await converter.PostAsJsonAsync($"/api/orders/shortage-alerts/{alerts![0].Id}/convert-to-indent",
             new ConvertShortageToIndentRequest(96, 3, SeedDataIds.OrdersAndInventoryControlId, "Shortage indent"));
         Assert.Equal(HttpStatusCode.OK, convert.StatusCode);
+        var reference = await convert.Content.ReadFromJsonAsync<IndentReferenceResponse>();
+        var viewer = factory.CreateAuthenticatedClient(ApplicationPermissions.IndentView);
+        var detail = await viewer.GetFromJsonAsync<IndentDto>($"/api/indents/{reference!.IndentId}");
+        Assert.Equal(IndentSourceType.ShortageAlert, detail!.SourceType);
+        Assert.Equal(alerts[0].Id, detail.SourceReferenceId);
+    }
+
+    [Fact]
+    public async Task SeededIndentHasSourceTypeAndDisplayText()
+    {
+        var viewer = factory.CreateAuthenticatedClient(ApplicationPermissions.IndentView);
+        var detail = await viewer.GetFromJsonAsync<IndentDto>($"/api/indents/{SeedDataIds.SampleIndentId}");
+        Assert.Equal(IndentSourceType.Manual, detail!.SourceType);
+        Assert.False(string.IsNullOrWhiteSpace(detail.SourceDisplayText));
     }
 
     private sealed record IndentCreatedResponse(Guid Id, Guid CreatedByUserId);
+    private sealed record IndentReferenceResponse(Guid IndentId);
 }
 
 public sealed class ApiAuthorizationFactory : WebApplicationFactory<Program>

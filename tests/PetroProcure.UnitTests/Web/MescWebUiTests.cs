@@ -57,5 +57,5 @@ public sealed class MescWebUiTests
     }
 
     private static MescItemDto Item(string code, string groupCode, string generalDescription) =>
-        new(Guid.NewGuid(), code, groupCode, generalDescription, "شرح اختصاصی", "عدد", true);
+        new(Guid.NewGuid(), code, groupCode, generalDescription, "شرح اختصاصی", "عدد", Guid.NewGuid(), true);
 }

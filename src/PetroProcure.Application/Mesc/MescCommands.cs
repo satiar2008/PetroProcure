@@ -5,8 +5,8 @@ namespace PetroProcure.Application.Mesc;
 
 public sealed record CreateMescGeneralGroupCommand(string Code, string GeneralDescription);
 public sealed record UpdateMescGeneralGroupCommand(Guid Id, string Code, string GeneralDescription);
-public sealed record CreateMescItemCommand(string Code, string SpecificDescription, string UnitOfMeasure, string? GeneralDescription = null);
-public sealed record UpdateMescItemCommand(Guid Id, string Code, string SpecificDescription, string UnitOfMeasure, string? GeneralDescription = null);
+public sealed record CreateMescItemCommand(string Code, string SpecificDescription, string UnitOfMeasure, string? GeneralDescription = null, Guid? UnitOfMeasureId = null);
+public sealed record UpdateMescItemCommand(Guid Id, string Code, string SpecificDescription, string UnitOfMeasure, string? GeneralDescription = null, Guid? UnitOfMeasureId = null);
 public sealed record ActivateMescItemCommand(Guid Id);
 public sealed record DeactivateMescItemCommand(Guid Id);
 
@@ -46,7 +46,8 @@ public sealed class MescCommandHandler(
             throw new MescCatalogConflictException($"MESC item '{code}' already exists.");
 
         var group = await ResolveGroup(code, command.GeneralDescription, cancellationToken);
-        var item = new MescItem(Guid.NewGuid(), code, command.SpecificDescription, command.UnitOfMeasure);
+        var unitId = await ResolveUnit(command.UnitOfMeasure, command.UnitOfMeasureId, cancellationToken);
+        var item = new MescItem(Guid.NewGuid(), code, command.SpecificDescription, command.UnitOfMeasure, unitId);
         item.LinkGeneralGroup(group);
         await repository.AddItemAsync(item, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
@@ -62,7 +63,8 @@ public sealed class MescCommandHandler(
             throw new MescCatalogConflictException($"MESC item '{code}' already exists.");
 
         var group = await ResolveGroup(code, command.GeneralDescription, cancellationToken);
-        item.Update(code, command.SpecificDescription, command.UnitOfMeasure);
+        var unitId = await ResolveUnit(command.UnitOfMeasure, command.UnitOfMeasureId, cancellationToken);
+        item.Update(code, command.SpecificDescription, command.UnitOfMeasure, unitId);
         item.LinkGeneralGroup(group);
         await repository.SaveChangesAsync(cancellationToken);
         return ToDto(item, group);
@@ -98,8 +100,16 @@ public sealed class MescCommandHandler(
         return group;
     }
 
+    private async Task<Guid> ResolveUnit(string unitOfMeasure, Guid? unitOfMeasureId, CancellationToken cancellationToken)
+    {
+        if (unitOfMeasureId.HasValue && unitOfMeasureId.Value != Guid.Empty) return unitOfMeasureId.Value;
+        var resolved = await repository.ResolveUnitOfMeasureIdAsync(unitOfMeasure, cancellationToken);
+        if (resolved == Guid.Empty) throw new MescCatalogValidationException($"Unit of measure '{unitOfMeasure}' does not exist.");
+        return resolved;
+    }
+
     private static MescItemDto ToDto(MescItem item, MescGeneralGroup group) =>
-        new(item.Id, item.Code, item.GeneralGroupCode, group.Description, item.Description, item.UnitOfMeasure, item.IsActive);
+        new(item.Id, item.Code, item.GeneralGroupCode, group.Description, item.Description, item.UnitOfMeasure, item.UnitOfMeasureId, item.IsActive);
 }
 
 public sealed class MescCatalogValidationException(string message) : Exception(message);

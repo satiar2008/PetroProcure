@@ -10,10 +10,14 @@ public sealed record IndentDto(
     Guid Id, string IndentNumber, int YearPart, int TypeDigit, int Sequence,
     IndentType IndentType, string Title, Guid RequestingDepartmentId,
     Guid? ApplicantDepartmentId, Guid CreatedByUserId, DateTime CreatedAt,
-    IndentStatus Status, string? Description, IReadOnlyList<IndentItemDto> Items);
+    IndentStatus Status, string? Description, IndentSourceType SourceType,
+    string? SourceDescription, Guid? SourceReferenceId, string SourceDisplayText,
+    IReadOnlyList<IndentItemDto> Items);
 public sealed record IndentSummaryDto(
     Guid Id, string IndentNumber, IndentType IndentType, string Title,
-    Guid RequestingDepartmentId, IndentStatus Status, DateTime CreatedAt, int ItemCount);
+    Guid RequestingDepartmentId, IndentStatus Status, DateTime CreatedAt, int ItemCount,
+    IndentSourceType SourceType, string? SourceDescription, Guid? SourceReferenceId,
+    string SourceDisplayText);
 public sealed record CreateIndentRequest(
     int YearPart, int TypeDigit, string Title, Guid RequestingDepartmentId,
     Guid? ApplicantDepartmentId, string? Description);

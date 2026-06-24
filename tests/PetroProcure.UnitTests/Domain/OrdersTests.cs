@@ -1,4 +1,5 @@
 using PetroProcure.Domain.Enums;
+using PetroProcure.Domain.Modules.Indents;
 using PetroProcure.Domain.Modules.Orders;
 
 namespace PetroProcure.UnitTests.Domain;
@@ -60,6 +61,39 @@ public sealed class OrdersTests
         Assert.Equal("123456", need.MescGeneralGroupCode);
         Assert.Equal("General", need.GeneralDescription);
         Assert.Equal("Specific", need.SpecificDescription);
+    }
+
+    [Fact]
+    public void Manual_indent_has_manual_source_type()
+    {
+        var indent = new Indent(Guid.NewGuid(), "2630001", 26, 3, 1, "Manual",
+            Guid.NewGuid(), null, Guid.NewGuid());
+        Assert.Equal(IndentSourceType.Manual, indent.SourceType);
+        Assert.Equal("دستی", indent.SourceDisplayText);
+    }
+
+    [Fact]
+    public void Material_need_indent_source_display_text_is_generated()
+    {
+        var needId = Guid.NewGuid();
+        var indent = new Indent(Guid.NewGuid(), "2630001", 26, 3, 1, "From need",
+            Guid.NewGuid(), null, Guid.NewGuid(), sourceType: IndentSourceType.MaterialNeed,
+            sourceMaterialNeedId: needId, sourceDescription: "MN-2026-000001");
+        Assert.Equal(IndentSourceType.MaterialNeed, indent.SourceType);
+        Assert.Equal(needId, indent.SourceReferenceId);
+        Assert.Contains("نیاز کالا", indent.SourceDisplayText);
+    }
+
+    [Fact]
+    public void Shortage_alert_indent_source_display_text_is_generated()
+    {
+        var alertId = Guid.NewGuid();
+        var indent = new Indent(Guid.NewGuid(), "2630001", 26, 3, 1, "From shortage",
+            Guid.NewGuid(), null, Guid.NewGuid(), sourceType: IndentSourceType.ShortageAlert,
+            sourceShortageAlertId: alertId, sourceDescription: "1234560001");
+        Assert.Equal(IndentSourceType.ShortageAlert, indent.SourceType);
+        Assert.Equal(alertId, indent.SourceReferenceId);
+        Assert.Contains("هشدار کمبود", indent.SourceDisplayText);
     }
 
     private static MaterialNeed Need() => new(Guid.NewGuid(), "MN-2026-000001",

@@ -53,7 +53,7 @@ public interface IOrdersRepository
 }
 
 public sealed record MescOrderSnapshot(Guid Id, string Code, string GeneralGroupCode, string GeneralDescription,
-    string SpecificDescription, string UnitOfMeasure, bool IsActive);
+    string SpecificDescription, string UnitOfMeasure, Guid UnitOfMeasureId, bool IsActive);
 
 public sealed class OrdersCommandHandler(
     IOrdersRepository repository,
@@ -74,7 +74,7 @@ public sealed class OrdersCommandHandler(
     {
         RequireDepartment(command.SourceDepartmentId);
         var snapshot = await ActiveMesc(command.MescItemId, ct);
-        var unitId = await repository.ResolveUnitOfMeasureIdAsync(snapshot.UnitOfMeasure, ct);
+        var unitId = snapshot.UnitOfMeasureId;
         var needNumber = await repository.GenerateNextNeedNumberAsync(DateTime.UtcNow.Year, ct);
         var need = new MaterialNeed(Guid.NewGuid(), needNumber, snapshot.Id, snapshot.Code, snapshot.GeneralGroupCode,
             snapshot.GeneralDescription, snapshot.SpecificDescription, unitId, command.RequestedQuantity,
@@ -103,7 +103,7 @@ public sealed class OrdersCommandHandler(
         var indent = await CreateIndent(command.YearPart, command.TypeDigit, command.Title ?? $"تقاضا از نیاز {need.NeedNumber}",
             need.SourceDepartmentId, need.ApplicantDepartmentId, need.Description, need.MescItemId, need.MescCode,
             need.MescGeneralGroupCode, need.GeneralDescription, need.SpecificDescription, need.UnitOfMeasureId,
-            need.RequestedQuantity, need.Description, need.NeededByDate, ct);
+            need.RequestedQuantity, need.Description, need.NeededByDate, IndentSourceType.MaterialNeed, need.Id, null, need.NeedNumber, ct);
         need.MarkConvertedToIndent(indent.Id);
         await repository.SaveChangesAsync(ct);
         return indent.Id;
@@ -126,7 +126,7 @@ public sealed class OrdersCommandHandler(
         var indent = await CreateIndent(command.YearPart, command.TypeDigit, command.Title ?? $"تقاضا از کمبود {alert.MescCode}",
             command.RequestingDepartmentId, null, alert.ResolutionNote, alert.MescItemId, alert.MescCode,
             alert.MescGeneralGroupCode, alert.GeneralDescription, alert.SpecificDescription, alert.UnitOfMeasureId,
-            alert.ShortageQuantity, "Created from shortage alert.", null, ct);
+            alert.ShortageQuantity, "Created from shortage alert.", null, IndentSourceType.ShortageAlert, null, alert.Id, alert.MescCode, ct);
         alert.MarkConvertedToIndent(indent.Id);
         await repository.SaveChangesAsync(ct);
         return indent.Id;
@@ -138,12 +138,14 @@ public sealed class OrdersCommandHandler(
     private async Task<Indent> CreateIndent(int yearPart, int typeDigit, string title, Guid requestingDepartmentId,
         Guid? applicantDepartmentId, string? description, Guid mescItemId, string mescCode, string groupCode,
         string generalDescription, string specificDescription, Guid unitOfMeasureId, decimal quantity,
-        string? technicalDescription, DateOnly? requiredDate, CancellationToken ct)
+        string? technicalDescription, DateOnly? requiredDate, IndentSourceType sourceType, Guid? sourceMaterialNeedId,
+        Guid? sourceShortageAlertId, string? sourceDescription, CancellationToken ct)
     {
         var number = await indentNumberService.GenerateNextIndentNumber(yearPart, typeDigit, ct);
         var parts = indentNumberService.ParseIndentNumber(number);
         var indent = new Indent(Guid.NewGuid(), number, parts.YearPart, parts.TypeDigit, parts.Sequence,
-            title, requestingDepartmentId, applicantDepartmentId, currentUser.UserId, description);
+            title, requestingDepartmentId, applicantDepartmentId, currentUser.UserId, description,
+            sourceType, sourceMaterialNeedId, sourceShortageAlertId, sourceDescription);
         indent.AddItem(new IndentItem(Guid.NewGuid(), indent.Id, mescItemId, mescCode, groupCode, generalDescription,
             specificDescription, unitOfMeasureId, quantity, technicalDescription, requiredDate));
         await repository.AddIndentAsync(indent, ct);

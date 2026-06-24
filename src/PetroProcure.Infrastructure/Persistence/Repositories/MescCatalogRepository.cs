@@ -21,6 +21,15 @@ internal sealed class MescCatalogRepository(PetroProcureDbContext dbContext) : I
     public Task<MescItem?> FindItemAsync(Guid id, CancellationToken cancellationToken) =>
         dbContext.MescItems.Include(item => item.GeneralGroup).SingleOrDefaultAsync(item => item.Id == id, cancellationToken);
 
+    public async Task<Guid> ResolveUnitOfMeasureIdAsync(string unitOfMeasure, CancellationToken cancellationToken)
+    {
+        var normalized = unitOfMeasure.Trim();
+        return await dbContext.UnitOfMeasures.AsNoTracking()
+            .Where(unit => unit.IsActive && (unit.Code == normalized || unit.Name == normalized))
+            .Select(unit => unit.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task AddGeneralGroupAsync(MescGeneralGroup group, CancellationToken cancellationToken) =>
         await dbContext.MescGeneralGroups.AddAsync(group, cancellationToken);
 
@@ -71,5 +80,6 @@ internal sealed class MescCatalogRepository(PetroProcureDbContext dbContext) : I
             generalGroup.Description,
             item.Description,
             item.UnitOfMeasure,
+            item.UnitOfMeasureId,
             item.IsActive);
 }

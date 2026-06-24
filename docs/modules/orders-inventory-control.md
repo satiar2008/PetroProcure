@@ -81,4 +81,5 @@
 - اتصال کامل به ماژول Warehouse برای تراکنش‌های واقعی موجودی.
 - فرم‌های پیشرفته‌تر انتخاب واحد متقاضی و فیلترهای کامل‌تر.
 - گزارش رسمی Material Need و Shortage Alert.
-- نمایش بهتر source در Indent detail در صورت توسعه مدل Indent.
+- نمایش source در Indent اکنون رسمی شده و برای MaterialNeed و ShortageAlert لینک مرجع نگهداری می‌شود.
+- MESC Item اکنون علاوه بر متن واحد، `UnitOfMeasureId` رسمی دارد و تبدیل نیاز/کمبود به Indent از شناسه واحد استفاده می‌کند.

@@ -34,7 +34,7 @@ internal sealed class OrdersRepository(PetroProcureDbContext db) : IOrdersReposi
     public Task<MescOrderSnapshot?> GetMescSnapshotAsync(Guid mescItemId, CancellationToken ct) =>
         db.MescItems.AsNoTracking().Where(x => x.Id == mescItemId)
             .Select(x => new MescOrderSnapshot(x.Id, x.Code, x.GeneralGroupCode, x.GeneralGroup!.Description,
-                x.Description, x.UnitOfMeasure, x.IsActive)).SingleOrDefaultAsync(ct);
+                x.Description, x.UnitOfMeasure, x.UnitOfMeasureId, x.IsActive)).SingleOrDefaultAsync(ct);
 
     public async Task<Guid> ResolveUnitOfMeasureIdAsync(string unitOfMeasure, CancellationToken ct)
     {

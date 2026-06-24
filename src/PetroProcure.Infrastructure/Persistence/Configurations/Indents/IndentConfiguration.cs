@@ -22,6 +22,8 @@ internal sealed class IndentConfiguration : IEntityTypeConfiguration<Indent>
         builder.Property(indent => indent.CreatedAt).IsRequired();
         builder.Property(indent => indent.Status).IsRequired();
         builder.Property(indent => indent.Description).HasMaxLength(2000);
+        builder.Property(indent => indent.SourceType).IsRequired();
+        builder.Property(indent => indent.SourceDescription).HasMaxLength(500);
 
         builder.HasIndex(indent => indent.IndentNumber).IsUnique();
         builder.HasIndex(indent => new { indent.YearPart, indent.TypeDigit, indent.Sequence }).IsUnique();

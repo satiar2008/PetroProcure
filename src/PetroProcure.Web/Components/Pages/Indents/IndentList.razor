@@ -21,10 +21,10 @@ else{
     <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_from" Label="از تاریخ" /></MudItem><MudItem xs="12" md="3"><MudDatePicker @bind-Date="_to" Label="تا تاریخ" /></MudItem>
 </MudGrid></MudPaper>
 <MudPaper Class="data-panel" Elevation="0"><MudTable Items="Filtered" Dense="true" Hover="true" RowsPerPage="10">
-<HeaderContent><MudTh>شماره تقاضا</MudTh><MudTh>عنوان</MudTh><MudTh>نوع تقاضا</MudTh><MudTh>واحد درخواست‌کننده</MudTh><MudTh>وضعیت</MudTh><MudTh>تاریخ ایجاد</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+<HeaderContent><MudTh>شماره تقاضا</MudTh><MudTh>عنوان</MudTh><MudTh>نوع تقاضا</MudTh><MudTh>منبع درخواست</MudTh><MudTh>واحد درخواست‌کننده</MudTh><MudTh>وضعیت</MudTh><MudTh>تاریخ ایجاد</MudTh><MudTh>عملیات</MudTh></HeaderContent>
 <RowTemplate>
 <MudTd><MudLink Href="@($"/orders/indents/{context.Id}")"><strong>@IndentUiPolicy.FormatNumber(context.IndentNumber)</strong></MudLink><MudText Typo="Typo.caption">@context.IndentNumber</MudText></MudTd>
-<MudTd>@context.Title</MudTd><MudTd>@IndentUiPolicy.TypeText(context.IndentType)</MudTd><MudTd>@FakeDirectory.DepartmentName(context.RequestingDepartmentId)</MudTd>
+<MudTd>@context.Title</MudTd><MudTd>@IndentUiPolicy.TypeText(context.IndentType)</MudTd><MudTd>@SourceCell(context)</MudTd><MudTd>@FakeDirectory.DepartmentName(context.RequestingDepartmentId)</MudTd>
 <MudTd><StatusChip Text="@IndentUiPolicy.StatusText(context.Status)" /></MudTd><MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
 <MudTd><MudIconButton Icon="@Icons.Material.Filled.Visibility" Href="@($"/orders/indents/{context.Id}")" />
 @if(IndentUiPolicy.CanEdit(context.Status,Access.HasPermission)){<MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@($"/orders/indents/{context.Id}/edit")" />}
@@ -41,4 +41,6 @@ protected override async Task OnAfterRenderAsync(bool first){if(!first)return;if
 private async Task Load(){_loading=true;_error=null;try{_items=await Api.GetIndentsAsync();}catch(Exception ex){_error="امکان دریافت فهرست تقاضاها وجود ندارد.";Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
 private async Task Action(IndentSummaryDto item,string action,string title,string message){var d=await Dialog.ShowAsync<ConfirmDialog>(title,new DialogParameters{{"Message",message}});var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.ChangeIndentStatusAsync(item.Id,action);Snackbar.Add("عملیات با موفقیت انجام شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
 private async Task Reject(IndentSummaryDto item){var d=await Dialog.ShowAsync<RejectIndentDialog>("رد تقاضا");var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.ChangeIndentStatusAsync(item.Id,"reject");Snackbar.Add("تقاضا رد شد. توجه: Backend فعلی علت رد را ذخیره نمی‌کند.",Severity.Warning);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private RenderFragment SourceCell(IndentSummaryDto item)=>@<span>@if(SourceRoute(item) is { } route){<MudLink Href="@route">@item.SourceDisplayText</MudLink>}else{@item.SourceDisplayText}</span>;
+private static string? SourceRoute(IndentSummaryDto item)=>item.SourceType switch{IndentSourceType.MaterialNeed when item.SourceReferenceId.HasValue=>$"/orders/material-needs/{item.SourceReferenceId}",IndentSourceType.ShortageAlert=>"/orders/shortage-alerts",_=>null};
 }

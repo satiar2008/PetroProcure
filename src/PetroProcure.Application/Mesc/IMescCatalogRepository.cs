@@ -9,6 +9,7 @@ public interface IMescCatalogRepository
     Task<MescGeneralGroup?> FindGeneralGroupAsync(Guid id, CancellationToken cancellationToken);
     Task<MescGeneralGroup?> FindGeneralGroupByCodeAsync(string code, CancellationToken cancellationToken);
     Task<MescItem?> FindItemAsync(Guid id, CancellationToken cancellationToken);
+    Task<Guid> ResolveUnitOfMeasureIdAsync(string unitOfMeasure, CancellationToken cancellationToken);
     Task AddGeneralGroupAsync(MescGeneralGroup group, CancellationToken cancellationToken);
     Task AddItemAsync(MescItem item, CancellationToken cancellationToken);
     Task<IReadOnlyList<MescGeneralGroupDto>> GetGeneralGroupsAsync(bool includeInactive, CancellationToken cancellationToken);

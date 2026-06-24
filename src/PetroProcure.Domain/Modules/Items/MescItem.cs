@@ -4,13 +4,14 @@ namespace PetroProcure.Domain.Modules.Items;
 
 public sealed class MescItem : AuditableEntity<Guid>
 {
-    public MescItem(Guid id, string code, string description, string unitOfMeasure)
+    public MescItem(Guid id, string code, string description, string unitOfMeasure, Guid unitOfMeasureId)
         : base(id)
     {
         Code = ValidateCode(code);
         GeneralGroupCode = GetGeneralGroupCode(Code);
         Description = ValidateRequired(description, "Specific description is required.", nameof(description));
         UnitOfMeasure = ValidateRequired(unitOfMeasure, "Unit of measure is required.", nameof(unitOfMeasure));
+        UnitOfMeasureId = unitOfMeasureId == Guid.Empty ? throw new ArgumentException("Unit of measure id is required.", nameof(unitOfMeasureId)) : unitOfMeasureId;
         IsActive = true;
     }
 
@@ -21,6 +22,8 @@ public sealed class MescItem : AuditableEntity<Guid>
     public string Description { get; private set; }
 
     public string UnitOfMeasure { get; private set; }
+
+    public Guid UnitOfMeasureId { get; private set; }
 
     public MescGeneralGroup? GeneralGroup { get; private set; }
 
@@ -43,12 +46,13 @@ public sealed class MescItem : AuditableEntity<Guid>
         GeneralGroup = generalGroup;
     }
 
-    public void Update(string code, string description, string unitOfMeasure)
+    public void Update(string code, string description, string unitOfMeasure, Guid unitOfMeasureId)
     {
         Code = ValidateCode(code);
         GeneralGroupCode = GetGeneralGroupCode(Code);
         Description = ValidateRequired(description, "Specific description is required.", nameof(description));
         UnitOfMeasure = ValidateRequired(unitOfMeasure, "Unit of measure is required.", nameof(unitOfMeasure));
+        UnitOfMeasureId = unitOfMeasureId == Guid.Empty ? throw new ArgumentException("Unit of measure id is required.", nameof(unitOfMeasureId)) : unitOfMeasureId;
         MarkModified(null);
     }
 

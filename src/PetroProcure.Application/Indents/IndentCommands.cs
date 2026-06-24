@@ -47,7 +47,8 @@ public sealed class IndentCommandHandler(
 
         var item = new IndentItem(
             Guid.NewGuid(), indent.Id, snapshot.Id, snapshot.Code, snapshot.GeneralGroupCode,
-            snapshot.GeneralDescription, snapshot.SpecificDescription, command.UnitOfMeasureId,
+            snapshot.GeneralDescription, snapshot.SpecificDescription,
+            command.UnitOfMeasureId == Guid.Empty ? snapshot.UnitOfMeasureId : command.UnitOfMeasureId,
             command.RequestedQuantity, command.TechnicalDescription, command.RequiredDate);
         indent.AddItem(item);
         await repository.SaveChangesAsync(cancellationToken);
@@ -91,7 +92,8 @@ public sealed class IndentCommandHandler(
     internal static IndentDto ToDto(Indent indent) => new(
         indent.Id, indent.IndentNumber, indent.YearPart, indent.TypeDigit, indent.Sequence, indent.IndentType,
         indent.Title, indent.RequestingDepartmentId, indent.ApplicantDepartmentId, indent.CreatedByUserId,
-        indent.CreatedAt, indent.Status, indent.Description, indent.Items.Select(ToDto).ToArray());
+        indent.CreatedAt, indent.Status, indent.Description, indent.SourceType, indent.SourceDescription,
+        indent.SourceReferenceId, indent.SourceDisplayText, indent.Items.Select(ToDto).ToArray());
 
     internal static IndentItemDto ToDto(IndentItem item) => new(
         item.Id, item.MescItemId, item.MescCode, item.MescGeneralGroupCode, item.GeneralDescription,

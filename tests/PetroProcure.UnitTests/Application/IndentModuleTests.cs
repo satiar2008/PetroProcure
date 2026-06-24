@@ -66,7 +66,7 @@ public sealed class IndentModuleTests
         repository.Indent = indent;
         repository.Snapshot = new(
             Guid.NewGuid(), "1234560001", "123456", "Original general",
-            "Original specific", true);
+            "Original specific", repository.UnitId, true);
         var handler = new IndentCommandHandler(repository, new IndentNumberService(repository),
             new TestCurrentUser(Guid.NewGuid(), isSystemAdmin: true));
 

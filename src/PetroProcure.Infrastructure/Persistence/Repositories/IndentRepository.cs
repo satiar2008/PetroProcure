@@ -51,7 +51,7 @@ internal sealed class IndentRepository(PetroProcureDbContext dbContext) : IInden
             .Where(item => item.Id == mescItemId)
             .Select(item => new MescItemSnapshot(
                 item.Id, item.Code, item.GeneralGroupCode, item.GeneralGroup!.Description,
-                item.Description, item.IsActive))
+                item.Description, item.UnitOfMeasureId, item.IsActive))
             .SingleOrDefaultAsync(cancellationToken);
 
     public Task<bool> UnitOfMeasureExistsAsync(Guid id, CancellationToken cancellationToken) =>
@@ -65,7 +65,8 @@ internal sealed class IndentRepository(PetroProcureDbContext dbContext) : IInden
             .OrderByDescending(indent => indent.CreatedAt)
             .Select(indent => new IndentListDto(
                 indent.Id, indent.IndentNumber, indent.IndentType, indent.Title,
-                indent.RequestingDepartmentId, indent.Status, indent.CreatedAt, indent.Items.Count))
+                indent.RequestingDepartmentId, indent.Status, indent.CreatedAt, indent.Items.Count,
+                indent.SourceType, indent.SourceDescription, indent.SourceReferenceId, indent.SourceDisplayText))
             .ToListAsync(cancellationToken);
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)

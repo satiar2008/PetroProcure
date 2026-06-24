@@ -29,6 +29,9 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
             .IsRequired()
             .HasMaxLength(30);
 
+        builder.Property(item => item.UnitOfMeasureId)
+            .IsRequired();
+
         builder.Property(item => item.IsActive)
             .IsRequired();
 
@@ -51,6 +54,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "123456",
                 Description = "لوله فولادی عمومی",
                 UnitOfMeasure = "M",
+                UnitOfMeasureId = SeedDataIds.MeterUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -61,6 +65,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "123456",
                 Description = "زانو فولادی عمومی",
                 UnitOfMeasure = "EA",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -71,6 +76,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "223344",
                 Description = "شیر کشویی صنعتی",
                 UnitOfMeasure = "EA",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -81,6 +87,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "334455",
                 Description = "پمپ سانتریفیوژ عمومی",
                 UnitOfMeasure = "DEV",
+                UnitOfMeasureId = SeedDataIds.DeviceUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -91,6 +98,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "123456",
                 Description = "فلنج فولادی",
                 UnitOfMeasure = "EA",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -101,6 +109,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "123456",
                 Description = "سه راهی فولادی",
                 UnitOfMeasure = "EA",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -111,6 +120,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "223344",
                 Description = "شیر توپی صنعتی",
                 UnitOfMeasure = "EA",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -121,6 +131,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "223344",
                 Description = "شیر یک طرفه صنعتی",
                 UnitOfMeasure = "EA",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -131,6 +142,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "334455",
                 Description = "پمپ دنده‌ای",
                 UnitOfMeasure = "DEV",
+                UnitOfMeasureId = SeedDataIds.DeviceUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -141,6 +153,7 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 GeneralGroupCode = "334455",
                 Description = "مکانیکال سیل پمپ",
                 UnitOfMeasure = "EA",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             });
