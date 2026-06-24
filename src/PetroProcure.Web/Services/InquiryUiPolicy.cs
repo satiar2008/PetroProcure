@@ -13,6 +13,21 @@ public static class InquiryUiPolicy
     public const string ReceiveQuote = "Inquiry.ReceiveQuote";
     public const string CompareQuotes = "Inquiry.CompareQuotes";
     public const string SelectSupplier = "Inquiry.SelectSupplier";
+
+    public static bool CanSend(InquiryStatus status, Func<string, bool> hasPermission) =>
+        hasPermission(Send) && status is InquiryStatus.Draft or InquiryStatus.ReadyToSend;
+
+    public static bool CanManageSuppliers(InquiryStatus status, Func<string, bool> hasPermission) =>
+        hasPermission(ManageSuppliers) && status is InquiryStatus.Draft or InquiryStatus.ReadyToSend;
+
+    public static bool CanReceiveQuote(InquiryStatus status, Func<string, bool> hasPermission) =>
+        hasPermission(ReceiveQuote)
+        && status is InquiryStatus.Sent or InquiryStatus.PartiallyResponded or InquiryStatus.FullyResponded;
+
+    public static bool CanSelectSupplier(InquiryStatus status, Func<string, bool> hasPermission) =>
+        hasPermission(SelectSupplier)
+        && status is InquiryStatus.FullyResponded or InquiryStatus.UnderComparison;
+
     public static string StatusText(InquiryStatus s) => s switch
     {
         InquiryStatus.Draft => "پیش‌نویس",

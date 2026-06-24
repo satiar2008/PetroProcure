@@ -6,10 +6,17 @@
             <MudText Typo="Typo.body2" Color="Color.Secondary">@Subtitle</MudText>
         }
     </div>
-    @if (Actions is not null) { <div class="page-actions">@Actions</div> }
+    @if (Actions is not null || ChildContent is not null)
+    {
+        <div class="page-actions">
+            @Actions
+            @ChildContent
+        </div>
+    }
 </div>
 @code {
     [Parameter, EditorRequired] public string Title { get; set; } = "";
     [Parameter] public string? Subtitle { get; set; }
     [Parameter] public RenderFragment? Actions { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
 }

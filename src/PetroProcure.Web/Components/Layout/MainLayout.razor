@@ -20,21 +20,21 @@
             </div>
         </div>
         <MudSpacer />
-        @if (Access.Departments.Count > 1)
+        @if (Access.Panels.Count > 1)
         {
             <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
                 <ActivatorContent>
                     <MudButton Variant="Variant.Text" Color="Color.Inherit"
                                StartIcon="@Icons.Material.Filled.Apartment"
                                EndIcon="@Icons.Material.Filled.ExpandMore">
-                        @Access.CurrentDepartment.Title
+                        @Access.CurrentPanel.Title
                     </MudButton>
                 </ActivatorContent>
                 <ChildContent>
-                    @foreach (var department in Access.Departments)
+                    @foreach (var panel in Access.Panels)
                     {
-                        <MudMenuItem Icon="@department.Icon" OnClick="@(() => SwitchDepartment(department))">
-                            @department.Title
+                        <MudMenuItem Icon="@panel.Icon" OnClick="@(() => SwitchPanel(panel))">
+                            @panel.Title
                         </MudMenuItem>
                     }
                 </ChildContent>
@@ -109,10 +109,10 @@
         UpdateBreadcrumbs();
     }
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
-    private void SwitchDepartment(DepartmentAccess department)
+    private void SwitchPanel(DepartmentAccess panel)
     {
-        Access.SwitchDepartment(department.Key);
-        Navigation.NavigateTo(department.Route);
+        Access.SwitchPanel(panel.Key);
+        Navigation.NavigateTo(panel.Route);
     }
     private void OnAccessChanged() => InvokeAsync(StateHasChanged);
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e) { UpdateBreadcrumbs(); InvokeAsync(StateHasChanged); }

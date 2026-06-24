@@ -1,5 +1,6 @@
 @page "/orders/indents"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject IPetroProcureApiClient Api
 @inject IUserAccessContext Access
 @inject IDialogService Dialog
@@ -37,10 +38,12 @@ else{
 @code{
 private List<IndentSummaryDto>_items=[];private bool _loading=true;private string?_error,_number,_title;private IndentStatus?_status;private IndentType?_type;private Guid?_department;private DateTime?_from,_to;
 private IEnumerable<IndentSummaryDto>Filtered=>_items.Where(x=>(string.IsNullOrWhiteSpace(_number)||x.IndentNumber.Contains(_number.Trim()))&&(string.IsNullOrWhiteSpace(_title)||x.Title.Contains(_title.Trim(),StringComparison.OrdinalIgnoreCase))&&(!_status.HasValue||x.Status==_status)&&(!_type.HasValue||x.IndentType==_type)&&(!_department.HasValue||x.RequestingDepartmentId==_department)&&(!_from.HasValue||x.CreatedAt.Date>=_from.Value.Date)&&(!_to.HasValue||x.CreatedAt.Date<=_to.Value.Date)).OrderByDescending(x=>x.CreatedAt);
-protected override async Task OnAfterRenderAsync(bool first){if(!first)return;if(!IndentUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();StateHasChanged();}
-private async Task Load(){_loading=true;_error=null;try{_items=await Api.GetIndentsAsync();}catch(Exception ex){_error="امکان دریافت فهرست تقاضاها وجود ندارد.";Snackbar.Add(ex.Message,Severity.Error);}finally{_loading=false;}}
+private bool _disposed;
+protected override async Task OnAfterRenderAsync(bool first){if(!first||_disposed)return;if(!IndentUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();if(!_disposed)await InvokeAsync(StateHasChanged);}
+private async Task Load(){if(_disposed)return;_loading=true;_error=null;try{_items=await Api.GetIndentsAsync();}catch(Exception ex){if(!_disposed){_error="امکان دریافت فهرست تقاضاها وجود ندارد.";Snackbar.Add(ex.Message,Severity.Error);}}finally{if(!_disposed)_loading=false;}}
 private async Task Action(IndentSummaryDto item,string action,string title,string message){var d=await Dialog.ShowAsync<ConfirmDialog>(title,new DialogParameters{{"Message",message}});var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.ChangeIndentStatusAsync(item.Id,action);Snackbar.Add("عملیات با موفقیت انجام شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
 private async Task Reject(IndentSummaryDto item){var d=await Dialog.ShowAsync<RejectIndentDialog>("رد تقاضا");var r=await d.Result;if(r?.Canceled!=false)return;try{await Api.ChangeIndentStatusAsync(item.Id,"reject");Snackbar.Add("تقاضا رد شد. توجه: Backend فعلی علت رد را ذخیره نمی‌کند.",Severity.Warning);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
 private RenderFragment SourceCell(IndentSummaryDto item)=>@<span>@if(SourceRoute(item) is { } route){<MudLink Href="@route">@item.SourceDisplayText</MudLink>}else{@item.SourceDisplayText}</span>;
 private static string? SourceRoute(IndentSummaryDto item)=>item.SourceType switch{IndentSourceType.MaterialNeed when item.SourceReferenceId.HasValue=>$"/orders/material-needs/{item.SourceReferenceId}",IndentSourceType.ShortageAlert=>"/orders/shortage-alerts",_=>null};
+public void Dispose()=>_disposed=true;
 }

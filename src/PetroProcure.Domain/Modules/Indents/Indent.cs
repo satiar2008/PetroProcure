@@ -7,7 +7,11 @@ public sealed class Indent : AuditableEntity<Guid>
 {
     private readonly List<IndentItem> _items = [];
 
-    private Indent() : base(Guid.Empty) { }
+    private Indent() : base(Guid.Empty)
+    {
+        IndentNumber = string.Empty;
+        Title = string.Empty;
+    }
 
     public Indent(
         Guid id,

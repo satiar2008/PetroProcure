@@ -2,6 +2,7 @@ using PetroProcure.Api.Security;
 using PetroProcure.Application.Orders;
 using PetroProcure.Application.Security;
 using PetroProcure.Contracts.V1.Orders;
+using PetroProcure.Domain.Enums;
 
 namespace PetroProcure.Api.Endpoints;
 
@@ -54,8 +55,17 @@ public static class OrdersEndpoints
             Results.Ok(new { IndentId = await h.Handle(new ConvertMaterialNeedToIndentCommand(id, r.YearPart, r.TypeDigit, r.Title), ct) }))
             .RequirePermission(ApplicationPermissions.OrdersConvertNeedToIndent);
 
-        orders.MapGet("/shortage-alerts", async ([AsParameters] ShortageAlertListRequest r, OrdersQueryHandler h, CancellationToken ct) =>
-            await h.Handle(new GetShortageAlertsQuery(r), ct)).RequirePermission(ApplicationPermissions.OrdersManageShortageAlerts);
+        orders.MapGet("/shortage-alerts", async (string? status, string? mescCode, int? pageNumber, int? pageSize, OrdersQueryHandler h, CancellationToken ct) =>
+        {
+            if (!TryParseNullableEnum<ShortageAlertStatus>(status, out var parsedStatus))
+                return Results.BadRequest(new { error = "وضعیت هشدار کمبود نامعتبر است." });
+
+            return Results.Ok(await h.Handle(new GetShortageAlertsQuery(new ShortageAlertListRequest(
+                parsedStatus,
+                string.IsNullOrWhiteSpace(mescCode) ? null : mescCode,
+                pageNumber ?? 1,
+                pageSize ?? 20)), ct));
+        }).RequirePermission(ApplicationPermissions.OrdersManageShortageAlerts);
 
         orders.MapPost("/shortage-alerts/detect", async (DetectShortageAlertsRequest r, OrdersCommandHandler h, CancellationToken ct) =>
             Results.Ok(await h.Handle(new DetectShortageAlertsCommand(r.IncludeExistingOpen), ct)))
@@ -69,5 +79,15 @@ public static class OrdersEndpoints
         { await h.Handle(new ResolveShortageAlertCommand(id, r.ResolutionNote), ct); return Results.NoContent(); }).RequirePermission(ApplicationPermissions.OrdersManageShortageAlerts);
 
         return app;
+    }
+
+    private static bool TryParseNullableEnum<TEnum>(string? value, out TEnum? result)
+        where TEnum : struct
+    {
+        result = null;
+        if (string.IsNullOrWhiteSpace(value)) return true;
+        if (!Enum.TryParse<TEnum>(value, ignoreCase: true, out var parsed)) return false;
+        result = parsed;
+        return true;
     }
 }

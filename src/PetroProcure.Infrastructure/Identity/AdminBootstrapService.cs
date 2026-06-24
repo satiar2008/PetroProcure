@@ -30,13 +30,35 @@ public sealed class AdminBootstrapService(
         await using var scope = services.CreateAsyncScope();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
         var user = await userManager.FindByIdAsync(IdentitySeedData.DefaultAdminUserId.ToString());
-        if (user is null || await userManager.HasPasswordAsync(user))
+        if (user is null)
             return;
 
-        var result = await userManager.AddPasswordAsync(user, password);
+        IdentityResult result;
+        if (!await userManager.HasPasswordAsync(user))
+        {
+            result = await userManager.AddPasswordAsync(user, password);
+        }
+        else if (environment.IsDevelopment() && !await userManager.CheckPasswordAsync(user, password))
+        {
+            result = await userManager.RemovePasswordAsync(user);
+            if (result.Succeeded)
+                result = await userManager.AddPasswordAsync(user, password);
+        }
+        else
+        {
+            result = IdentityResult.Success;
+        }
+
         if (!result.Succeeded)
             throw new InvalidOperationException(
                 $"Admin bootstrap failed: {string.Join("; ", result.Errors.Select(error => error.Description))}");
+
+        if (environment.IsDevelopment())
+        {
+            user.LockoutEnd = null;
+            user.AccessFailedCount = 0;
+            await userManager.UpdateAsync(user);
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

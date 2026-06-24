@@ -26,41 +26,87 @@ public static class IndentEndpoints
 
         indents.MapPost("/", async (CreateIndentRequest request, IndentCommandHandler handler, CancellationToken ct) =>
         {
-            var result = await handler.Handle(new CreateIndentCommand(
-                request.YearPart, request.TypeDigit, request.Title, request.RequestingDepartmentId,
-                request.ApplicantDepartmentId, request.Description), ct);
-            return Results.Created($"/api/indents/{result.Id}", result.ToContract());
+            return await Execute(async () =>
+            {
+                var result = await handler.Handle(new CreateIndentCommand(
+                    request.YearPart, request.TypeDigit, request.Title, request.RequestingDepartmentId,
+                    request.ApplicantDepartmentId, request.Description), ct);
+                return Results.Created($"/api/indents/{result.Id}", result.ToContract());
+            });
         }).RequirePermission(ApplicationPermissions.IndentCreate);
         indents.MapPost("/{id:guid}/items", async (Guid id, AddIndentItemRequest request, IndentCommandHandler handler, CancellationToken ct) =>
         {
-            var result = await handler.Handle(new AddIndentItemCommand(
-                id, request.MescItemId, request.UnitOfMeasureId, request.RequestedQuantity,
-                request.TechnicalDescription, request.RequiredDate), ct);
-            return Results.Created($"/api/indents/{id}/items/{result.Id}", result.ToContract());
+            return await Execute(async () =>
+            {
+                var result = await handler.Handle(new AddIndentItemCommand(
+                    id, request.MescItemId, request.UnitOfMeasureId, request.RequestedQuantity,
+                    request.TechnicalDescription, request.RequiredDate), ct);
+                return Results.Created($"/api/indents/{id}/items/{result.Id}", result.ToContract());
+            });
         }).RequirePermission(ApplicationPermissions.IndentCreate);
         indents.MapDelete("/{id:guid}/items/{itemId:guid}", async (Guid id, Guid itemId, IndentCommandHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new RemoveIndentItemCommand(id, itemId), ct);
-            return Results.NoContent();
+            return await Execute(async () =>
+            {
+                await handler.Handle(new RemoveIndentItemCommand(id, itemId), ct);
+                return Results.NoContent();
+            });
         }).RequirePermission(ApplicationPermissions.IndentCreate);
         indents.MapPost("/{id:guid}/submit", async (Guid id, IndentCommandHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new SubmitIndentCommand(id), ct); return Results.NoContent();
+            return await Execute(async () =>
+            {
+                await handler.Handle(new SubmitIndentCommand(id), ct);
+                return Results.NoContent();
+            });
         }).RequirePermission(ApplicationPermissions.IndentCreate);
         indents.MapPost("/{id:guid}/approve", async (Guid id, IndentCommandHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new ApproveIndentCommand(id), ct); return Results.NoContent();
+            return await Execute(async () =>
+            {
+                await handler.Handle(new ApproveIndentCommand(id), ct);
+                return Results.NoContent();
+            });
         }).RequirePermission(ApplicationPermissions.IndentApprove);
         indents.MapPost("/{id:guid}/reject", async (Guid id, IndentCommandHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new RejectIndentCommand(id), ct); return Results.NoContent();
+            return await Execute(async () =>
+            {
+                await handler.Handle(new RejectIndentCommand(id), ct);
+                return Results.NoContent();
+            });
         }).RequirePermission(ApplicationPermissions.IndentApprove);
         indents.MapPost("/{id:guid}/send-to-purchase", async (Guid id, IndentCommandHandler handler, CancellationToken ct) =>
         {
-            await handler.Handle(new SendIndentToPurchaseDepartmentCommand(id), ct); return Results.NoContent();
+            return await Execute(async () =>
+            {
+                await handler.Handle(new SendIndentToPurchaseDepartmentCommand(id), ct);
+                return Results.NoContent();
+            });
         }).RequirePermission(ApplicationPermissions.IndentSendToPurchase);
 
         return app;
     }
 
+    private static async Task<IResult> Execute(Func<Task<IResult>> action)
+    {
+        try
+        {
+            return await action();
+        }
+        catch (IndentValidationException ex)
+        {
+            return Results.BadRequest(new { error = ToPersianMessage(ex.Message) });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ToPersianMessage(ex.Message) });
+        }
+    }
+
+    private static string ToPersianMessage(string message) => message switch
+    {
+        "An indent must contain at least one item before submission." => "برای ارسال تقاضا، ثبت حداقل یک قلم کالا الزامی است.",
+        _ => message
+    };
 }

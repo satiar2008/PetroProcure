@@ -1,6 +1,35 @@
-<MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@Color" Icon="@Icon">@Text</MudChip>
+<MudChip T="string" Size="Size.Small" Variant="Variant.Filled" Color="@ResolvedColor" Icon="@Icon">@ResolvedText</MudChip>
 @code {
-    [Parameter] public string Text { get; set; } = "فعال";
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Status { get; set; }
     [Parameter] public Color Color { get; set; } = Color.Success;
     [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Circle;
+
+    private string ResolvedText => !string.IsNullOrWhiteSpace(Text)
+        ? Text
+        : Status switch
+        {
+            "Active" => "فعال",
+            "Inactive" => "غیرفعال",
+            "Draft" => "پیش‌نویس",
+            "Submitted" => "ارسال‌شده",
+            "Approved" => "تأیید شده",
+            "Rejected" => "رد شده",
+            "Open" => "باز",
+            "Closed" => "بسته",
+            "Completed" => "تکمیل‌شده",
+            _ when !string.IsNullOrWhiteSpace(Status) => Status!,
+            _ => "فعال"
+        };
+
+    private Color ResolvedColor => !string.IsNullOrWhiteSpace(Text)
+        ? Color
+        : Status switch
+        {
+            "Active" or "Approved" or "Completed" or "Closed" => Color.Success,
+            "Inactive" or "Rejected" => Color.Error,
+            "Draft" => Color.Default,
+            "Submitted" or "Open" => Color.Info,
+            _ => Color
+        };
 }

@@ -561,7 +561,16 @@ public sealed class PetroProcureApiClient(
 
     public async Task<PagedResult<ShortageAlertDto>> GetShortageAlertsAsync(ShortageAlertListRequest r, CancellationToken ct = default)
     {
-        var url = $"/api/orders/shortage-alerts?Status={r.Status?.ToString()}&MescCode={Uri.EscapeDataString(r.MescCode ?? "")}&PageNumber={r.PageNumber}&PageSize={r.PageSize}";
+        var query = new Dictionary<string, string?>
+        {
+            ["Status"] = r.Status?.ToString(),
+            ["MescCode"] = r.MescCode,
+            ["PageNumber"] = r.PageNumber.ToString(),
+            ["PageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/orders/shortage-alerts?" + string.Join("&",
+            query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+                .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
         return await GetJsonAsync<PagedResult<ShortageAlertDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
     }
 

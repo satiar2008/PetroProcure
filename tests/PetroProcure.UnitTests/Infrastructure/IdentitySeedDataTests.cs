@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Identity;
+using PetroProcure.Infrastructure.Identity;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Infrastructure.Persistence.Seeding;
 
@@ -17,5 +19,16 @@ public sealed class IdentitySeedDataTests
         Assert.Contains(DepartmentType.Warehouse, departmentTypes);
         Assert.Contains(DepartmentType.Applicant, departmentTypes);
         Assert.Contains(DepartmentType.TenderCommission, departmentTypes);
+    }
+
+    [Fact]
+    public void SeededAdminPasswordHash_MatchesConfiguredDefaultPassword()
+    {
+        var result = new PasswordHasher<ApplicationUser>().VerifyHashedPassword(
+            IdentitySeedData.AdminUser,
+            IdentitySeedData.AdminUser.PasswordHash!,
+            IdentitySeedData.DefaultAdminPassword);
+
+        Assert.NotEqual(PasswordVerificationResult.Failed, result);
     }
 }

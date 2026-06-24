@@ -1,8 +1,9 @@
 @inject IUserAccessContext Access
+@implements IDisposable
 
 <div class="drawer-header">
     <MudText Typo="Typo.overline">پنل فعال</MudText>
-    <DepartmentBadge Title="@Access.CurrentDepartment.Title" Icon="@Access.CurrentDepartment.Icon" />
+    <DepartmentBadge Title="@Access.CurrentPanel.Title" Icon="@Access.CurrentPanel.Icon" />
 </div>
 
 <MudNavMenu Class="nav-menu">
@@ -27,9 +28,21 @@
 </div>
 
 @code {
+    protected override void OnInitialized()
+    {
+        Access.Changed += OnAccessChanged;
+    }
+
     private IEnumerable<NavigationAccess> VisibleDepartmentItems =>
         NavigationAccessPolicy.VisibleForDepartment(
-            Access.NavigationItems, Access.CurrentDepartment.Key, Access.HasPermission);
+            Access.NavigationItems, Access.CurrentPanel.Key, Access.HasPermission);
     private IEnumerable<NavigationAccess> SharedItems =>
         NavigationAccessPolicy.VisibleShared(Access.NavigationItems, Access.HasPermission);
+
+    private void OnAccessChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Access.Changed -= OnAccessChanged;
+    }
 }

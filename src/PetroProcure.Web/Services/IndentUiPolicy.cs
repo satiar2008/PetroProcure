@@ -12,6 +12,8 @@ public static class IndentUiPolicy
         status == IndentStatus.Draft && has("Indent.Create");
     public static bool CanSubmit(IndentStatus status, Func<string, bool> has) =>
         status == IndentStatus.Draft && has("Indent.Create");
+    public static bool CanSubmit(IndentStatus status, int itemCount, Func<string, bool> has) =>
+        CanSubmit(status, has) && itemCount > 0;
     public static bool CanApproveOrReject(IndentStatus status, Func<string, bool> has) =>
         status == IndentStatus.Submitted && has("Indent.Approve");
     public static bool CanSendToPurchase(IndentStatus status, Func<string, bool> has) =>

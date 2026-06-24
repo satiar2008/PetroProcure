@@ -11,6 +11,8 @@ public static class IdentitySeedData
 {
     public const string DefaultAdminUserName = "admin";
     public const string DefaultAdminEmail = "admin@petroprocure.local";
+    public const string DefaultAdminPassword = "Admin@123456";
+    public const string DefaultAdminPasswordHash = "AQAAAAIAAYagAAAAEP4Pkm7AMVlZbxtV8i/536d40zis6sJQNNNupy7R4tqFLRzt2sPJTRQwhfqlkWaq3g==";
 
     public static readonly Guid DefaultAdminUserId = StableGuid.Create("identity:user:admin");
     public static readonly Guid DefaultAdminProfileId = StableGuid.Create("org:user-profile:admin");
@@ -86,6 +88,7 @@ public static class IdentitySeedData
             Email = DefaultAdminEmail,
             NormalizedEmail = DefaultAdminEmail.ToUpperInvariant(),
             EmailConfirmed = true,
+            PasswordHash = DefaultAdminPasswordHash,
             SecurityStamp = StableGuid.Create("identity:user-security-stamp:admin").ToString(),
             ConcurrencyStamp = StableGuid.Create("identity:user-concurrency-stamp:admin").ToString(),
             UserProfileId = DefaultAdminProfileId

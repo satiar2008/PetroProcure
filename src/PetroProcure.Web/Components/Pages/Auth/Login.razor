@@ -4,13 +4,41 @@
 @inject NavigationManager Navigation
 
 <PageTitle>ورود به پتروپروکیور</PageTitle>
-<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="min-height:100vh">
-    <MudPaper Class="pa-8" Elevation="4" Style="width:100%">
-        <div class="d-flex flex-column align-center mb-6">
-            <MudAvatar Color="Color.Primary" Size="Size.Large">PP</MudAvatar>
-            <MudText Typo="Typo.h5" Class="mt-3">ورود به پتروپروکیور</MudText>
-            <MudText Typo="Typo.body2" Color="Color.Secondary">سامانه یکپارچه تدارکات و خرید پالایشگاه</MudText>
-        </div>
+
+<div class="login-page">
+    <div class="login-orb login-orb-one"></div>
+    <div class="login-orb login-orb-two"></div>
+
+    <MudPaper Class="login-shell" Elevation="0">
+        <section class="login-hero">
+            <div class="login-brand">
+                <MudAvatar Class="login-logo" Size="Size.Large">PP</MudAvatar>
+                <div>
+                    <MudText Typo="Typo.h5" Class="login-brand-title">پتروپروکیور</MudText>
+                    <MudText Typo="Typo.body2" Class="login-brand-subtitle">سامانه یکپارچه تدارکات، خرید و گردش‌کار پالایشگاه</MudText>
+                </div>
+            </div>
+
+            <div class="login-hero-copy">
+                <MudText Typo="Typo.h3" Class="login-hero-title">مدیریت امن پرونده‌های خرید</MudText>
+                <MudText Typo="Typo.body1" Class="login-hero-text">
+                    از کاتالوگ MESC و تقاضای خرید تا پرونده خرید، اسناد، کارتابل، گزارش‌ها و ارزیابی هوشمند؛ همه در یک محیط سازمانی کنترل‌شده.
+                </MudText>
+            </div>
+
+            <div class="login-feature-grid">
+                @Feature(Icons.Material.Filled.VerifiedUser, "دسترسی مبتنی بر مجوز")
+                @Feature(Icons.Material.Filled.AccountTree, "گردش‌کار بین واحدها")
+                @Feature(Icons.Material.Filled.FolderOpen, "پرونده مرکزی خرید")
+            </div>
+        </section>
+
+        <section class="login-card">
+            <div class="login-card-heading">
+                <MudText Typo="Typo.h5">ورود به سامانه</MudText>
+                <MudText Typo="Typo.body2">برای ادامه، اطلاعات حساب سازمانی خود را وارد کنید.</MudText>
+            </div>
+
         <MudForm @ref="_form">
             <MudTextField @bind-Value="_userName" Label="نام کاربری یا ایمیل"
                           Immediate="true"
@@ -28,12 +56,18 @@
                 <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-3">@_error</MudAlert>
             }
             <MudButton FullWidth="true" Color="Color.Primary" Variant="Variant.Filled"
-                       Size="Size.Large" Class="mt-5" Disabled="_busy" OnClick="LoginAsync">
+                       Size="Size.Large" Class="login-submit" Disabled="_busy" OnClick="LoginAsync">
                 @(_busy ? "در حال ورود..." : "ورود به سامانه")
             </MudButton>
         </MudForm>
+
+            <div class="login-footer-note">
+                <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" />
+                <span>ورود شما ثبت و مطابق سیاست‌های امنیتی سازمان کنترل می‌شود.</span>
+            </div>
+        </section>
     </MudPaper>
-</MudContainer>
+</div>
 
 @code {
     [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
@@ -43,6 +77,12 @@
     private string? _error;
     private bool _rememberMe;
     private bool _busy;
+
+    private static RenderFragment Feature(string icon, string text) =>
+        @<div class="login-feature">
+            <MudIcon Icon="@icon" />
+            <span>@text</span>
+        </div>;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

@@ -1,5 +1,6 @@
 @page "/orders/indents/{Id:guid}"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject IPetroProcureApiClient Api
 @inject IUserAccessContext Access
 @inject IDialogService Dialog
@@ -18,7 +19,8 @@ else{
 <MudTabPanel Text="گردش وضعیت" Icon="@Icons.Material.Filled.AccountTree">
 <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">وضعیت جاری: <strong>@IndentUiPolicy.StatusText(_indent.Status)</strong></MudAlert>
 <div class="report-actions mt-4">
-@if(IndentUiPolicy.CanSubmit(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(()=>ConfirmAction("submit","ارسال تقاضا","تقاضا برای بررسی ارسال شود؟"))">ارسال برای بررسی</MudButton>}
+@if(IndentUiPolicy.CanSubmit(_indent.Status,ItemCount,Access.HasPermission)){<MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(()=>ConfirmAction("submit","ارسال تقاضا","تقاضا برای بررسی ارسال شود؟"))">ارسال برای بررسی</MudButton>}
+else if(IndentUiPolicy.CanSubmit(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="true">ارسال برای بررسی</MudButton><MudAlert Severity="Severity.Warning" Dense="true">برای ارسال تقاضا، ابتدا حداقل یک قلم کالا ثبت کنید.</MudAlert>}
 @if(IndentUiPolicy.CanApproveOrReject(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@(()=>ConfirmAction("approve","تأیید تقاضا","تقاضا تأیید شود؟"))">تأیید</MudButton><MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="Reject">رد</MudButton>}
 @if(IndentUiPolicy.CanSendToPurchase(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Info" Variant="Variant.Filled" OnClick="@(()=>ConfirmAction("send-to-purchase","ارسال به واحد خرید","تقاضا به واحد خرید ارسال شود؟"))">ارسال به واحد خرید</MudButton>}
 @if(IndentUiPolicy.CanCreatePurchaseFile(_indent.Status,Access.HasPermission)){<MudButton Color="Color.Secondary" Variant="Variant.Filled" Href="@($"/purchase/files/from-indent/{Id}")">ایجاد پرونده خرید از این تقاضا</MudButton>}
@@ -29,14 +31,16 @@ else{
 <MudTabPanel Text="گزارش" Icon="@Icons.Material.Filled.PictureAsPdf"><div class="report-actions"><MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@($"/report-preview/indent/{Id}")" Target="_blank">دریافت PDF</MudButton><MudButton Variant="Variant.Outlined" OnClick="@(()=>_preview=!_preview)">پیش‌نمایش</MudButton></div>@if(_preview){<div class="report-preview"><iframe src="@($"/report-preview/indent/{Id}")" title="پیش‌نمایش گزارش تقاضا"></iframe></div>}<MudAlert Severity="Severity.Info" Class="mt-3">ذخیره گزارش Indent در مخزن پرونده، پس از ایجاد پرونده خرید مرتبط قابل انجام است.</MudAlert></MudTabPanel>
 </MudTabs>}
 @code{
-[Parameter]public Guid Id{get;set;}private IndentDto?_indent;private bool _loading=true,_itemsLoading=true,_relatedLoading=true,_preview;private string?_error,_itemsError,_relatedError;private List<IndentGroupedItemsDto>_groups=[];private PurchaseFileSummaryDto?_related;
-protected override async Task OnParametersSetAsync(){if(!IndentUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();}
-private async Task Load(){_loading=true;_error=null;try{_indent=await Api.GetIndentAsync(Id);if(_indent is null)return;await Task.WhenAll(LoadItems(),LoadRelated());}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
-private async Task LoadItems(){_itemsLoading=true;_itemsError=null;try{_groups=await Api.GetIndentGroupedItemsAsync(Id);}catch(Exception ex){_itemsError=ex.Message;}finally{_itemsLoading=false;}}
-private async Task LoadRelated(){if(_indent is null)return;_relatedLoading=true;_relatedError=null;try{var result=await Api.GetPurchaseFilesAsync(new(SourceIndentNumber:_indent.IndentNumber,PageSize:1));_related=result.Items.FirstOrDefault();}catch(Exception ex){_relatedError=ex.Message;}finally{_relatedLoading=false;}}
+[Parameter]public Guid Id{get;set;}private IndentDto?_indent;private bool _loading=true,_itemsLoading=true,_relatedLoading=true,_preview,_disposed;private string?_error,_itemsError,_relatedError;private List<IndentGroupedItemsDto>_groups=[];private PurchaseFileSummaryDto?_related;
+private int ItemCount=>_groups.Sum(x=>x.Items.Count);
+protected override async Task OnParametersSetAsync(){if(_disposed)return;if(!IndentUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();}
+private async Task Load(){if(_disposed)return;_loading=true;_error=null;try{_indent=await Api.GetIndentAsync(Id);if(_indent is null||_disposed)return;await Task.WhenAll(LoadItems(),LoadRelated());}catch(Exception ex){if(!_disposed)_error=ex.Message;}finally{if(!_disposed)_loading=false;}}
+private async Task LoadItems(){if(_disposed)return;_itemsLoading=true;_itemsError=null;try{_groups=await Api.GetIndentGroupedItemsAsync(Id);}catch(Exception ex){if(!_disposed)_itemsError=ex.Message;}finally{if(!_disposed)_itemsLoading=false;}}
+private async Task LoadRelated(){if(_indent is null||_disposed)return;_relatedLoading=true;_relatedError=null;try{var result=await Api.GetPurchaseFilesAsync(new(SourceIndentNumber:_indent.IndentNumber,PageSize:1));if(!_disposed)_related=result.Items.FirstOrDefault();}catch(Exception ex){if(!_disposed)_relatedError=ex.Message;}finally{if(!_disposed)_relatedLoading=false;}}
 private async Task ConfirmAction(string action,string title,string message){var d=await Dialog.ShowAsync<ConfirmDialog>(title,new DialogParameters{{"Message",message}});var r=await d.Result;if(r?.Canceled!=false)return;await Execute(action);}
 private async Task Reject(){var d=await Dialog.ShowAsync<RejectIndentDialog>("رد تقاضا");var r=await d.Result;if(r?.Canceled!=false)return;await Execute("reject");Snackbar.Add("Backend فعلی علت رد را نگهداری نمی‌کند.",Severity.Warning);}
-private async Task Execute(string action){try{await Api.ChangeIndentStatusAsync(Id,action);Snackbar.Add("وضعیت تقاضا تغییر کرد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private async Task Execute(string action){if(action=="submit"&&ItemCount==0){Snackbar.Add("برای ارسال تقاضا، ثبت حداقل یک قلم کالا الزامی است.",Severity.Warning);return;}try{await Api.ChangeIndentStatusAsync(Id,action);Snackbar.Add("وضعیت تقاضا تغییر کرد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
 private static string? SourceRoute(IndentDto item)=>item.SourceType switch{IndentSourceType.MaterialNeed when item.SourceReferenceId.HasValue=>$"/orders/material-needs/{item.SourceReferenceId}",IndentSourceType.ShortageAlert=>"/orders/shortage-alerts",_=>null};
 private RenderFragment Info(string label,string value)=>@<MudPaper Class="pa-3" Elevation="0" Outlined="true"><MudText Typo="Typo.caption">@label</MudText><MudText Typo="Typo.body1"><strong>@value</strong></MudText></MudPaper>;
+public void Dispose()=>_disposed=true;
 }
