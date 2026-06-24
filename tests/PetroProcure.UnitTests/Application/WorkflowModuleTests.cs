@@ -4,6 +4,7 @@ using PetroProcure.Domain.Modules.PurchaseFiles;
 using PetroProcure.Domain.Modules.Workflow;
 
 namespace PetroProcure.UnitTests.Application;
+
 public sealed class WorkflowModuleTests
 {
     [Fact]

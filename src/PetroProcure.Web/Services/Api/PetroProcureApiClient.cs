@@ -100,11 +100,16 @@ public sealed class PetroProcureApiClient(
     {
         var query = new Dictionary<string, string?>
         {
-            ["FileNumber"] = r.FileNumber, ["Title"] = r.Title, ["Status"] = r.Status?.ToString(),
+            ["FileNumber"] = r.FileNumber,
+            ["Title"] = r.Title,
+            ["Status"] = r.Status?.ToString(),
             ["CurrentDepartmentId"] = r.CurrentDepartmentId?.ToString(),
-            ["CreatedDateFrom"] = r.CreatedDateFrom?.ToString("O"), ["CreatedDateTo"] = r.CreatedDateTo?.ToString("O"),
-            ["SourceIndentNumber"] = r.SourceIndentNumber, ["SortBy"] = r.SortBy,
-            ["SortDescending"] = r.SortDescending.ToString(), ["PageNumber"] = r.PageNumber.ToString(),
+            ["CreatedDateFrom"] = r.CreatedDateFrom?.ToString("O"),
+            ["CreatedDateTo"] = r.CreatedDateTo?.ToString("O"),
+            ["SourceIndentNumber"] = r.SourceIndentNumber,
+            ["SortBy"] = r.SortBy,
+            ["SortDescending"] = r.SortDescending.ToString(),
+            ["PageNumber"] = r.PageNumber.ToString(),
             ["PageSize"] = r.PageSize.ToString()
         };
         var url = "/api/purchase-files?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))

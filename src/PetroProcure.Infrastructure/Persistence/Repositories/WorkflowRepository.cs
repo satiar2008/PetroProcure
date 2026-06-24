@@ -5,6 +5,7 @@ using PetroProcure.Domain.Modules.PurchaseFiles;
 using PetroProcure.Domain.Modules.Workflow;
 
 namespace PetroProcure.Infrastructure.Persistence.Repositories;
+
 internal sealed class WorkflowRepository(PetroProcureDbContext db) : IWorkflowRepository
 {
     public Task<WorkflowInstance?> FindWorkflowAsync(Guid id, bool steps, CancellationToken ct)

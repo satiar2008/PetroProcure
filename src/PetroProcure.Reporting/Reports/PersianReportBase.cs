@@ -36,15 +36,15 @@ public abstract class PersianReportBase : XtraReport
         {
             detail.Controls.Add(Label($"گروه MESC: {group.GeneralGroupCode} — {group.GeneralDescription}", 0, top, 747, 26, true));
             top += 26;
-            var headers = new[] { ("کد MESC",125f),("کد عمومی",85f),("شرح عمومی",175f),("شرح اختصاصی",210f),("واحد",70f),("مقدار",82f) };
+            var headers = new[] { ("کد MESC", 125f), ("کد عمومی", 85f), ("شرح عمومی", 175f), ("شرح اختصاصی", 210f), ("واحد", 70f), ("مقدار", 82f) };
             var x = 0f;
-            foreach (var (text,width) in headers) { detail.Controls.Add(Label(text,x,top,width,24,true,TextAlignment.MiddleCenter)); x += width; }
+            foreach (var (text, width) in headers) { detail.Controls.Add(Label(text, x, top, width, 24, true, TextAlignment.MiddleCenter)); x += width; }
             top += 24;
             foreach (var item in group.Items)
             {
                 x = 0;
-                foreach (var (text,width) in new[] {(item.MescCode,125f),(item.GeneralGroupCode,85f),(item.GeneralDescription,175f),(item.SpecificDescription,210f),(item.Unit,70f),(item.Quantity.ToString("0.####"),82f)})
-                { detail.Controls.Add(Label(text,x,top,width,25,false,TextAlignment.MiddleCenter)); x += width; }
+                foreach (var (text, width) in new[] { (item.MescCode, 125f), (item.GeneralGroupCode, 85f), (item.GeneralDescription, 175f), (item.SpecificDescription, 210f), (item.Unit, 70f), (item.Quantity.ToString("0.####"), 82f) })
+                { detail.Controls.Add(Label(text, x, top, width, 25, false, TextAlignment.MiddleCenter)); x += width; }
                 top += 25;
             }
             top += 12;

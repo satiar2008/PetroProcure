@@ -34,8 +34,10 @@ public sealed class ReportGeneratorTests : IDisposable
         var storage = new FileStorageService(repository,
             Microsoft.Extensions.Options.Options.Create(new FileStorageOptions
             {
-                RootPath = _root, QuarantinePath = Path.Combine(_root, ".quarantine"),
-                AllowedExtensions = [".pdf"], AllowedMimeTypes = ["application/pdf"]
+                RootPath = _root,
+                QuarantinePath = Path.Combine(_root, ".quarantine"),
+                AllowedExtensions = [".pdf"],
+                AllowedMimeTypes = ["application/pdf"]
             }), new NoOpFileScanner());
         var generator = new ReportGenerator(new FakeDataProvider(), storage,
             new TestCurrentUser(Guid.NewGuid()));
@@ -82,7 +84,7 @@ public sealed class ReportGeneratorTests : IDisposable
     {
         public Task EnsurePurchaseFileFoldersAsync(PurchaseFile purchaseFile, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<FileDocumentDto> SaveFileAsync(Guid purchaseFileId, DocumentType documentType, string originalFileName, Stream stream, Guid uploadedByUserId, Guid? departmentId = null, string? mimeType = null, string? description = null, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new FileDocumentDto(Guid.NewGuid(),purchaseFileId,null,documentType,originalFileName,"stored.pdf","PurchaseFiles/test.pdf",".pdf","application/pdf",stream.Length,"hash",1,uploadedByUserId,DateTime.UtcNow,false,description));
+            Task.FromResult(new FileDocumentDto(Guid.NewGuid(), purchaseFileId, null, documentType, originalFileName, "stored.pdf", "PurchaseFiles/test.pdf", ".pdf", "application/pdf", stream.Length, "hash", 1, uploadedByUserId, DateTime.UtcNow, false, description));
         public Task<StoredFileContent> OpenFileAsync(Guid fileDocumentId, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task DeleteFileAsync(Guid fileDocumentId, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public Task<FileDocumentDto> CreateNewVersionAsync(Guid fileDocumentId, Stream stream, Guid createdByUserId, CancellationToken cancellationToken = default) => throw new NotImplementedException();
@@ -96,7 +98,7 @@ public sealed class ReportGeneratorTests : IDisposable
         public FileDocument? Document { get; private set; }
         public Task<PurchaseFile?> FindPurchaseFileAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(PurchaseFile);
         public Task<FileDocument?> FindDocumentAsync(Guid id, bool includeVersions, CancellationToken cancellationToken) => Task.FromResult(Document);
-        public Task AddDocumentAsync(FileDocument document, CancellationToken cancellationToken) { Document=document; return Task.CompletedTask; }
+        public Task AddDocumentAsync(FileDocument document, CancellationToken cancellationToken) { Document = document; return Task.CompletedTask; }
         public Task<IReadOnlyList<FileDocumentDto>> GetDocumentsAsync(Guid purchaseFileId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FileDocumentDto>>([]);
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }

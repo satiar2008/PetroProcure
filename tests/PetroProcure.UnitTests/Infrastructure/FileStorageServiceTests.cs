@@ -141,8 +141,11 @@ public sealed class FileStorageServiceTests : IDisposable
         new(_repository, Options.Create(TestOptions()), new NoOpFileScanner());
     private FileStorageOptions TestOptions() => new()
     {
-        RootPath = _root, QuarantinePath = Path.Combine(_root, ".quarantine"), MaxFileSizeMb = 1,
-        AllowedExtensions = [".pdf", ".txt"], AllowedMimeTypes = ["application/pdf", "text/plain"]
+        RootPath = _root,
+        QuarantinePath = Path.Combine(_root, ".quarantine"),
+        MaxFileSizeMb = 1,
+        AllowedExtensions = [".pdf", ".txt"],
+        AllowedMimeTypes = ["application/pdf", "text/plain"]
     };
 
     private string ToPhysical(string relativePath) =>

@@ -62,8 +62,8 @@ public static class DependencyInjection
         services.AddScoped<IWorkflowActionResolver, WorkflowActionResolver>();
         services.AddScoped<IReportDataProvider, ReportDataProvider>();
         services.AddScoped<AiRepository>();
-        services.AddScoped<IAiEvaluationRepository>(sp=>sp.GetRequiredService<AiRepository>());
-        services.AddScoped<IPurchaseFileAiContextBuilder>(sp=>sp.GetRequiredService<AiRepository>());
+        services.AddScoped<IAiEvaluationRepository>(sp => sp.GetRequiredService<AiRepository>());
+        services.AddScoped<IPurchaseFileAiContextBuilder>(sp => sp.GetRequiredService<AiRepository>());
         services.AddHostedService<AdminBootstrapService>();
 
         services.AddHealthChecks()

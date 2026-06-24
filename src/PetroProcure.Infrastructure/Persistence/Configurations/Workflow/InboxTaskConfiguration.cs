@@ -8,6 +8,7 @@ using PetroProcure.Infrastructure.Identity;
 using PetroProcure.Infrastructure.Persistence.Configurations;
 
 namespace PetroProcure.Infrastructure.Persistence.Configurations.Workflow;
+
 internal sealed class InboxTaskConfiguration : IEntityTypeConfiguration<InboxTask>
 {
     public void Configure(EntityTypeBuilder<InboxTask> b)

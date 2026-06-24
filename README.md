@@ -1,63 +1,107 @@
 # PetroProcure
 
-PetroProcure سامانه مدیریت تدارکات پالایشگاهی است که تمرکز اصلی آن بر مدیریت پرونده خرید است. این مخزن در حال حاضر فقط شامل مستندات اولیه و اسکلت راهکار ASP.NET Aspire است و هنوز موجودیت‌های تجاری، منطق دامنه، گزارش‌ها یا قابلیت‌های هوش مصنوعی پیاده‌سازی نشده‌اند.
+PetroProcure is a refinery procurement management system built with ASP.NET Aspire, ASP.NET Core Web API, Blazor/MudBlazor, SQL Server, EF Core, DevExpress Reports foundations, and an extendable AI Agent foundation.
 
-## هدف پروژه
+The central business aggregate is the Purchase File. Indents, MESC items, documents, workflow tasks, reports, and AI evaluations are connected around it.
 
-هدف محصول، ایجاد یک بستر سازمانی برای ثبت، پیگیری و گزارش‌گیری پرونده‌های خرید پالایشگاهی است. در فازهای بعدی، پرونده خرید، اقلام با کد MESC، اسناد و پیوست‌ها، گردش کار واحدها، گزارش‌های رسمی DevExpress و AI Agent به صورت مرحله‌ای اضافه می‌شوند.
+## Current modules
 
-رابط کاربری از ابتدا برای پشتیبانی از فارسی و انگلیسی آماده شده است. زبان پیش‌فرض فارسی است و امکان تغییر به انگلیسی از صفحه اصلی وجود دارد.
+- ASP.NET Aspire AppHost for orchestrating API, Web, Worker, and SQL Server resources
+- ASP.NET Core Web API with JWT authentication and permission-based authorization
+- Persian RTL MudBlazor Web interface
+- SQL Server persistence through EF Core migrations
+- Identity, roles, permissions, departments, refresh tokens, sessions, lockout, and admin audit log
+- MESC catalog with general groups, item validation, search, activation/deactivation, and grouped views
+- Indent / Purchase Request with 7-digit numbering, workflow actions, item snapshots, and grouped MESC items
+- Purchase File core with file numbering, status history, notes, items, timeline, and creation from approved indents
+- Root folder file repository with relative paths, hashing, versioning, soft delete, upload validation, and scanner abstraction
+- Workflow and Inbox foundation with department-aware tasks and action matrix
+- Reporting foundation for official printable PDF reports
+- AI foundation for purchase file summaries, missing document checks, rule evaluation, and future RAG integration
+- Admin UI foundation for users, roles, permissions, departments, settings, audit log, and workflow matrix
+- Unit, integration, and architecture tests
+- GitHub Actions CI preparation
 
-## ساختار راهکار
+## Solution layout
 
 ```text
-docs/
-  مستندات چشم‌انداز، معماری، دامنه، گردش کار، MESC، Indent، فایل‌ها، گزارش‌گیری و AI
-
 src/
-  PetroProcure.AppHost/          ارکستریشن Aspire برای Web، Api و SQL Server
-  PetroProcure.ServiceDefaults/  تنظیمات مشترک Aspire، سلامت، OpenTelemetry و Service Discovery
-  PetroProcure.Web/              Blazor Web App با پشتیبانی اولیه فارسی و انگلیسی
-  PetroProcure.Api/              ASP.NET Core Web API
-  PetroProcure.Domain/           لایه دامنه، بدون وابستگی به پروژه‌های دیگر
-  PetroProcure.Application/      لایه کاربرد، وابسته به Domain و Contracts
-  PetroProcure.Infrastructure/   زیرساخت و آماده برای SQL Server و EF Core
-  PetroProcure.Contracts/        قراردادهای مشترک بین Web و Api
-  PetroProcure.Reporting/        فضای ایزوله برای DevExpress Reports در فازهای بعدی
-  PetroProcure.AI/               فضای ایزوله برای AI Agent و Providerهای آینده
-  PetroProcure.Worker/           سرویس پس‌زمینه آماده برای پردازش‌های آتی
+  PetroProcure.AppHost/          Aspire orchestration
+  PetroProcure.ServiceDefaults/  shared Aspire defaults
+  PetroProcure.Api/              ASP.NET Core API
+  PetroProcure.Web/              Blazor/MudBlazor Persian RTL Web UI
+  PetroProcure.Domain/           domain model and business rules
+  PetroProcure.Application/      application commands, queries, services, and interfaces
+  PetroProcure.Infrastructure/   EF Core, SQL Server, storage, identity, and integrations
+  PetroProcure.Contracts/        shared V1 API contracts used by API and Web
+  PetroProcure.Reporting/        report generator foundations
+  PetroProcure.AI/               AI provider and agent foundations
+  PetroProcure.Worker/           background service placeholders
 
 tests/
   PetroProcure.UnitTests/
   PetroProcure.IntegrationTests/
   PetroProcure.ArchitectureTests/
+
+docs/
+  architecture, development, deployment, and security documentation
 ```
 
-## اجرای پروژه با Aspire
+## Configuration and secrets
 
-ابتدا وابستگی‌ها را بازیابی و راهکار را build کنید:
+Do not commit real secrets. The committed `appsettings.json` contains only safe defaults. Use:
+
+- `src/PetroProcure.Api/appsettings.example.json` as a template;
+- `dotnet user-secrets` for development secrets;
+- environment variables or an approved secret manager for production.
+
+Important keys:
+
+```text
+ConnectionStrings__PetroProcureDb
+Authentication__Jwt__SigningKey
+Security__BootstrapAdmin__Password
+PetroProcure__AI__OpenAiApiKey
+```
+
+See [docs/security/secrets-and-github.md](docs/security/secrets-and-github.md) for the repository security rules.
+
+## Run locally
+
+Restore, build, and test:
 
 ```bash
 dotnet restore
 dotnet build
+dotnet test
 ```
 
-برای اجرای محیط Aspire:
+Run with Aspire:
 
 ```bash
 dotnet run --project src/PetroProcure.AppHost/PetroProcure.AppHost.csproj
 ```
 
-AppHost پروژه‌های Web و Api را اجرا می‌کند و یک منبع SQL Server با نام `sql` و دیتابیس `petroprocuredb` را برای استفاده آینده آماده می‌کند.
+Aspire supplies secret parameters such as the JWT signing key and bootstrap admin password to the API. For direct API execution, configure those values through user-secrets or environment variables.
 
-## قوانین توسعه
+## Architecture rules
 
-- تا زمان شروع فاز دامنه، هیچ موجودیت تجاری در پروژه‌ها اضافه نشود.
-- `PetroProcure.Domain` نباید به هیچ پروژه کاربردی یا زیرساختی وابسته باشد.
-- منطق تجاری نباید در Blazor UI پیاده‌سازی شود.
-- قراردادهای مشترک Web و Api باید در `PetroProcure.Contracts` قرار بگیرند.
-- کدهای مربوط به EF Core و SQL Server باید در `PetroProcure.Infrastructure` متمرکز بمانند.
-- گزارش‌های رسمی باید در آینده از مسیر `PetroProcure.Reporting` و DevExpress Reports توسعه داده شوند.
-- قابلیت‌های AI باید در `PetroProcure.AI` ایزوله بمانند و به صورت مستقیم مالک داده‌های دامنه نشوند.
-- Worker فقط برای پردازش‌های پس‌زمینه استفاده شود و منطق اصلی پرونده خرید در آن پخش نشود.
-- هر تغییر معماری مهم باید در مستندات `docs/` منعکس شود.
+- `PetroProcure.Domain` must not reference Infrastructure, EF Core, ASP.NET Core, or Web.
+- `PetroProcure.Application` must not reference Web or Infrastructure.
+- Web must use `PetroProcure.Contracts` V1 DTOs and must not directly reference Infrastructure.
+- API can reference Infrastructure.
+- Reporting must not directly depend on Web.
+- AI must remain replaceable through interfaces.
+- The client must not send `CreatedByUserId`, `ActingUserId`, `UploadedByUserId`, or `IsAdmin`; identity comes from authenticated claims.
+
+## Not implemented yet
+
+The following business modules are intentionally not implemented yet:
+
+- Supplier management
+- Inquiry
+- Tender
+- Contract
+- Purchase Order
+- Warehouse Receipt
+- Inventory integration

@@ -86,33 +86,63 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
             },
             new
             {
-                Id = SeedDataIds.FlangeItemId, Code = "1234560003", GeneralGroupCode = "123456",
-                Description = "فلنج فولادی", UnitOfMeasure = "EA", IsActive = true, CreatedAtUtc = createdAt
+                Id = SeedDataIds.FlangeItemId,
+                Code = "1234560003",
+                GeneralGroupCode = "123456",
+                Description = "فلنج فولادی",
+                UnitOfMeasure = "EA",
+                IsActive = true,
+                CreatedAtUtc = createdAt
             },
             new
             {
-                Id = SeedDataIds.TeeItemId, Code = "1234560004", GeneralGroupCode = "123456",
-                Description = "سه راهی فولادی", UnitOfMeasure = "EA", IsActive = true, CreatedAtUtc = createdAt
+                Id = SeedDataIds.TeeItemId,
+                Code = "1234560004",
+                GeneralGroupCode = "123456",
+                Description = "سه راهی فولادی",
+                UnitOfMeasure = "EA",
+                IsActive = true,
+                CreatedAtUtc = createdAt
             },
             new
             {
-                Id = SeedDataIds.BallValveItemId, Code = "2233440002", GeneralGroupCode = "223344",
-                Description = "شیر توپی صنعتی", UnitOfMeasure = "EA", IsActive = true, CreatedAtUtc = createdAt
+                Id = SeedDataIds.BallValveItemId,
+                Code = "2233440002",
+                GeneralGroupCode = "223344",
+                Description = "شیر توپی صنعتی",
+                UnitOfMeasure = "EA",
+                IsActive = true,
+                CreatedAtUtc = createdAt
             },
             new
             {
-                Id = SeedDataIds.CheckValveItemId, Code = "2233440003", GeneralGroupCode = "223344",
-                Description = "شیر یک طرفه صنعتی", UnitOfMeasure = "EA", IsActive = true, CreatedAtUtc = createdAt
+                Id = SeedDataIds.CheckValveItemId,
+                Code = "2233440003",
+                GeneralGroupCode = "223344",
+                Description = "شیر یک طرفه صنعتی",
+                UnitOfMeasure = "EA",
+                IsActive = true,
+                CreatedAtUtc = createdAt
             },
             new
             {
-                Id = SeedDataIds.GearPumpItemId, Code = "3344550002", GeneralGroupCode = "334455",
-                Description = "پمپ دنده‌ای", UnitOfMeasure = "DEV", IsActive = true, CreatedAtUtc = createdAt
+                Id = SeedDataIds.GearPumpItemId,
+                Code = "3344550002",
+                GeneralGroupCode = "334455",
+                Description = "پمپ دنده‌ای",
+                UnitOfMeasure = "DEV",
+                IsActive = true,
+                CreatedAtUtc = createdAt
             },
             new
             {
-                Id = SeedDataIds.PumpSealItemId, Code = "3344550003", GeneralGroupCode = "334455",
-                Description = "مکانیکال سیل پمپ", UnitOfMeasure = "EA", IsActive = true, CreatedAtUtc = createdAt
+                Id = SeedDataIds.PumpSealItemId,
+                Code = "3344550003",
+                GeneralGroupCode = "334455",
+                Description = "مکانیکال سیل پمپ",
+                UnitOfMeasure = "EA",
+                IsActive = true,
+                CreatedAtUtc = createdAt
             });
     }
 }

@@ -5,6 +5,7 @@ using PetroProcure.Contracts.V1.Workflow;
 using PetroProcure.Api.Contracts;
 
 namespace PetroProcure.Api.Endpoints;
+
 public static class WorkflowEndpoints
 {
     public static IEndpointRouteBuilder MapWorkflowEndpoints(this IEndpointRouteBuilder app)
@@ -52,8 +53,11 @@ public static class WorkflowEndpoints
             Results.Ok(new { Id = await h.Handle(new StartWorkflowCommand(r.EntityType, r.EntityId, r.CurrentDepartmentId), ct) }))
             .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
         app.MapPost("/api/workflow/send-to-department", async (SendToDepartmentRequest r, WorkflowCommandHandler h, CancellationToken ct) =>
-            Results.Ok(new { StepId = await h.Handle(new SendToDepartmentCommand(
-                r.WorkflowInstanceId, r.ToDepartmentId, r.ActionName, r.Comment, r.TaskTitle, r.TaskDescription, r.DueDate), ct) }))
+            Results.Ok(new
+            {
+                StepId = await h.Handle(new SendToDepartmentCommand(
+                r.WorkflowInstanceId, r.ToDepartmentId, r.ActionName, r.Comment, r.TaskTitle, r.TaskDescription, r.DueDate), ct)
+            }))
             .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
         app.MapPost("/api/inbox/{taskId:guid}/assign", async (Guid taskId, AssignInboxTaskRequest r, WorkflowCommandHandler h, CancellationToken ct) =>
         { await h.Handle(new AssignInboxTaskCommand(taskId, r.AssignedUserId), ct); return Results.NoContent(); })
@@ -65,8 +69,11 @@ public static class WorkflowEndpoints
         { await h.Handle(new CompleteInboxTaskCommand(taskId), ct); return Results.NoContent(); })
             .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
         app.MapPost("/api/workflow/return", async (ReturnWorkflowRequest r, WorkflowCommandHandler h, CancellationToken ct) =>
-            Results.Ok(new { StepId = await h.Handle(new ReturnToPreviousDepartmentCommand(
-                r.WorkflowInstanceId, r.Comment, r.TaskTitle, r.TaskDescription), ct) }))
+            Results.Ok(new
+            {
+                StepId = await h.Handle(new ReturnToPreviousDepartmentCommand(
+                r.WorkflowInstanceId, r.Comment, r.TaskTitle, r.TaskDescription), ct)
+            }))
             .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
         return app;
     }

@@ -65,7 +65,7 @@ public sealed class PurchaseFileUiTests
         {"id":"00000000-0000-0000-0000-000000000001","purchaseFileId":"00000000-0000-0000-0000-000000000002","departmentId":null,"documentType":2,"originalFileName":"spec.pdf","storedFileName":"safe.pdf","relativePath":"PurchaseFiles/spec.pdf","extension":".pdf","mimeType":"application/pdf","size":3,"hash":"abc","versionNo":1,"uploadedByUserId":"00000000-0000-0000-0000-000000000003","uploadedAt":"2026-01-01T00:00:00Z","isDeleted":false,"description":"test"}
         """);
         var client = new PetroProcureApiClient(new HttpClient(handler) { BaseAddress = new Uri("https://api.test") });
-        await client.UploadDocumentAsync(Guid.NewGuid(), new MemoryStream([1,2,3]), "spec.pdf",
+        await client.UploadDocumentAsync(Guid.NewGuid(), new MemoryStream([1, 2, 3]), "spec.pdf",
             "application/pdf", new(DocumentType.TechnicalSpecification, null, "test"));
         Assert.Contains("multipart/form-data", handler.ContentType);
         Assert.Contains("spec.pdf", handler.Body);

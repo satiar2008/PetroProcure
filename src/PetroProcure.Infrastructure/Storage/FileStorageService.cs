@@ -54,13 +54,13 @@ public sealed class FileStorageService(
             Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
             File.Move(quarantineFile, physicalPath);
             createdPhysicalPath = physicalPath;
-        var document = new FileDocument(
-            Guid.NewGuid(), purchaseFileId, departmentId, documentType, safeOriginalName, storedName,
-            relativePath, extension, mimeType ?? GetMimeType(extension), size, hash, 1,
-            uploadedByUserId, description);
-        await repository.AddDocumentAsync(document, cancellationToken);
-        await repository.SaveChangesAsync(cancellationToken);
-        return ToDto(document);
+            var document = new FileDocument(
+                Guid.NewGuid(), purchaseFileId, departmentId, documentType, safeOriginalName, storedName,
+                relativePath, extension, mimeType ?? GetMimeType(extension), size, hash, 1,
+                uploadedByUserId, description);
+            await repository.AddDocumentAsync(document, cancellationToken);
+            await repository.SaveChangesAsync(cancellationToken);
+            return ToDto(document);
         }
         catch
         {
@@ -107,10 +107,10 @@ public sealed class FileStorageService(
             Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
             File.Move(quarantineFile, physicalPath);
             createdPhysicalPath = physicalPath;
-        document.AddVersion(new DocumentVersion(
-            Guid.NewGuid(), document.Id, nextVersion, storedName, relativePath, size, hash, createdByUserId));
-        await repository.SaveChangesAsync(cancellationToken);
-        return ToDto(document);
+            document.AddVersion(new DocumentVersion(
+                Guid.NewGuid(), document.Id, nextVersion, storedName, relativePath, size, hash, createdByUserId));
+            await repository.SaveChangesAsync(cancellationToken);
+            return ToDto(document);
         }
         catch
         {

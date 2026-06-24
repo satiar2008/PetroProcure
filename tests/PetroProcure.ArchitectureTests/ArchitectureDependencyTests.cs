@@ -21,7 +21,8 @@ public sealed class ArchitectureDependencyTests
     [Fact] public void WebMustNotDirectlyReferenceInfrastructure() => AssertNoProjectReference("src/PetroProcure.Web/PetroProcure.Web.csproj", "PetroProcure.Infrastructure");
     [Fact] public void ApiCanReferenceInfrastructure() => AssertProjectReference("src/PetroProcure.Api/PetroProcure.Api.csproj", "PetroProcure.Infrastructure");
     [Fact] public void ReportingMustNotDependOnWeb() => AssertNoAssemblyReference(typeof(IReportGenerator).Assembly, "PetroProcure.Web");
-    [Fact] public void WebTypedClientUsesSharedContracts() =>
+    [Fact]
+    public void WebTypedClientUsesSharedContracts() =>
         Assert.Equal(typeof(Task<PurchaseFileDto>),
             typeof(IPetroProcureApiClient).GetMethod(nameof(IPetroProcureApiClient.CreatePurchaseFileAsync))!.ReturnType);
 

@@ -6,6 +6,7 @@ using PetroProcure.Infrastructure.Identity;
 using PetroProcure.Infrastructure.Persistence.Configurations;
 
 namespace PetroProcure.Infrastructure.Persistence.Configurations.Workflow;
+
 internal sealed class WorkflowInstanceConfiguration : IEntityTypeConfiguration<WorkflowInstance>
 {
     public void Configure(EntityTypeBuilder<WorkflowInstance> b)

@@ -138,7 +138,7 @@ public sealed class ApiAuthorizationFactory : WebApplicationFactory<Program>
             {
                 ["Authentication:Jwt:Issuer"] = "PetroProcure.Tests",
                 ["Authentication:Jwt:Audience"] = "PetroProcure.Api.Tests",
-                //["Authentication:Jwt:SigningKey"] = "integration-test-signing-key-at-least-32-chars",
+                ["Authentication:Jwt:SigningKey"] = "integration-test-signing-key-at-least-32-chars",
                 ["ConnectionStrings:PetroProcureDb"] = _connectionString,
                 ["PetroProcure:FileStorage:RootPath"] = Path.Combine(Path.GetTempPath(), "PetroProcureApiSecurity"),
                 ["Security:BootstrapAdmin:Enabled"] = "false"

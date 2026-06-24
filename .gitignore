@@ -11,3 +11,12 @@ release/
 publish/
 
 appsettings.Development.json
+appsettings.Production.json
+appsettings.Local.json
+*.secrets.json
+.env
+.env.*
+secrets/
+*.pfx
+*.pem
+*.key
