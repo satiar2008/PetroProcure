@@ -1,5 +1,8 @@
 using PetroProcure.Domain.Modules.Indents;
+using PetroProcure.Domain.Modules.Workflow;
+using PetroProcure.Domain.Enums;
 using PetroProcure.Application.Security;
+using PetroProcure.Application.Workflow;
 
 namespace PetroProcure.Application.Indents;
 
@@ -18,7 +21,8 @@ public sealed record SendIndentToPurchaseDepartmentCommand(Guid Id);
 public sealed class IndentCommandHandler(
     IIndentRepository repository,
     IIndentNumberService numberService,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    IWorkflowRepository? workflowRepository = null)
 {
     public async Task<IndentDto> Handle(CreateIndentCommand command, CancellationToken cancellationToken = default)
     {
@@ -68,8 +72,32 @@ public sealed class IndentCommandHandler(
         ChangeStatus(command.Id, indent => indent.Approve(), cancellationToken);
     public Task Handle(RejectIndentCommand command, CancellationToken cancellationToken = default) =>
         ChangeStatus(command.Id, indent => indent.Reject(), cancellationToken);
-    public Task Handle(SendIndentToPurchaseDepartmentCommand command, CancellationToken cancellationToken = default) =>
-        ChangeStatus(command.Id, indent => indent.SendToPurchaseDepartment(), cancellationToken);
+    public async Task Handle(SendIndentToPurchaseDepartmentCommand command, CancellationToken cancellationToken = default)
+    {
+        var indent = await RequiredIndent(command.Id, true, cancellationToken);
+        var fromDepartmentId = indent.RequestingDepartmentId;
+        try { indent.SendToPurchaseDepartment(); }
+        catch (InvalidOperationException exception) { throw new IndentValidationException(exception.Message); }
+
+        if (workflowRepository is not null)
+        {
+            var purchaseDepartmentId = await repository.GetDepartmentIdByTypeAsync(
+                DepartmentType.PurchaseDepartment, cancellationToken)
+                ?? throw new IndentValidationException("Purchase department was not found.");
+            var workflow = new WorkflowInstance(Guid.NewGuid(), "Indent", indent.Id,
+                fromDepartmentId, currentUser.UserId);
+            workflow.Send(purchaseDepartmentId, "SendIndentToPurchaseDepartment",
+                $"تقاضای شماره {indent.IndentNumber} به واحد خرید ارسال شد.", currentUser.UserId);
+            await workflowRepository.AddWorkflowAsync(workflow, cancellationToken);
+            await workflowRepository.AddTaskAsync(new InboxTask(
+                Guid.NewGuid(), workflow.Id, null, indent.Id, purchaseDepartmentId, null,
+                $"بررسی تقاضای خرید {indent.IndentNumber}",
+                $"تقاضای «{indent.Title}» از واحد سفارشات/درخواست‌کننده به واحد خرید ارسال شده است. پس از بررسی، امکان تشکیل پرونده خرید وجود دارد.",
+                null), cancellationToken);
+        }
+
+        await repository.SaveChangesAsync(cancellationToken);
+    }
 
     private async Task ChangeStatus(Guid id, Action<Indent> change, CancellationToken cancellationToken)
     {

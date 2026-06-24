@@ -274,7 +274,7 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
 
         var detector = factory.CreateAuthenticatedClient(ApplicationPermissions.OrdersManageShortageAlerts,
             userId: IdentitySeedData.DefaultAdminUserId);
-        var detected = await detector.PostAsJsonAsync("/api/orders/shortage-alerts/detect", new DetectShortageAlertsRequest());
+        var detected = await detector.PostAsJsonAsync("/api/orders/shortage-alerts/detect", new DetectShortageAlertsRequest(true));
         Assert.Equal(HttpStatusCode.OK, detected.StatusCode);
         var alerts = await detected.Content.ReadFromJsonAsync<List<ShortageAlertDto>>();
         Assert.NotEmpty(alerts!);
@@ -351,6 +351,55 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
         Assert.Equal(SeedDataIds.SamplePurchaseFileId, session.Session.PurchaseFileId);
         Assert.Equal(IdentitySeedData.DefaultAdminUserId, session.Session.CreatedByUserId);
         Assert.Single(session.AgendaItems);
+    }
+
+    [Fact]
+    public async Task UserWithoutTenderReportExportCannotExportTenderReport()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.TenderView);
+        var response = await client.GetAsync($"/api/tenders/{Guid.NewGuid()}/reports/summary/pdf");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserWithTenderReportExportCanGenerateTenderSummaryPdf()
+    {
+        var tenderCreator = factory.CreateAuthenticatedClient(ApplicationPermissions.TenderCreate,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var tenderResponse = await tenderCreator.PostAsJsonAsync("/api/tenders",
+            new CreateTenderRequest(SeedDataIds.SamplePurchaseFileId, "Tender report integration",
+                TenderType.PublicTender, DateTime.UtcNow.AddDays(7), DateTime.UtcNow.AddDays(8), null));
+        Assert.Equal(HttpStatusCode.Created, tenderResponse.StatusCode);
+        var tender = await tenderResponse.Content.ReadFromJsonAsync<TenderDetailDto>();
+
+        var reporter = factory.CreateAuthenticatedClient(ApplicationPermissions.TenderReportExport,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var response = await reporter.GetAsync($"/api/tenders/{tender!.Tender.Id}/reports/summary/pdf");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task UserWithoutTenderManageDocumentsCannotUploadTenderDocument()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.TenderView);
+        using var form = new MultipartFormDataContent();
+        var response = await client.PostAsync($"/api/tenders/{Guid.NewGuid()}/documents/upload", form);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserWithoutCommissionReportExportCannotExportCommissionReport()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.CommissionView);
+        var response = await client.GetAsync($"/api/commission/sessions/{Guid.NewGuid()}/reports/minutes/pdf");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private sealed record IndentCreatedResponse(Guid Id, Guid CreatedByUserId);

@@ -1,0 +1,71 @@
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+
+<MudAlert Severity="Severity.Warning" Class="mb-3">
+    گزارش‌ها سند رسمی برای چاپ و بایگانی هستند، اما انتخاب برنده و تصمیم نهایی همچنان با انسان و کمیسیون مجاز است.
+</MudAlert>
+
+@if (!Access.HasPermission(TenderUiPolicy.ReportView) && !Access.HasPermission(TenderUiPolicy.ReportExport))
+{
+    <MudAlert Severity="Severity.Error">شما مجوز مشاهده گزارش‌های مناقصه را ندارید.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        @ReportCard("خلاصه مناقصه", "مشخصات مناقصه، پرونده خرید، شرکت‌کنندگان و اقلام گروه‌بندی‌شده MESC", $"/report-preview/tender/{TenderId}/summary", SaveSummary)
+        @ReportCard("جدول مقایسه مناقصه", "مقایسه پیشنهادهای تأمین‌کنندگان و وضعیت فنی/مالی اقلام", $"/report-preview/tender/{TenderId}/comparison", SaveComparison)
+        @ReportCard("تصمیم برنده مناقصه", "خروجی رسمی انتخاب برنده و دلایل ثبت‌شده", $"/report-preview/tender/{TenderId}/winner-decision", SaveWinnerDecision)
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid TenderId { get; set; }
+
+    private bool _saving;
+
+    private RenderFragment ReportCard(string title, string description, string previewUrl, Func<Task> saveAction) =>
+        @<MudItem xs="12" md="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.h6">@title</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">@description</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Href="@previewUrl" Target="_blank" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Visibility"
+                               Disabled="@(!Access.HasPermission(TenderUiPolicy.ReportView) && !Access.HasPermission(TenderUiPolicy.ReportExport))">
+                        پیش‌نمایش / PDF
+                    </MudButton>
+                    @if (Access.HasPermission(TenderUiPolicy.ReportExport))
+                    {
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SaveAlt"
+                                   Disabled="_saving" OnClick="saveAction">
+                            ذخیره در اسناد
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>;
+
+    private Task SaveSummary() => Save("خلاصه مناقصه", () => Api.SaveTenderSummaryReportAsync(TenderId));
+    private Task SaveComparison() => Save("جدول مقایسه مناقصه", () => Api.SaveTenderComparisonReportAsync(TenderId));
+    private Task SaveWinnerDecision() => Save("تصمیم برنده مناقصه", () => Api.SaveTenderWinnerDecisionReportAsync(TenderId));
+
+    private async Task Save(string title, Func<Task> action)
+    {
+        _saving = true;
+        try
+        {
+            await action();
+            Snackbar.Add($"گزارش «{title}» در اسناد پرونده ذخیره شد.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

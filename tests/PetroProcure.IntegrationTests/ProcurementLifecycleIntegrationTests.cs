@@ -42,10 +42,24 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
     }
 
     [Fact]
+    public async Task ApplyingMigrationsAgainDoesNotDuplicateSeedData()
+    {
+        await using var scope = fixture.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<PetroProcureDbContext>();
+
+        var before = await CountSeededCoreData(db);
+        await db.Database.MigrateAsync();
+        var after = await CountSeededCoreData(db);
+
+        Assert.Equal(before, after);
+    }
+
+    [Fact]
     public async Task FullProcurementLifecycleSucceeds()
     {
         await using var scope = fixture.Services.CreateAsyncScope();
         var sp = scope.ServiceProvider;
+        var db = sp.GetRequiredService<PetroProcureDbContext>();
         var mesc = sp.GetRequiredService<MescCommandHandler>();
         var indentHandler = sp.GetRequiredService<IndentCommandHandler>();
         var purchaseHandler = sp.GetRequiredService<PurchaseFileCommandHandler>();
@@ -65,6 +79,15 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
         await indentHandler.Handle(new AddIndentItemCommand(indent.Id, item.Id, SeedDataIds.EachUnitId, 5, "Technical", null));
         await indentHandler.Handle(new SubmitIndentCommand(indent.Id));
         await indentHandler.Handle(new ApproveIndentCommand(indent.Id));
+        await indentHandler.Handle(new SendIndentToPurchaseDepartmentCommand(indent.Id));
+
+        var indentWorkflow = await db.WorkflowInstances.AsNoTracking()
+            .SingleOrDefaultAsync(x => x.EntityType == "Indent" && x.EntityId == indent.Id);
+        Assert.NotNull(indentWorkflow);
+        Assert.True(await db.InboxTasks.AsNoTracking().AnyAsync(x =>
+            x.WorkflowInstanceId == indentWorkflow.Id
+            && x.IndentId == indent.Id
+            && x.AssignedDepartmentId == SeedDataIds.PurchaseDepartmentId));
 
         var file = await purchaseHandler.Handle(new CreatePurchaseFileFromIndentCommand(
             indent.Id, 2026, SeedDataIds.PurchaseDepartmentId, IdentitySeedData.DefaultAdminUserId,
@@ -83,7 +106,6 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
             workflowId, SeedDataIds.ApplicantId, "Technical review", "Review requested",
             "Applicant technical review", null, null));
 
-        var db = sp.GetRequiredService<PetroProcureDbContext>();
         Assert.Equal(SeedDataIds.ApplicantId, (await db.PurchaseFiles.FindAsync(file.Id))!.CurrentDepartmentId);
         Assert.True(await db.InboxTasks.AnyAsync(x => x.WorkflowInstanceId == workflowId && x.AssignedDepartmentId == SeedDataIds.ApplicantId));
 
@@ -91,4 +113,23 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
             new Dictionary<string, object?> { ["PurchaseFileId"] = file.Id });
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
     }
+
+    private static async Task<Dictionary<string, int>> CountSeededCoreData(PetroProcureDbContext db) =>
+        new()
+        {
+            ["departments"] = await db.Departments.CountAsync(),
+            ["users"] = await db.Users.CountAsync(),
+            ["userDepartments"] = await db.UserDepartments.CountAsync(),
+            ["roles"] = await db.Roles.CountAsync(),
+            ["permissions"] = await db.Permissions.CountAsync(),
+            ["units"] = await db.UnitOfMeasures.CountAsync(),
+            ["mescGroups"] = await db.MescGeneralGroups.CountAsync(),
+            ["mescItems"] = await db.MescItems.CountAsync(),
+            ["indents"] = await db.Indents.CountAsync(),
+            ["purchaseFiles"] = await db.PurchaseFiles.CountAsync(),
+            ["workflowInstances"] = await db.WorkflowInstances.CountAsync(),
+            ["inboxTasks"] = await db.InboxTasks.CountAsync(),
+            ["fileDocuments"] = await db.FileDocuments.CountAsync(),
+            ["workflowActions"] = await db.WorkflowActionDefinitions.CountAsync()
+        };
 }

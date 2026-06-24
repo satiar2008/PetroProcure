@@ -1,6 +1,9 @@
 using PetroProcure.Application.Indents;
+using PetroProcure.Application.Workflow;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Indents;
+using PetroProcure.Domain.Modules.PurchaseFiles;
+using PetroProcure.Domain.Modules.Workflow;
 
 namespace PetroProcure.UnitTests.Application;
 
@@ -83,6 +86,30 @@ public sealed class IndentModuleTests
         Assert.Equal("Original general", indent.Items.Single().GeneralDescription);
     }
 
+    [Fact]
+    public async Task SendingIndentToPurchaseCreatesWorkflowAndInboxTask()
+    {
+        var repository = new FakeIndentRepository();
+        var workflow = new FakeWorkflowRepository();
+        var indent = CreateIndent();
+        indent.AddItem(CreateItem(indent.Id, "1234560001", "123456", "Pipes", "Pipe"));
+        indent.Submit();
+        indent.Approve();
+        repository.Indent = indent;
+        var handler = new IndentCommandHandler(repository, new IndentNumberService(repository),
+            new TestCurrentUser(Guid.NewGuid(), isSystemAdmin: true), workflow);
+
+        await handler.Handle(new SendIndentToPurchaseDepartmentCommand(indent.Id));
+
+        Assert.Equal(IndentStatus.SentToPurchaseDepartment, indent.Status);
+        Assert.NotNull(workflow.Workflow);
+        Assert.Equal("Indent", workflow.Workflow!.EntityType);
+        Assert.Equal(indent.Id, workflow.Workflow.EntityId);
+        var task = Assert.Single(workflow.Tasks);
+        Assert.Equal(indent.Id, task.IndentId);
+        Assert.Equal(repository.PurchaseDepartmentId, task.AssignedDepartmentId);
+    }
+
     private static Indent CreateIndent() => new(
         Guid.NewGuid(), "2630001", 26, 3, 1, "Test indent",
         Guid.NewGuid(), null, Guid.NewGuid());
@@ -98,6 +125,7 @@ public sealed class IndentModuleTests
         public Indent? Indent { get; set; }
         public string? ExistingNumber { get; set; }
         public Guid UnitId { get; } = Guid.NewGuid();
+        public Guid PurchaseDepartmentId { get; } = Guid.NewGuid();
         public MescItemSnapshot? Snapshot { get; set; }
 
         public Task<string> GenerateNextIndentNumberAsync(int yearPart, int typeDigit, CancellationToken cancellationToken)
@@ -118,6 +146,8 @@ public sealed class IndentModuleTests
             Task.FromResult(Snapshot?.Id == mescItemId ? Snapshot : null);
         public Task<bool> UnitOfMeasureExistsAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(id == UnitId);
+        public Task<Guid?> GetDepartmentIdByTypeAsync(DepartmentType type, CancellationToken cancellationToken) =>
+            Task.FromResult<Guid?>(type == DepartmentType.PurchaseDepartment ? PurchaseDepartmentId : null);
         public Task AddAsync(Indent indent, CancellationToken cancellationToken)
         {
             Indent = indent;
@@ -126,5 +156,45 @@ public sealed class IndentModuleTests
         public Task<IReadOnlyList<IndentListDto>> GetAllAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<IndentListDto>>([]);
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class FakeWorkflowRepository : IWorkflowRepository
+    {
+        public WorkflowInstance? Workflow { get; private set; }
+        public List<InboxTask> Tasks { get; } = [];
+
+        public Task<WorkflowInstance?> FindWorkflowAsync(Guid id, bool includeSteps, CancellationToken ct) =>
+            Task.FromResult(Workflow?.Id == id ? Workflow : null);
+        public Task<WorkflowInstance?> FindPurchaseFileWorkflowAsync(Guid purchaseFileId, CancellationToken ct) =>
+            Task.FromResult<WorkflowInstance?>(null);
+        public Task<PurchaseFile?> FindPurchaseFileAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult<PurchaseFile?>(null);
+        public Task<InboxTask?> FindTaskAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(Tasks.SingleOrDefault(task => task.Id == id));
+        public Task<bool> UserHasDepartmentAccessAsync(Guid userId, Guid departmentId, CancellationToken ct) =>
+            Task.FromResult(true);
+        public Task AddWorkflowAsync(WorkflowInstance workflow, CancellationToken ct)
+        {
+            Workflow = workflow;
+            return Task.CompletedTask;
+        }
+        public Task AddTaskAsync(InboxTask task, CancellationToken ct)
+        {
+            Tasks.Add(task);
+            return Task.CompletedTask;
+        }
+        public Task<IReadOnlyList<InboxTaskDto>> GetMyTasksAsync(Guid userId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<InboxTaskDto>>([]);
+        public Task<IReadOnlyList<InboxTaskDto>> GetDepartmentTasksAsync(Guid departmentId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<InboxTaskDto>>([]);
+        public Task<InboxTaskDto?> GetTaskDtoAsync(Guid taskId, CancellationToken ct) =>
+            Task.FromResult<InboxTaskDto?>(null);
+        public Task<IReadOnlyList<WorkflowStepDto>> GetWorkflowTimelineAsync(Guid workflowInstanceId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<WorkflowStepDto>>([]);
+        public Task<IReadOnlyList<WorkflowStepDto>> GetTimelineAsync(Guid purchaseFileId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<WorkflowStepDto>>([]);
+        public Task<IReadOnlyList<InboxTaskDto>> GetOpenPurchaseFileTasksAsync(Guid purchaseFileId, CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<InboxTaskDto>>([]);
+        public Task SaveChangesAsync(CancellationToken ct) => Task.CompletedTask;
     }
 }

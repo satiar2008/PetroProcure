@@ -39,6 +39,8 @@ public sealed record TenderCommissionDecisionDto(Guid Id, Guid SessionId, Tender
 
 public sealed record TenderCommissionAttachmentDto(Guid Id, Guid SessionId, Guid? FileDocumentId,
     string DocumentType, string? OriginalFileName, string? Description, DateTime UploadedAt, Guid UploadedByUserId);
+public sealed record CommissionAttachmentDto(Guid Id, Guid SessionId, Guid? FileDocumentId,
+    string DocumentType, string? OriginalFileName, string? Description, DateTime UploadedAt, Guid UploadedByUserId);
 
 public sealed record CommissionSessionLookupDto(Guid Id, string SessionNumber, string Title,
     TenderCommissionSessionStatus Status);

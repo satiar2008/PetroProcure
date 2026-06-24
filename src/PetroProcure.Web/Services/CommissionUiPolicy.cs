@@ -18,6 +18,9 @@ public static class CommissionUiPolicy
     public const string ManageAgenda = "Commission.ManageAgenda";
     public const string ManageMinutes = "Commission.ManageMinutes";
     public const string ManageDecisions = "Commission.ManageDecisions";
+    public const string ManageDocuments = "Commission.ManageDocuments";
+    public const string ReportView = "Commission.ReportView";
+    public const string ReportExport = "Commission.ReportExport";
 
     public static bool CanCreate(Func<string, bool> has) => has(Create);
     public static bool CanEdit(TenderCommissionSessionStatus status, Func<string, bool> has) =>

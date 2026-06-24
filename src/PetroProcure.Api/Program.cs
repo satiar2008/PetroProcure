@@ -130,6 +130,7 @@ app.MapInquiryEndpoints();
 app.MapOrdersEndpoints();
 app.MapTenderEndpoints();
 app.MapCommissionEndpoints();
+app.MapTenderCommissionDocumentReportEndpoints();
 
 app.MapDefaultEndpoints();
 

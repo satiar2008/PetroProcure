@@ -27,10 +27,10 @@ public abstract class PersianReportBase : XtraReport
         Bands.Add(footer);
     }
 
-    protected static XRLabel Label(string text, float x, float y, float width, float height, bool bold = false, TextAlignment alignment = TextAlignment.MiddleRight) =>
+    internal static XRLabel Label(string text, float x, float y, float width, float height, bool bold = false, TextAlignment alignment = TextAlignment.MiddleRight) =>
         new() { Text = text, BoundsF = new RectangleF(x, y, width, height), Font = bold ? SectionFont : BodyFont, TextAlignment = alignment, Borders = BorderSide.All, Padding = new PaddingInfo(4, 4, 2, 2) };
 
-    protected static void AddGroups(DetailBand detail, IReadOnlyList<ReportItemGroupData> groups, float top)
+    internal static void AddGroups(DetailBand detail, IReadOnlyList<ReportItemGroupData> groups, float top)
     {
         foreach (var group in groups)
         {

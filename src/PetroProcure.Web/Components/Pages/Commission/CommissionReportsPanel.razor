@@ -1,0 +1,111 @@
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+
+<MudAlert Severity="Severity.Warning" Class="mb-3">
+    گزارش‌های کمیسیون برای چاپ و بایگانی رسمی آماده می‌شوند؛ تصمیم‌گیری نهایی همچنان انسانی و خارج از اختیار AI/سیستم است.
+</MudAlert>
+
+@if (!Access.HasPermission(CommissionUiPolicy.ReportView) && !Access.HasPermission(CommissionUiPolicy.ReportExport))
+{
+    <MudAlert Severity="Severity.Error">شما مجوز مشاهده گزارش‌های کمیسیون را ندارید.</MudAlert>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudCard>
+                <MudCardContent>
+                    <MudText Typo="Typo.h6">صورتجلسه کمیسیون</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary">اعضا، دستورجلسه، صورتجلسه‌ها و تصمیمات ثبت‌شده</MudText>
+                </MudCardContent>
+                <MudCardActions>
+                    <MudButton Href="@($"/report-preview/commission/{SessionId}/minutes")" Target="_blank" Variant="Variant.Outlined"
+                               StartIcon="@Icons.Material.Filled.Visibility">
+                        پیش‌نمایش / PDF
+                    </MudButton>
+                    @if (Access.HasPermission(CommissionUiPolicy.ReportExport))
+                    {
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SaveAlt"
+                                   Disabled="_saving" OnClick="SaveMinutes">
+                            ذخیره در اسناد
+                        </MudButton>
+                    }
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    </MudGrid>
+
+    <MudDivider Class="my-4" />
+    <MudText Typo="Typo.h6" Class="mb-2">گزارش تصمیمات کمیسیون</MudText>
+    @if (Decisions.Count == 0)
+    {
+        <EmptyState Title="تصمیمی برای گزارش وجود ندارد" Description="پس از ثبت تصمیم کمیسیون، گزارش مستقل تصمیم قابل چاپ و ذخیره خواهد بود." />
+    }
+    else
+    {
+        <MudTable Items="Decisions" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>نوع تصمیم</MudTh>
+                <MudTh>وضعیت</MudTh>
+                <MudTh>متن تصمیم</MudTh>
+                <MudTh>تاریخ</MudTh>
+                <MudTh>عملیات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@CommissionUiPolicy.DecisionTypeText(context.DecisionType)</MudTd>
+                <MudTd>@CommissionUiPolicy.DecisionStatusText(context.Status)</MudTd>
+                <MudTd>@context.DecisionText</MudTd>
+                <MudTd><DateDisplay Value="@context.CreatedAt" IncludeTime="true" /></MudTd>
+                <MudTd>
+                    <MudButton Href="@($"/report-preview/commission/{SessionId}/decision/{context.Id}")" Target="_blank"
+                               Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Visibility">
+                        PDF
+                    </MudButton>
+                    @if (Access.HasPermission(CommissionUiPolicy.ReportExport))
+                    {
+                        <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving"
+                                   OnClick="@(() => SaveDecision(context.Id))">
+                            ذخیره در اسناد
+                        </MudButton>
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+    [Parameter] public IReadOnlyList<TenderCommissionDecisionDto> Decisions { get; set; } = [];
+
+    private bool _saving;
+
+    private async Task SaveMinutes()
+    {
+        await Save("صورتجلسه کمیسیون", () => Api.SaveCommissionMinutesReportAsync(SessionId));
+    }
+
+    private async Task SaveDecision(Guid decisionId)
+    {
+        await Save("تصمیم کمیسیون", () => Api.SaveCommissionDecisionReportAsync(SessionId, decisionId));
+    }
+
+    private async Task Save(string title, Func<Task> action)
+    {
+        _saving = true;
+        try
+        {
+            await action();
+            Snackbar.Add($"گزارش «{title}» در اسناد پرونده ذخیره شد.", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

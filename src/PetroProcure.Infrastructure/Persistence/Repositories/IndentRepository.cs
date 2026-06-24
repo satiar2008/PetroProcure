@@ -1,6 +1,7 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
 using PetroProcure.Application.Indents;
+using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Indents;
 
 namespace PetroProcure.Infrastructure.Persistence.Repositories;
@@ -56,6 +57,12 @@ internal sealed class IndentRepository(PetroProcureDbContext dbContext) : IInden
 
     public Task<bool> UnitOfMeasureExistsAsync(Guid id, CancellationToken cancellationToken) =>
         dbContext.UnitOfMeasures.AnyAsync(unit => unit.Id == id && unit.IsActive, cancellationToken);
+
+    public async Task<Guid?> GetDepartmentIdByTypeAsync(DepartmentType type, CancellationToken cancellationToken) =>
+        await dbContext.Departments.AsNoTracking()
+            .Where(department => department.Type == type && department.IsActive)
+            .Select(department => (Guid?)department.Id)
+            .SingleOrDefaultAsync(cancellationToken);
 
     public async Task AddAsync(Indent indent, CancellationToken cancellationToken) =>
         await dbContext.Indents.AddAsync(indent, cancellationToken);

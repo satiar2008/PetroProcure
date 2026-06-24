@@ -40,6 +40,8 @@ public static class ApplicationPermissions
     public const string TenderSelectWinner = "Tender.SelectWinner";
     public const string TenderClose = "Tender.Close";
     public const string TenderManageDocuments = "Tender.ManageDocuments";
+    public const string TenderReportView = "Tender.ReportView";
+    public const string TenderReportExport = "Tender.ReportExport";
     public const string TenderEvaluate = "Tender.Evaluate";
     public const string TenderApproveWinner = "Tender.ApproveWinner";
 
@@ -56,6 +58,8 @@ public static class ApplicationPermissions
     public const string CommissionManageMinutes = "Commission.ManageMinutes";
     public const string CommissionManageDecisions = "Commission.ManageDecisions";
     public const string CommissionManageDocuments = "Commission.ManageDocuments";
+    public const string CommissionReportView = "Commission.ReportView";
+    public const string CommissionReportExport = "Commission.ReportExport";
 
     public const string SupplierView = "Supplier.View";
     public const string SupplierCreate = "Supplier.Create";
@@ -134,6 +138,8 @@ public static class ApplicationPermissions
         TenderSelectWinner,
         TenderClose,
         TenderManageDocuments,
+        TenderReportView,
+        TenderReportExport,
         TenderEvaluate,
         TenderApproveWinner,
         CommissionView,
@@ -149,6 +155,8 @@ public static class ApplicationPermissions
         CommissionManageMinutes,
         CommissionManageDecisions,
         CommissionManageDocuments,
+        CommissionReportView,
+        CommissionReportExport,
         SupplierView,
         SupplierCreate,
         SupplierEdit,

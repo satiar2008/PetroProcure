@@ -13,6 +13,14 @@ public static class AuthorizationExtensions
         return builder;
     }
 
+    public static TBuilder RequireAnyPermission<TBuilder>(this TBuilder builder, params string[] permissions)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        builder.RequireAuthorization(policy =>
+            policy.RequireAssertion(context => permissions.Any(context.User.HasPermission)));
+        return builder;
+    }
+
     public static bool HasPermission(this ClaimsPrincipal user, string permission) =>
         user.HasClaim(ApplicationPermissions.ClaimType, permission)
         || user.IsInRole(ApplicationRoles.SystemAdmin);

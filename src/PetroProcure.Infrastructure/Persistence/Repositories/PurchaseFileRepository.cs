@@ -47,7 +47,9 @@ internal sealed class PurchaseFileRepository(PetroProcureDbContext dbContext) : 
             .SingleOrDefaultAsync(file => file.FileNumber == fileNumber, ct);
     public Task<Indent?> FindApprovedIndentAsync(Guid id, CancellationToken ct) =>
         dbContext.Indents.Include(indent => indent.Items)
-            .SingleOrDefaultAsync(indent => indent.Id == id && indent.Status == IndentStatus.Approved, ct);
+            .SingleOrDefaultAsync(indent => indent.Id == id
+                && (indent.Status == IndentStatus.Approved
+                    || indent.Status == IndentStatus.SentToPurchaseDepartment), ct);
     public Task<PurchaseFileMescSnapshot?> GetMescSnapshotAsync(Guid id, CancellationToken ct) =>
         dbContext.MescItems.AsNoTracking().Where(item => item.Id == id)
             .Select(item => new PurchaseFileMescSnapshot(

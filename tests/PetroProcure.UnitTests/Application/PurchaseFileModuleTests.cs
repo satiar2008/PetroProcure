@@ -38,6 +38,20 @@ public sealed class PurchaseFileModuleTests
     }
 
     [Fact]
+    public async Task CreatesPurchaseFileFromIndentSentToPurchaseDepartment()
+    {
+        var indent = CreateApprovedIndent();
+        indent.SendToPurchaseDepartment();
+        var repository = new FakeRepository { Indent = indent };
+
+        var result = await Handler(repository).Handle(new CreatePurchaseFileFromIndentCommand(
+            indent.Id, 2026, Guid.NewGuid(), null));
+
+        Assert.Equal(indent.Id, result.SourceIndentId);
+        Assert.Single(result.Items);
+    }
+
+    [Fact]
     public async Task FileNumberIsGeneratedCorrectly()
     {
         var service = new PurchaseFileNumberService(new FakeRepository());
@@ -135,7 +149,10 @@ public sealed class PurchaseFileModuleTests
         public Task<PurchaseFile?> FindByNumberAsync(string fileNumber, CancellationToken cancellationToken) =>
             Task.FromResult(File?.FileNumber == fileNumber ? File : null);
         public Task<Indent?> FindApprovedIndentAsync(Guid id, CancellationToken cancellationToken) =>
-            Task.FromResult(Indent?.Id == id && Indent.Status == IndentStatus.Approved ? Indent : null);
+            Task.FromResult(Indent?.Id == id
+                && (Indent.Status is IndentStatus.Approved or IndentStatus.SentToPurchaseDepartment)
+                    ? Indent
+                    : null);
         public Task<PurchaseFileMescSnapshot?> GetMescSnapshotAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<PurchaseFileMescSnapshot?>(null);
         public Task<bool> UnitOfMeasureExistsAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(true);

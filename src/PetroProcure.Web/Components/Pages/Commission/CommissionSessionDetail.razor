@@ -283,17 +283,11 @@
         </MudTabPanel>
 
         <MudTabPanel Text="پیوست‌ها" Icon="@Icons.Material.Filled.AttachFile">
-            @if (_detail.Attachments.Count == 0)
-            {
-                <EmptyState Title="پیوستی ثبت نشده" Description="اتصال کامل پیوست‌های کمیسیون به مخزن اسناد پرونده خرید در گام بعدی تکمیل می‌شود." />
-            }
-            else
-            {
-                <MudTable Items="_detail.Attachments" Dense="true">
-                    <HeaderContent><MudTh>نوع سند</MudTh><MudTh>نام فایل</MudTh><MudTh>تاریخ بارگذاری</MudTh><MudTh>شرح</MudTh></HeaderContent>
-                    <RowTemplate><MudTd>@context.DocumentType</MudTd><MudTd>@(context.OriginalFileName ?? "—")</MudTd><MudTd><DateDisplay Value="@context.UploadedAt" /></MudTd><MudTd>@(context.Description ?? "—")</MudTd></RowTemplate>
-                </MudTable>
-            }
+            <CommissionAttachmentsPanel SessionId="Id" />
+        </MudTabPanel>
+
+        <MudTabPanel Text="گزارش‌ها" Icon="@Icons.Material.Filled.PictureAsPdf">
+            <CommissionReportsPanel SessionId="Id" Decisions="_detail.Decisions" />
         </MudTabPanel>
 
         <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link">

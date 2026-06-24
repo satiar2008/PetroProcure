@@ -1,0 +1,168 @@
+@implements IAsyncDisposable
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+
+@if (CanViewInbox)
+{
+    <MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+        <ActivatorContent>
+            <MudBadge Content="@PendingCountText" Visible="@(_pendingCount > 0)" Color="Color.Error" Overlap="true">
+                <MudIconButton Icon="@Icons.Material.Filled.NotificationsNone"
+                               Color="Color.Inherit"
+                               Disabled="@_loading"
+                               OnClick="@RefreshVisibleAsync" />
+            </MudBadge>
+        </ActivatorContent>
+        <ChildContent>
+            <MudMenuItem Icon="@Icons.Material.Filled.Inbox" OnClick="@GoToInbox">
+                کارتابل من
+            </MudMenuItem>
+            <MudDivider />
+
+            @if (_loading && _tasks.Count == 0)
+            {
+                <MudMenuItem Disabled="true">
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="ml-2" />
+                    در حال دریافت اعلان‌ها...
+                </MudMenuItem>
+            }
+            else if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <MudMenuItem Disabled="true" Icon="@Icons.Material.Filled.ErrorOutline">
+                    @_error
+                </MudMenuItem>
+                <MudMenuItem Icon="@Icons.Material.Filled.Refresh" OnClick="@RefreshVisibleAsync">
+                    تلاش مجدد
+                </MudMenuItem>
+            }
+            else if (_tasks.Count == 0)
+            {
+                <MudMenuItem Disabled="true" Icon="@Icons.Material.Filled.CheckCircleOutline">
+                    کار جدیدی در کارتابل شما نیست.
+                </MudMenuItem>
+            }
+            else
+            {
+                @foreach (var task in _tasks)
+                {
+                    <MudMenuItem Icon="@Icons.Material.Filled.TaskAlt" OnClick="@(() => OpenTask(task))">
+                        <div class="notification-item">
+                            <strong>@task.Title</strong>
+                            <small>@InboxUiPolicy.EntityType(task) • @InboxUiPolicy.StatusText(task.Status)</small>
+                        </div>
+                    </MudMenuItem>
+                }
+            }
+        </ChildContent>
+    </MudMenu>
+}
+
+@code {
+    private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(20);
+    private readonly CancellationTokenSource _disposeCts = new();
+    private PeriodicTimer? _timer;
+    private List<InboxTaskDto> _tasks = [];
+    private int _pendingCount;
+    private bool _loading;
+    private bool _disposed;
+    private string? _error;
+
+    private bool CanViewInbox => InboxUiPolicy.CanView(Access.HasPermission);
+    private string PendingCountText => _pendingCount > 99 ? "+۹۹" : _pendingCount.ToString("N0");
+
+    protected override async Task OnInitializedAsync()
+    {
+        Access.Changed += OnAccessChanged;
+        await RefreshAsync(true);
+        _ = RunRefreshLoopAsync(_disposeCts.Token);
+    }
+
+    private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        _timer = new PeriodicTimer(RefreshInterval);
+        try
+        {
+            while (await _timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(() => RefreshAsync(true));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    private void OnAccessChanged()
+    {
+        if (_disposed) return;
+        _ = InvokeAsync(() => RefreshAsync(false));
+    }
+
+    private async Task RefreshAsync(bool silent)
+    {
+        if (_disposed) return;
+
+        if (!CanViewInbox)
+        {
+            _tasks = [];
+            _pendingCount = 0;
+            _error = null;
+            await SafeRefreshAsync();
+            return;
+        }
+
+        if (!silent) _loading = true;
+        _error = null;
+
+        try
+        {
+            var tasks = await Api.GetMyInboxTasksAsync(_disposeCts.Token);
+            _pendingCount = tasks.Count(task => task.Status is WorkflowStatus.Pending or WorkflowStatus.InProgress);
+            _tasks = tasks
+                .Where(task => task.Status is WorkflowStatus.Pending or WorkflowStatus.InProgress)
+                .OrderBy(task => task.DueDate ?? DateOnly.MaxValue)
+                .ThenByDescending(task => task.CreatedAt)
+                .Take(5)
+                .ToList();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception)
+        {
+            if (!silent) _error = "دریافت اعلان‌ها ناموفق بود.";
+        }
+        finally
+        {
+            if (!silent) _loading = false;
+            await SafeRefreshAsync();
+        }
+    }
+
+    private Task RefreshVisibleAsync() => RefreshAsync(false);
+
+    private void OpenTask(InboxTaskDto task) => Navigation.NavigateTo($"/inbox/tasks/{task.Id}");
+    private void GoToInbox() => Navigation.NavigateTo("/inbox/my");
+
+    private async Task SafeRefreshAsync()
+    {
+        if (!_disposed)
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        Access.Changed -= OnAccessChanged;
+        _disposeCts.Cancel();
+        _timer?.Dispose();
+        _disposeCts.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

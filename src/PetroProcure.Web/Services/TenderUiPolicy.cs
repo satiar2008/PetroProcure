@@ -14,6 +14,9 @@ public static class TenderUiPolicy
     public const string CompareBids = "Tender.CompareBids";
     public const string SelectWinner = "Tender.SelectWinner";
     public const string Close = "Tender.Close";
+    public const string ManageDocuments = "Tender.ManageDocuments";
+    public const string ReportView = "Tender.ReportView";
+    public const string ReportExport = "Tender.ReportExport";
 
     public static bool CanPublish(TenderStatus status, int itemCount, int participantCount, Func<string, bool> has) =>
         has(Publish) && status is TenderStatus.Draft or TenderStatus.ReadyToPublish && itemCount > 0 && participantCount > 0;

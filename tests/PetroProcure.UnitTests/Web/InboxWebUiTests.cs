@@ -16,6 +16,18 @@ public sealed class InboxWebUiTests
         AssertRoute("PetroProcure.Web.Components.Pages.Inbox.DepartmentInbox", "/inbox/department");
 
     [Fact]
+    public void Notification_bell_component_is_available() =>
+        Assert.NotNull(typeof(InboxUiPolicy).Assembly.GetType(
+            "PetroProcure.Web.Components.Inbox.InboxNotificationBell"));
+
+    [Fact]
+    public void Inbox_is_available_for_workflow_department_permissions()
+    {
+        Assert.True(InboxUiPolicy.CanView(permission => permission == "Warehouse.View"));
+        Assert.True(InboxUiPolicy.CanManage(permission => permission == "Warehouse.View"));
+    }
+
+    [Fact]
     public void User_only_has_access_to_assigned_departments()
     {
         var department = Guid.NewGuid();

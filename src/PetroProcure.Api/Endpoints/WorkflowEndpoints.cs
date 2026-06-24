@@ -8,19 +8,43 @@ namespace PetroProcure.Api.Endpoints;
 
 public static class WorkflowEndpoints
 {
+    private static readonly string[] InboxViewPermissions =
+    [
+        ApplicationPermissions.PurchaseFileView,
+        ApplicationPermissions.IndentView,
+        ApplicationPermissions.WarehouseView,
+        ApplicationPermissions.TenderView,
+        ApplicationPermissions.CommissionView,
+        ApplicationPermissions.OrdersViewDashboard,
+        ApplicationPermissions.SupplierView,
+        ApplicationPermissions.InquiryView
+    ];
+
+    private static readonly string[] InboxManagePermissions =
+    [
+        ApplicationPermissions.PurchaseFileSendToDepartment,
+        ApplicationPermissions.IndentSendToPurchase,
+        ApplicationPermissions.PurchaseFileView,
+        ApplicationPermissions.IndentView,
+        ApplicationPermissions.WarehouseView,
+        ApplicationPermissions.TenderView,
+        ApplicationPermissions.CommissionView,
+        ApplicationPermissions.OrdersViewDashboard
+    ];
+
     public static IEndpointRouteBuilder MapWorkflowEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/inbox/my", async (WorkflowQueryHandler h, CancellationToken ct) =>
             (await h.Handle(new GetMyInboxTasksQuery(), ct)).Select(x => x.ToContract()))
-            .RequirePermission(ApplicationPermissions.PurchaseFileView);
+            .RequireAnyPermission(InboxViewPermissions);
         app.MapGet("/api/inbox/department/{departmentId:guid}", async (Guid departmentId, WorkflowQueryHandler h, CancellationToken ct) =>
             (await h.Handle(new GetDepartmentInboxTasksQuery(departmentId), ct)).Select(x => x.ToContract()))
-            .RequirePermission(ApplicationPermissions.PurchaseFileView);
+            .RequireAnyPermission(InboxViewPermissions);
         app.MapGet("/api/inbox/tasks/{taskId:guid}", async (Guid taskId, WorkflowQueryHandler h, CancellationToken ct) =>
         {
             var result = await h.Handle(new GetInboxTaskByIdQuery(taskId), ct);
             return new InboxTaskDetailDto(result.Task.ToContract(), result.Timeline.Select(x => x.ToContract()).ToArray());
-        }).RequirePermission(ApplicationPermissions.PurchaseFileView);
+        }).RequireAnyPermission(InboxViewPermissions);
         app.MapGet("/api/purchase-files/{id:guid}/workflow/timeline", async (Guid id, WorkflowQueryHandler h, CancellationToken ct) =>
             new WorkflowTimelineDto(id, (await h.Handle(new GetPurchaseFileWorkflowTimelineQuery(id), ct)).Select(x => x.ToContract()).ToArray()))
             .RequirePermission(ApplicationPermissions.PurchaseFileView);
@@ -61,13 +85,13 @@ public static class WorkflowEndpoints
             .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
         app.MapPost("/api/inbox/{taskId:guid}/assign", async (Guid taskId, AssignInboxTaskRequest r, WorkflowCommandHandler h, CancellationToken ct) =>
         { await h.Handle(new AssignInboxTaskCommand(taskId, r.AssignedUserId), ct); return Results.NoContent(); })
-            .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
+            .RequireAnyPermission(InboxManagePermissions);
         app.MapPost("/api/inbox/{taskId:guid}/assign-to-self", async (Guid taskId, WorkflowCommandHandler h, CancellationToken ct) =>
         { await h.HandleAssignToSelf(taskId, ct); return Results.NoContent(); })
-            .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
+            .RequireAnyPermission(InboxManagePermissions);
         app.MapPost("/api/inbox/{taskId:guid}/complete", async (Guid taskId, WorkflowCommandHandler h, CancellationToken ct) =>
         { await h.Handle(new CompleteInboxTaskCommand(taskId), ct); return Results.NoContent(); })
-            .RequirePermission(ApplicationPermissions.PurchaseFileSendToDepartment);
+            .RequireAnyPermission(InboxManagePermissions);
         app.MapPost("/api/workflow/return", async (ReturnWorkflowRequest r, WorkflowCommandHandler h, CancellationToken ct) =>
             Results.Ok(new
             {

@@ -63,6 +63,9 @@ body { margin: 0; }
 .profile-avatar { background: rgba(214,155,45,.18) !important; color:#fff !important; border:1px solid rgba(255,255,255,.28); }
 .profile-copy { display:flex; flex-direction:column; align-items:flex-start; line-height:1.25; }
 .profile-copy small { opacity:.68; font-size:.68rem; }
+.notification-item { display:flex; flex-direction:column; min-width:240px; max-width:340px; white-space:normal; line-height:1.7; }
+.notification-item strong { font-weight:800; color:var(--pp-ink); }
+.notification-item small { color:var(--pp-muted); }
 
 .app-drawer { border-left:1px solid #e4eaec; background:rgba(255,255,255,.94) !important; backdrop-filter:blur(14px); }
 .drawer-header { padding:1.25rem 1rem 1rem; border-bottom:1px solid #edf1f2; }

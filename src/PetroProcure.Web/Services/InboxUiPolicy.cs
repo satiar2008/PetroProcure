@@ -5,8 +5,20 @@ namespace PetroProcure.Web.Services;
 
 public static class InboxUiPolicy
 {
-    public static bool CanView(Func<string, bool> has) => has("PurchaseFile.View");
-    public static bool CanManage(Func<string, bool> has) => has("PurchaseFile.SendToDepartment");
+    public static bool CanView(Func<string, bool> has) =>
+        has("PurchaseFile.View")
+        || has("Indent.View")
+        || has("Warehouse.View")
+        || has("Tender.View")
+        || has("Commission.View")
+        || has("Orders.ViewDashboard")
+        || has("Supplier.View")
+        || has("Inquiry.View");
+
+    public static bool CanManage(Func<string, bool> has) =>
+        CanView(has)
+        || has("PurchaseFile.SendToDepartment")
+        || has("Indent.SendToPurchase");
     public static bool CanAssignOther(Func<string, bool> has) =>
         CanManage(has) && has("Admin.ManageUsers");
     public static bool CanAssignToSelf(InboxTaskDto task, Guid userId, Func<string, bool> has) =>

@@ -101,7 +101,12 @@
             </MudTable>
         }
     </MudTabPanel>
-    <MudTabPanel Text="اسناد" Icon="@Icons.Material.Filled.AttachFile"><EmptyState Title="اسناد مناقصه" Description="اتصال کامل به مخزن اسناد در فاز بعدی توسعه داده می‌شود." /></MudTabPanel>
+    <MudTabPanel Text="اسناد" Icon="@Icons.Material.Filled.AttachFile">
+        <TenderDocumentsPanel TenderId="Id" />
+    </MudTabPanel>
+    <MudTabPanel Text="گزارش‌ها" Icon="@Icons.Material.Filled.PictureAsPdf">
+        <TenderReportsPanel TenderId="Id" />
+    </MudTabPanel>
     <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link"><MudAlert Severity="Severity.Info">پرونده خرید، استعلام مبنا و جلسات کمیسیون از تب‌های همین صفحه قابل مشاهده هستند. اتصال به قرارداد و سفارش خرید در فازهای بعدی انجام می‌شود.</MudAlert></MudTabPanel>
 </MudTabs>
 }

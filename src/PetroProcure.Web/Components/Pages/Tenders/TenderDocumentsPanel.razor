@@ -1,0 +1,161 @@
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="my-3" />
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <RetryPanel Message="@_error" OnRetry="Load" />
+}
+else
+{
+    @if (Access.HasPermission(TenderUiPolicy.ManageDocuments))
+    {
+        <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.h6">بارگذاری سند مناقصه</MudText>
+            <MudGrid Class="mt-1">
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_documentType" Label="نوع سند" HelperText="مثلاً TenderDocument یا TechnicalClarification" />
+                </MudItem>
+                <MudItem xs="12" md="5">
+                    <MudTextField @bind-Value="_description" Label="شرح سند" />
+                </MudItem>
+                <MudItem xs="12" md="3" Class="d-flex align-end">
+                    <InputFile OnChange="Upload" disabled="@_uploading" />
+                </MudItem>
+            </MudGrid>
+            @if (_uploading)
+            {
+                <MudProgressLinear Indeterminate="true" Class="mt-2" />
+            }
+        </MudPaper>
+    }
+
+    @if (_documents.Count == 0)
+    {
+        <EmptyState Title="سندی برای مناقصه ثبت نشده" Description="اسناد بارگذاری‌شده در مخزن پرونده خرید ذخیره و در اینجا به مناقصه متصل می‌شوند." />
+    }
+    else
+    {
+        <MudTable Items="_documents" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>نوع سند</MudTh>
+                <MudTh>نام فایل</MudTh>
+                <MudTh>تاریخ بارگذاری</MudTh>
+                <MudTh>شرح</MudTh>
+                <MudTh>عملیات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.DocumentType</MudTd>
+                <MudTd>@(context.OriginalFileName ?? "—")</MudTd>
+                <MudTd><DateDisplay Value="@context.UploadedAt" IncludeTime="true" /></MudTd>
+                <MudTd>@(context.Description ?? "—")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Download" Color="Color.Primary"
+                                   Href="@Api.GetTenderDocumentDownloadUrl(TenderId, context.Id)" Target="_blank" />
+                    @if (Access.HasPermission(TenderUiPolicy.ManageDocuments))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(() => Delete(context))" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    [Parameter] public Guid TenderId { get; set; }
+
+    private List<TenderDocumentDto> _documents = [];
+    private bool _loading = true;
+    private bool _uploading;
+    private string? _error;
+    private string _documentType = "TenderDocument";
+    private string? _description;
+    private long _maxUploadBytes = 50L * 1024 * 1024;
+
+    protected override async Task OnParametersSetAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            try
+            {
+                var limits = await Api.GetUploadLimitsAsync();
+                _maxUploadBytes = Math.Max(1, limits.MaxFileSizeMb) * 1024L * 1024L;
+            }
+            catch
+            {
+                _maxUploadBytes = 50L * 1024L * 1024L;
+            }
+
+            _documents = await Api.GetTenderDocumentsAsync(TenderId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Upload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+
+        _uploading = true;
+        try
+        {
+            await using var stream = file.OpenReadStream(_maxUploadBytes);
+            await Api.UploadTenderDocumentAsync(TenderId, stream, file.Name,
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                string.IsNullOrWhiteSpace(_documentType) ? "TenderDocument" : _documentType.Trim(),
+                _description);
+            _description = null;
+            Snackbar.Add("سند مناقصه بارگذاری شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private async Task Delete(TenderDocumentDto document)
+    {
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>("حذف سند مناقصه",
+            new DialogParameters
+            {
+                { "Message", $"سند «{document.OriginalFileName ?? document.DocumentType}» حذف نرم شود؟" },
+                { "ConfirmColor", Color.Error }
+            });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        try
+        {
+            await Api.DeleteTenderDocumentAsync(TenderId, document.Id);
+            Snackbar.Add("سند مناقصه حذف شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

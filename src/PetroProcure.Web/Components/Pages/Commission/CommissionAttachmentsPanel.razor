@@ -1,0 +1,161 @@
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Class="my-3" />
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <RetryPanel Message="@_error" OnRetry="Load" />
+}
+else
+{
+    @if (Access.HasPermission(CommissionUiPolicy.ManageDocuments))
+    {
+        <MudPaper Class="pa-3 mb-3" Elevation="0" Outlined="true">
+            <MudText Typo="Typo.h6">بارگذاری پیوست کمیسیون</MudText>
+            <MudGrid Class="mt-1">
+                <MudItem xs="12" md="4">
+                    <MudTextField @bind-Value="_documentType" Label="نوع پیوست" HelperText="مثلاً CommissionAttachment یا CommissionMinutes" />
+                </MudItem>
+                <MudItem xs="12" md="5">
+                    <MudTextField @bind-Value="_description" Label="شرح پیوست" />
+                </MudItem>
+                <MudItem xs="12" md="3" Class="d-flex align-end">
+                    <InputFile OnChange="Upload" disabled="@_uploading" />
+                </MudItem>
+            </MudGrid>
+            @if (_uploading)
+            {
+                <MudProgressLinear Indeterminate="true" Class="mt-2" />
+            }
+        </MudPaper>
+    }
+
+    @if (_attachments.Count == 0)
+    {
+        <EmptyState Title="پیوستی ثبت نشده" Description="پیوست‌های کمیسیون در مخزن پرونده خرید ذخیره و به همین جلسه متصل می‌شوند." />
+    }
+    else
+    {
+        <MudTable Items="_attachments" Dense="true" Hover="true">
+            <HeaderContent>
+                <MudTh>نوع پیوست</MudTh>
+                <MudTh>نام فایل</MudTh>
+                <MudTh>تاریخ بارگذاری</MudTh>
+                <MudTh>شرح</MudTh>
+                <MudTh>عملیات</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.DocumentType</MudTd>
+                <MudTd>@(context.OriginalFileName ?? "—")</MudTd>
+                <MudTd><DateDisplay Value="@context.UploadedAt" IncludeTime="true" /></MudTd>
+                <MudTd>@(context.Description ?? "—")</MudTd>
+                <MudTd>
+                    <MudIconButton Icon="@Icons.Material.Filled.Download" Color="Color.Primary"
+                                   Href="@Api.GetCommissionAttachmentDownloadUrl(SessionId, context.Id)" Target="_blank" />
+                    @if (Access.HasPermission(CommissionUiPolicy.ManageDocuments))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                       OnClick="@(() => Delete(context))" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+}
+
+@code {
+    [Parameter] public Guid SessionId { get; set; }
+
+    private List<CommissionAttachmentDto> _attachments = [];
+    private bool _loading = true;
+    private bool _uploading;
+    private string? _error;
+    private string _documentType = "CommissionAttachment";
+    private string? _description;
+    private long _maxUploadBytes = 50L * 1024 * 1024;
+
+    protected override async Task OnParametersSetAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            try
+            {
+                var limits = await Api.GetUploadLimitsAsync();
+                _maxUploadBytes = Math.Max(1, limits.MaxFileSizeMb) * 1024L * 1024L;
+            }
+            catch
+            {
+                _maxUploadBytes = 50L * 1024L * 1024L;
+            }
+
+            _attachments = await Api.GetCommissionAttachmentsAsync(SessionId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Upload(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+
+        _uploading = true;
+        try
+        {
+            await using var stream = file.OpenReadStream(_maxUploadBytes);
+            await Api.UploadCommissionAttachmentAsync(SessionId, stream, file.Name,
+                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                string.IsNullOrWhiteSpace(_documentType) ? "CommissionAttachment" : _documentType.Trim(),
+                _description);
+            _description = null;
+            Snackbar.Add("پیوست کمیسیون بارگذاری شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _uploading = false;
+        }
+    }
+
+    private async Task Delete(CommissionAttachmentDto attachment)
+    {
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>("حذف پیوست کمیسیون",
+            new DialogParameters
+            {
+                { "Message", $"پیوست «{attachment.OriginalFileName ?? attachment.DocumentType}» حذف نرم شود؟" },
+                { "ConfirmColor", Color.Error }
+            });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        try
+        {
+            await Api.DeleteCommissionAttachmentAsync(SessionId, attachment.Id);
+            Snackbar.Add("پیوست کمیسیون حذف شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+        }
+    }
+}

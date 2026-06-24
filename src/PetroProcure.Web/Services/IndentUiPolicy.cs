@@ -19,7 +19,8 @@ public static class IndentUiPolicy
     public static bool CanSendToPurchase(IndentStatus status, Func<string, bool> has) =>
         status == IndentStatus.Approved && has("Indent.SendToPurchase");
     public static bool CanCreatePurchaseFile(IndentStatus status, Func<string, bool> has) =>
-        status == IndentStatus.Approved && has("PurchaseFile.Create");
+        (status is IndentStatus.Approved or IndentStatus.SentToPurchaseDepartment)
+        && has("PurchaseFile.Create");
 
     public static string FormatNumber(string number) =>
         number.Length == 7 ? $"{number[..2]}-{number[2]}-{number[3..]}" : number;

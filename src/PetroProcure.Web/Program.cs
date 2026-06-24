@@ -62,9 +62,29 @@ app.UseAntiforgery();
 
 app.MapGet("/report-preview/purchase-file/{id:guid}", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
     Results.File(await api.GetPurchaseFileSummaryPdfAsync(id, ct), "application/pdf"));
+app.MapGet("/report-preview/tender/{id:guid}/summary", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
+    Results.File(await api.GetTenderSummaryReportPdfAsync(id, ct), "application/pdf", $"tender-summary-{id}.pdf", enableRangeProcessing: true));
+app.MapGet("/report-preview/tender/{id:guid}/comparison", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
+    Results.File(await api.GetTenderComparisonReportPdfAsync(id, ct), "application/pdf", $"tender-comparison-{id}.pdf", enableRangeProcessing: true));
+app.MapGet("/report-preview/tender/{id:guid}/winner-decision", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
+    Results.File(await api.GetTenderWinnerDecisionReportPdfAsync(id, ct), "application/pdf", $"tender-winner-decision-{id}.pdf", enableRangeProcessing: true));
+app.MapGet("/report-preview/commission/{id:guid}/minutes", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
+    Results.File(await api.GetCommissionMinutesReportPdfAsync(id, ct), "application/pdf", $"commission-minutes-{id}.pdf", enableRangeProcessing: true));
+app.MapGet("/report-preview/commission/{id:guid}/decision/{decisionId:guid}", async (Guid id, Guid decisionId, IPetroProcureApiClient api, CancellationToken ct) =>
+    Results.File(await api.GetCommissionDecisionReportPdfAsync(id, decisionId, ct), "application/pdf", $"commission-decision-{decisionId}.pdf", enableRangeProcessing: true));
 app.MapGet("/document-download/{id:guid}", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
 {
     var file = await api.DownloadDocumentAsync(id, ct);
+    return Results.File(file.Content, file.ContentType, file.FileName);
+});
+app.MapGet("/tender-document-download/{tenderId:guid}/{documentId:guid}", async (Guid tenderId, Guid documentId, IPetroProcureApiClient api, CancellationToken ct) =>
+{
+    var file = await api.DownloadTenderDocumentAsync(tenderId, documentId, ct);
+    return Results.File(file.Content, file.ContentType, file.FileName);
+});
+app.MapGet("/commission-attachment-download/{sessionId:guid}/{attachmentId:guid}", async (Guid sessionId, Guid attachmentId, IPetroProcureApiClient api, CancellationToken ct) =>
+{
+    var file = await api.DownloadCommissionAttachmentAsync(sessionId, attachmentId, ct);
     return Results.File(file.Content, file.ContentType, file.FileName);
 });
 app.MapGet("/report-preview/indent/{id:guid}", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
