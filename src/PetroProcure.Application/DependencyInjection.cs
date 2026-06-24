@@ -8,6 +8,7 @@ using PetroProcure.Application.Workflow;
 using PetroProcure.Application.Suppliers;
 using PetroProcure.Application.Inquiries;
 using PetroProcure.Application.Orders;
+using PetroProcure.Application.Tenders;
 
 namespace PetroProcure.Application;
 
@@ -34,6 +35,8 @@ public static class DependencyInjection
         services.AddScoped<InquiryQueryHandler>();
         services.AddScoped<OrdersCommandHandler>();
         services.AddScoped<OrdersQueryHandler>();
+        services.AddScoped<TenderCommandHandler>();
+        services.AddScoped<TenderQueryHandler>();
         return services;
     }
 }

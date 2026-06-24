@@ -1,0 +1,63 @@
+@page "/purchase/tenders/create"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد مناقصه</PageTitle>
+<PageHeader Title="ایجاد مناقصه" Subtitle="ثبت مناقصه رسمی متصل به پرونده خرید" />
+
+<MudPaper Class="form-panel" Elevation="0">
+    <MudForm @ref="_form">
+        <MudGrid>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان" Required="true" RequiredError="عنوان الزامی است." /></MudItem>
+            <MudItem xs="12" md="6"><MudSelect T="Guid" @bind-Value="_purchaseFileId" Label="پرونده خرید" Required="true" RequiredError="پرونده خرید الزامی است.">@foreach(var file in _files){<MudSelectItem Value="@file.Id">@file.FileNumber — @file.Title</MudSelectItem>}</MudSelect></MudItem>
+            <MudItem xs="12" md="4"><MudSelect T="TenderType" @bind-Value="_type" Label="نوع مناقصه">@foreach(var t in Enum.GetValues<TenderType>()){<MudSelectItem Value="@t">@TenderUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
+            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_deadline" Label="مهلت ارسال پیشنهاد" /></MudItem>
+            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_opening" Label="تاریخ گشایش" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Lines="4" /></MudItem>
+        </MudGrid>
+        <div class="form-actions">
+            <MudButton Variant="Variant.Text" Href="/purchase/tenders">انصراف</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" OnClick="Save">ثبت مناقصه</MudButton>
+        </div>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm? _form;
+    private string _title = "";
+    private string? _description;
+    private TenderType _type = TenderType.LimitedTender;
+    private DateTime? _deadline, _opening;
+    private Guid _purchaseFileId;
+    private bool _saving;
+    private List<PurchaseFileSummaryDto> _files = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(TenderUiPolicy.Create)) { Navigation.NavigateTo("/access-denied"); return; }
+        try
+        {
+            _files = (await Api.GetPurchaseFilesAsync(new(PageSize: 50))).Items.ToList();
+            _purchaseFileId = _files.FirstOrDefault()?.Id ?? Guid.Empty;
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid || _purchaseFileId == Guid.Empty) return;
+        _saving = true;
+        try
+        {
+            var tender = await Api.CreateTenderAsync(new(_purchaseFileId, _title, _type, _deadline, _opening, _description));
+            Snackbar.Add("مناقصه ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/tenders/{tender.Tender.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+}

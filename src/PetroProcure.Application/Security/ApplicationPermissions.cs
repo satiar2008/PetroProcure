@@ -27,6 +27,19 @@ public static class ApplicationPermissions
 
     public const string TenderCreate = "Tender.Create";
     public const string TenderView = "Tender.View";
+    public const string TenderEdit = "Tender.Edit";
+    public const string TenderPublish = "Tender.Publish";
+    public const string TenderCancel = "Tender.Cancel";
+    public const string TenderManageItems = "Tender.ManageItems";
+    public const string TenderManageParticipants = "Tender.ManageParticipants";
+    public const string TenderReceiveBid = "Tender.ReceiveBid";
+    public const string TenderEvaluateQualification = "Tender.EvaluateQualification";
+    public const string TenderEvaluateTechnical = "Tender.EvaluateTechnical";
+    public const string TenderEvaluateCommercial = "Tender.EvaluateCommercial";
+    public const string TenderCompareBids = "Tender.CompareBids";
+    public const string TenderSelectWinner = "Tender.SelectWinner";
+    public const string TenderClose = "Tender.Close";
+    public const string TenderManageDocuments = "Tender.ManageDocuments";
     public const string TenderEvaluate = "Tender.Evaluate";
     public const string TenderApproveWinner = "Tender.ApproveWinner";
 
@@ -94,6 +107,19 @@ public static class ApplicationPermissions
         WarehouseIssue,
         TenderCreate,
         TenderView,
+        TenderEdit,
+        TenderPublish,
+        TenderCancel,
+        TenderManageItems,
+        TenderManageParticipants,
+        TenderReceiveBid,
+        TenderEvaluateQualification,
+        TenderEvaluateTechnical,
+        TenderEvaluateCommercial,
+        TenderCompareBids,
+        TenderSelectWinner,
+        TenderClose,
+        TenderManageDocuments,
         TenderEvaluate,
         TenderApproveWinner,
         SupplierView,

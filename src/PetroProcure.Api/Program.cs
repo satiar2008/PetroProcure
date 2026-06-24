@@ -128,6 +128,7 @@ app.MapAiEndpoints();
 app.MapSupplierEndpoints();
 app.MapInquiryEndpoints();
 app.MapOrdersEndpoints();
+app.MapTenderEndpoints();
 
 app.MapDefaultEndpoints();
 

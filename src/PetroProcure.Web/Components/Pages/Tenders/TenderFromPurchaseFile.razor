@@ -1,0 +1,114 @@
+@page "/purchase/tenders/from-purchase-file/{PurchaseFileId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد مناقصه از پرونده خرید</PageTitle>
+<PageHeader Title="ایجاد مناقصه از پرونده خرید" Subtitle="@(_file is null ? "در حال دریافت پرونده" : $"{_file.FileNumber} — {_file.Title}")" />
+
+<DataStateView TItem="PurchaseFileGroupedItemsDto" Loading="_loading" Error="_error" Retry="Load">
+    @if (_file is not null)
+    {
+        <MudPaper Class="form-panel" Elevation="0">
+            <MudGrid>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان مناقصه" Required="true" /></MudItem>
+                <MudItem xs="12" md="6"><MudSelect T="TenderType" @bind-Value="_type" Label="نوع مناقصه">@foreach(var t in Enum.GetValues<TenderType>()){<MudSelectItem Value="@t">@TenderUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
+                <MudItem xs="12" md="6"><MudDatePicker @bind-Date="_deadline" Label="مهلت ارسال پیشنهاد" /></MudItem>
+                <MudItem xs="12" md="6"><MudDatePicker @bind-Date="_opening" Label="تاریخ گشایش" /></MudItem>
+                <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Lines="3" /></MudItem>
+            </MudGrid>
+        </MudPaper>
+
+        <MudPaper Class="data-panel" Elevation="0">
+            <MudText Typo="Typo.h6" Class="mb-3">اقلام پرونده خرید</MudText>
+            @foreach (var group in _groups)
+            {
+                <MudExpansionPanel Text="@($"{group.MescGeneralGroupCode} — {group.GeneralDescription}")">
+                    <MudTable Items="group.Items" Dense="true">
+                        <HeaderContent><MudTh>انتخاب</MudTh><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>مقدار</MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd><MudCheckBox T="bool" Value="@_selectedItems.Contains(context.Id)" ValueChanged="@(_ => ToggleItem(context.Id))" /></MudTd>
+                            <MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.ApprovedQuantity</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudExpansionPanel>
+            }
+        </MudPaper>
+
+        <MudPaper Class="data-panel" Elevation="0">
+            <MudText Typo="Typo.h6" Class="mb-3">شرکت‌کنندگان</MudText>
+            <SupplierSelector Value="_supplier" ValueChanged="AddSupplier" />
+            @if (_suppliers.Count == 0) { <EmptyState Title="تأمین‌کننده‌ای انتخاب نشده است" Description="حداقل یک تأمین‌کننده برای انتشار مناقصه لازم است." /> }
+            else
+            {
+                <div class="d-flex flex-wrap gap-2">
+                    @foreach (var s in _suppliers)
+                    {
+                        <MudChip T="string">@s.SupplierCode — @s.Name</MudChip>
+                        <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" OnClick="@(() => RemoveSupplier(s.Id))" />
+                    }
+                </div>
+            }
+        </MudPaper>
+
+        <div class="form-actions">
+            <MudButton Variant="Variant.Text" Href="@($"/purchase/files/{PurchaseFileId}")">بازگشت</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" OnClick="Save">ایجاد مناقصه</MudButton>
+        </div>
+    }
+</DataStateView>
+
+@code {
+    [Parameter] public Guid PurchaseFileId { get; set; }
+    private bool _loading = true, _saving;
+    private string? _error, _description;
+    private string _title = "";
+    private TenderType _type = TenderType.LimitedTender;
+    private DateTime? _deadline, _opening;
+    private PurchaseFileDto? _file;
+    private List<PurchaseFileGroupedItemsDto> _groups = [];
+    private HashSet<Guid> _selectedItems = [];
+    private SupplierLookupDto? _supplier;
+    private List<SupplierLookupDto> _suppliers = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(TenderUiPolicy.Create)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            _file = await Api.GetPurchaseFileAsync(PurchaseFileId);
+            _title = _file is null ? "" : $"مناقصه {_file.FileNumber}";
+            _groups = await Api.GetGroupedItemsAsync(PurchaseFileId);
+            _selectedItems = _groups.SelectMany(x => x.Items).Select(x => x.Id).ToHashSet();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void ToggleItem(Guid id) { if (!_selectedItems.Add(id)) _selectedItems.Remove(id); }
+    private void AddSupplier(SupplierLookupDto? supplier) { if (supplier is null || _suppliers.Any(x => x.Id == supplier.Id)) return; _suppliers.Add(supplier); _supplier = null; }
+    private void RemoveSupplier(Guid id) => _suppliers.RemoveAll(x => x.Id == id);
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_title) || _selectedItems.Count == 0 || _suppliers.Count == 0)
+        { Snackbar.Add("عنوان، حداقل یک قلم و حداقل یک تأمین‌کننده الزامی است.", Severity.Warning); return; }
+        _saving = true;
+        try
+        {
+            var tender = await Api.CreateTenderFromPurchaseFileAsync(PurchaseFileId, new(_title, _type, _deadline, _opening, _description, _selectedItems.ToArray(), _suppliers.Select(x => x.Id).ToArray()));
+            Snackbar.Add("مناقصه از پرونده خرید ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/tenders/{tender.Tender.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+}

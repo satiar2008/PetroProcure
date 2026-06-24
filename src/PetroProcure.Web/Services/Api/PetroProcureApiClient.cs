@@ -12,6 +12,7 @@ using PetroProcure.Contracts.V1.Organization;
 using PetroProcure.Contracts.V1.Suppliers;
 using PetroProcure.Contracts.V1.Inquiry;
 using PetroProcure.Contracts.V1.Orders;
+using PetroProcure.Contracts.V1.Tenders;
 using PetroProcure.Web.Services.Auth;
 
 namespace PetroProcure.Web.Services.Api;
@@ -130,6 +131,19 @@ public interface IPetroProcureApiClient
     Task<List<ShortageAlertDto>> DetectShortagesAsync(DetectShortageAlertsRequest request, CancellationToken ct = default);
     Task<Guid> ConvertShortageToIndentAsync(Guid id, ConvertShortageToIndentRequest request, CancellationToken ct = default);
     Task ResolveShortageAlertAsync(Guid id, ResolveShortageAlertRequest request, CancellationToken ct = default);
+    Task<PagedResult<TenderSummaryDto>> GetTendersAsync(TenderListRequest request, CancellationToken ct = default);
+    Task<TenderDetailDto?> GetTenderAsync(Guid id, CancellationToken ct = default);
+    Task<List<TenderSummaryDto>> GetPurchaseFileTendersAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<TenderDetailDto> CreateTenderAsync(CreateTenderRequest request, CancellationToken ct = default);
+    Task<TenderDetailDto> CreateTenderFromPurchaseFileAsync(Guid purchaseFileId, CreateTenderFromPurchaseFileRequest request, CancellationToken ct = default);
+    Task PublishTenderAsync(Guid id, CancellationToken ct = default);
+    Task CancelTenderAsync(Guid id, string reason, CancellationToken ct = default);
+    Task CloseTenderAsync(Guid id, CancellationToken ct = default);
+    Task<TenderParticipantDto> AddTenderParticipantAsync(Guid id, AddTenderParticipantRequest request, CancellationToken ct = default);
+    Task<TenderBidDto> AddTenderBidAsync(Guid id, AddTenderBidRequest request, CancellationToken ct = default);
+    Task<TenderEvaluationDto> AddTenderEvaluationAsync(Guid id, AddTenderEvaluationRequest request, CancellationToken ct = default);
+    Task<TenderComparisonDto?> GetTenderComparisonAsync(Guid id, CancellationToken ct = default);
+    Task SelectTenderWinnerAsync(Guid id, SelectTenderWinnerRequest request, CancellationToken ct = default);
 }
 
 public sealed class PetroProcureApiClient(
@@ -591,6 +605,65 @@ public sealed class PetroProcureApiClient(
     {
         var response = await Client().PostAsJsonAsync($"/api/orders/shortage-alerts/{id}/resolve", request, ct); await Ensure(response, ct);
     }
+
+    public async Task<PagedResult<TenderSummaryDto>> GetTendersAsync(TenderListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["SearchTerm"] = r.SearchTerm,
+            ["TenderNumber"] = r.TenderNumber,
+            ["PurchaseFileNumber"] = r.PurchaseFileNumber,
+            ["Status"] = r.Status?.ToString(),
+            ["TenderType"] = r.TenderType?.ToString(),
+            ["SupplierId"] = r.SupplierId?.ToString(),
+            ["CreatedDateFrom"] = r.CreatedDateFrom?.ToString("O"),
+            ["CreatedDateTo"] = r.CreatedDateTo?.ToString("O"),
+            ["SubmissionDeadlineFrom"] = r.SubmissionDeadlineFrom?.ToString("O"),
+            ["SubmissionDeadlineTo"] = r.SubmissionDeadlineTo?.ToString("O"),
+            ["SortBy"] = r.SortBy,
+            ["SortDescending"] = r.SortDescending.ToString(),
+            ["PageNumber"] = r.PageNumber.ToString(),
+            ["PageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/tenders?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<TenderSummaryDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public Task<TenderDetailDto?> GetTenderAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<TenderDetailDto>($"/api/tenders/{id}", ct);
+
+    public async Task<List<TenderSummaryDto>> GetPurchaseFileTendersAsync(Guid purchaseFileId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<TenderSummaryDto>>($"/api/purchase-files/{purchaseFileId}/tenders", ct) ?? [];
+
+    public async Task<TenderDetailDto> CreateTenderAsync(CreateTenderRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/tenders", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<TenderDetailDto> CreateTenderFromPurchaseFileAsync(Guid purchaseFileId, CreateTenderFromPurchaseFileRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/tenders/from-purchase-file/{purchaseFileId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<TenderDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task PublishTenderAsync(Guid id, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/publish", new PublishTenderRequest(), ct); await Ensure(response, ct); }
+    public async Task CancelTenderAsync(Guid id, string reason, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/cancel", new CancelTenderRequest(reason), ct); await Ensure(response, ct); }
+    public async Task CloseTenderAsync(Guid id, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/close", new CloseTenderRequest(), ct); await Ensure(response, ct); }
+    public async Task<TenderParticipantDto> AddTenderParticipantAsync(Guid id, AddTenderParticipantRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/participants", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<TenderParticipantDto>(cancellationToken: ct))!; }
+    public async Task<TenderBidDto> AddTenderBidAsync(Guid id, AddTenderBidRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/bids", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<TenderBidDto>(cancellationToken: ct))!; }
+    public async Task<TenderEvaluationDto> AddTenderEvaluationAsync(Guid id, AddTenderEvaluationRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/evaluations", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<TenderEvaluationDto>(cancellationToken: ct))!; }
+    public Task<TenderComparisonDto?> GetTenderComparisonAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<TenderComparisonDto>($"/api/tenders/{id}/comparison", ct);
+    public async Task SelectTenderWinnerAsync(Guid id, SelectTenderWinnerRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/tenders/{id}/select-winner", request, ct); await Ensure(response, ct); }
 
     private sealed record IndentReference(Guid IndentId);
 

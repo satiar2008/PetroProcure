@@ -30,6 +30,13 @@ else if (_summary.Data is { } file)
                            Href="@($"/purchase/inquiries/from-purchase-file/{file.Id}")">
                     ایجاد استعلام از پرونده خرید
                 </MudButton>
+            </PermissionView>
+            <PermissionView Permission="@TenderUiPolicy.Create">
+                <MudButton Class="mt-4 mx-2" Variant="Variant.Outlined" Color="Color.Secondary"
+                           StartIcon="@Icons.Material.Filled.Gavel"
+                           Href="@($"/purchase/tenders/from-purchase-file/{file.Id}")">
+                    ایجاد مناقصه از پرونده خرید
+                </MudButton>
             </PermissionView></MudPaper>
         </MudTabPanel>
 
