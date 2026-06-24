@@ -1,0 +1,50 @@
+@page "/purchase/suppliers/create"
+@page "/purchase/suppliers/{Id:guid}/edit"
+@inject IPetroProcureApiClient Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>@Title</PageTitle>
+<PageHeader Title="@Title" Subtitle="اطلاعات پایه، دسته‌بندی و تماس اصلی تأمین‌کننده" />
+
+<MudForm @ref="_form">
+<MudPaper Class="form-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_code" Label="کد تأمین‌کننده" Required="true" RequiredError="کد تأمین‌کننده الزامی است" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="5"><MudTextField @bind-Value="_name" Label="نام" Required="true" RequiredError="نام تأمین‌کننده الزامی است" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="4"><MudSelect T="SupplierType" @bind-Value="_type" Label="نوع" Variant="Variant.Outlined">@foreach(var t in Enum.GetValues<SupplierType>()){<MudSelectItem Value="@t">@SupplierUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_nationalId" Label="شناسه ملی" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_economicCode" Label="کد اقتصادی" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_registrationNumber" Label="شماره ثبت" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_phone" Label="تلفن" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="4"><MudTextField @bind-Value="_email" Label="ایمیل" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="4"><MudTextField @bind-Value="_website" Label="وب‌سایت" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="2"><MudTextField @bind-Value="_city" Label="شهر" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="2"><MudTextField @bind-Value="_country" Label="کشور" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12"><MudTextField @bind-Value="_address" Label="نشانی" Variant="Variant.Outlined" Lines="2" /></MudItem>
+        <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Variant="Variant.Outlined" Lines="3" /></MudItem>
+    </MudGrid>
+</MudPaper>
+@if (Id is null)
+{
+<MudPaper Class="form-panel" Elevation="0">
+    <MudText Typo="Typo.h6">تماس اصلی</MudText>
+    <MudGrid>
+        <MudItem xs="12" md="4"><MudTextField @bind-Value="_contactName" Label="نام تماس" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_contactPosition" Label="سمت" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="2"><MudTextField @bind-Value="_contactPhone" Label="تلفن" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_contactEmail" Label="ایمیل" Variant="Variant.Outlined" /></MudItem>
+    </MudGrid>
+</MudPaper>
+}
+<div class="form-actions"><MudButton Disabled="_saving" OnClick="Save" Color="Color.Primary" Variant="Variant.Filled">ذخیره</MudButton><MudButton Href="/purchase/suppliers" Variant="Variant.Text">بازگشت</MudButton></div>
+</MudForm>
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private MudForm? _form; private bool _saving; private string Title=>Id.HasValue?"ویرایش تأمین‌کننده":"ایجاد تأمین‌کننده";
+    private string _code="",_name="",_nationalId="",_economicCode="",_registrationNumber="",_phone="",_email="",_website="",_address="",_city="",_country="ایران",_postalCode="",_description="";
+    private string _contactName="",_contactPosition="",_contactPhone="",_contactEmail=""; private SupplierType _type=SupplierType.Distributor;
+    protected override async Task OnInitializedAsync(){if(Id.HasValue){var detail=await Api.GetSupplierAsync(Id.Value);if(detail is null)return;var s=detail.Supplier;_code=s.SupplierCode;_name=s.Name;_nationalId=s.NationalId??"";_economicCode=s.EconomicCode??"";_registrationNumber=s.RegistrationNumber??"";_phone=s.Phone??"";_email=s.Email??"";_website=s.Website??"";_address=s.Address??"";_city=s.City??"";_country=s.Country??"ایران";_postalCode=s.PostalCode??"";_description=s.Description??"";_type=s.SupplierType;}}
+    private async Task Save(){await _form!.Validate();if(!_form.IsValid||_saving)return;_saving=true;try{if(Id.HasValue){await Api.UpdateSupplierAsync(Id.Value,new(_code,_name,_nationalId,_economicCode,_registrationNumber,_phone,_email,_website,_address,_city,_country,_postalCode,_type,_description));Snackbar.Add("تأمین‌کننده ویرایش شد.",Severity.Success);Navigation.NavigateTo($"/purchase/suppliers/{Id.Value}");}else{AddSupplierContactRequest? contact=string.IsNullOrWhiteSpace(_contactName)?null:new(_contactName,_contactPosition,_contactPhone,null,_contactEmail,true,null);var result=await Api.CreateSupplierAsync(new(_code,_name,_nationalId,_economicCode,_registrationNumber,_phone,_email,_website,_address,_city,_country,_postalCode,_type,_description,[],contact));Snackbar.Add("تأمین‌کننده ایجاد شد.",Severity.Success);Navigation.NavigateTo($"/purchase/suppliers/{result.Supplier.Id}");}}catch(Exception ex){Snackbar.Add("ذخیره تأمین‌کننده ناموفق بود: "+ex.Message,Severity.Error);}finally{_saving=false;}}
+}

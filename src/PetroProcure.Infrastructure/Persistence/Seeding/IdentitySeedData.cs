@@ -56,7 +56,12 @@ public static class IdentitySeedData
     public static readonly DepartmentMenuItem[] DepartmentMenuItems =
     [
         new(StableGuid.Create("menu:purchase:files"), DepartmentType.PurchaseDepartment, "پرونده‌های خرید", "/purchase-files", ApplicationPermissions.PurchaseFileView, 1),
-        new(StableGuid.Create("menu:orders:indents"), DepartmentType.OrdersAndInventoryControl, "درخواست‌های خرید", "/indents", ApplicationPermissions.IndentView, 1),
+        new(StableGuid.Create("menu:purchase:suppliers"), DepartmentType.PurchaseDepartment, "تأمین‌کنندگان", "/purchase/suppliers", ApplicationPermissions.SupplierView, 2),
+        new(StableGuid.Create("menu:orders:dashboard"), DepartmentType.OrdersAndInventoryControl, "داشبورد سفارشات", "/orders", ApplicationPermissions.OrdersViewDashboard, 1),
+        new(StableGuid.Create("menu:orders:inventory"), DepartmentType.OrdersAndInventoryControl, "کنترل موجودی", "/orders/inventory-control", ApplicationPermissions.OrdersViewInventory, 2),
+        new(StableGuid.Create("menu:orders:needs"), DepartmentType.OrdersAndInventoryControl, "نیازهای کالا", "/orders/material-needs", ApplicationPermissions.OrdersCreateMaterialNeed, 3),
+        new(StableGuid.Create("menu:orders:shortages"), DepartmentType.OrdersAndInventoryControl, "هشدارهای کمبود", "/orders/shortage-alerts", ApplicationPermissions.OrdersManageShortageAlerts, 4),
+        new(StableGuid.Create("menu:orders:indents"), DepartmentType.OrdersAndInventoryControl, "درخواست‌های خرید", "/orders/indents", ApplicationPermissions.IndentView, 5),
         new(StableGuid.Create("menu:warehouse:tasks"), DepartmentType.Warehouse, "عملیات انبار", "/warehouse", ApplicationPermissions.WarehouseView, 1),
         new(StableGuid.Create("menu:applicant:requests"), DepartmentType.Applicant, "درخواست‌های من", "/applicant/requests", ApplicationPermissions.IndentCreate, 1),
         new(StableGuid.Create("menu:tender:commission"), DepartmentType.TenderCommission, "کمیسیون مناقصه", "/tenders", ApplicationPermissions.TenderView, 1)
@@ -104,6 +109,27 @@ public static class IdentitySeedData
                 ApplicationPermissions.PurchaseFileArchive,
                 ApplicationPermissions.IndentView,
                 ApplicationPermissions.ItemView,
+                ApplicationPermissions.SupplierView,
+                ApplicationPermissions.SupplierCreate,
+                ApplicationPermissions.SupplierEdit,
+                ApplicationPermissions.SupplierActivateDeactivate,
+                ApplicationPermissions.SupplierBlacklist,
+                ApplicationPermissions.SupplierManageContacts,
+                ApplicationPermissions.SupplierManageCategories,
+                ApplicationPermissions.SupplierEvaluate,
+                ApplicationPermissions.SupplierManageDocuments,
+                ApplicationPermissions.InquiryView,
+                ApplicationPermissions.InquiryCreate,
+                ApplicationPermissions.InquiryEdit,
+                ApplicationPermissions.InquirySend,
+                ApplicationPermissions.InquiryCancel,
+                ApplicationPermissions.InquiryManageSuppliers,
+                ApplicationPermissions.InquiryReceiveQuote,
+                ApplicationPermissions.InquiryCompareQuotes,
+                ApplicationPermissions.InquirySelectSupplier,
+                ApplicationPermissions.InquiryManageDocuments,
+                ApplicationPermissions.OrdersViewDashboard,
+                ApplicationPermissions.OrdersViewInventory,
                 ApplicationPermissions.TenderView,
                 ApplicationPermissions.ReportView,
                 ApplicationPermissions.ReportPrint,
@@ -116,7 +142,19 @@ public static class IdentitySeedData
                 ApplicationPermissions.PurchaseFileEdit,
                 ApplicationPermissions.PurchaseFileSendToDepartment,
                 ApplicationPermissions.IndentView,
-                ApplicationPermissions.ItemView
+                ApplicationPermissions.ItemView,
+                ApplicationPermissions.SupplierView,
+                ApplicationPermissions.SupplierCreate,
+                ApplicationPermissions.SupplierEdit,
+                ApplicationPermissions.SupplierManageContacts,
+                ApplicationPermissions.SupplierManageCategories,
+                ApplicationPermissions.InquiryView,
+                ApplicationPermissions.InquiryCreate,
+                ApplicationPermissions.InquiryEdit,
+                ApplicationPermissions.InquirySend,
+                ApplicationPermissions.InquiryManageSuppliers,
+                ApplicationPermissions.InquiryReceiveQuote,
+                ApplicationPermissions.InquiryCompareQuotes
             ],
             [ApplicationRoles.OrdersManager] =
             [
@@ -124,14 +162,29 @@ public static class IdentitySeedData
                 ApplicationPermissions.IndentView,
                 ApplicationPermissions.IndentApprove,
                 ApplicationPermissions.IndentSendToPurchase,
-                ApplicationPermissions.ItemView
+                ApplicationPermissions.ItemView,
+                ApplicationPermissions.OrdersViewDashboard,
+                ApplicationPermissions.OrdersViewInventory,
+                ApplicationPermissions.OrdersManageInventoryControl,
+                ApplicationPermissions.OrdersCreateMaterialNeed,
+                ApplicationPermissions.OrdersReviewMaterialNeed,
+                ApplicationPermissions.OrdersApproveMaterialNeed,
+                ApplicationPermissions.OrdersConvertNeedToIndent,
+                ApplicationPermissions.OrdersConvertShortageToIndent,
+                ApplicationPermissions.OrdersManageShortageAlerts
             ],
             [ApplicationRoles.OrdersUser] =
             [
                 ApplicationPermissions.IndentCreate,
                 ApplicationPermissions.IndentView,
                 ApplicationPermissions.IndentSendToPurchase,
-                ApplicationPermissions.ItemView
+                ApplicationPermissions.ItemView,
+                ApplicationPermissions.OrdersViewDashboard,
+                ApplicationPermissions.OrdersViewInventory,
+                ApplicationPermissions.OrdersCreateMaterialNeed,
+                ApplicationPermissions.OrdersReviewMaterialNeed,
+                ApplicationPermissions.OrdersConvertNeedToIndent,
+                ApplicationPermissions.OrdersManageShortageAlerts
             ],
             [ApplicationRoles.WarehouseManager] =
             [
@@ -151,7 +204,8 @@ public static class IdentitySeedData
                 ApplicationPermissions.IndentCreate,
                 ApplicationPermissions.IndentView,
                 ApplicationPermissions.PurchaseFileView,
-                ApplicationPermissions.ItemView
+                ApplicationPermissions.ItemView,
+                ApplicationPermissions.OrdersCreateMaterialNeed
             ],
             [ApplicationRoles.TenderCommissionManager] =
             [
@@ -159,7 +213,11 @@ public static class IdentitySeedData
                 ApplicationPermissions.TenderView,
                 ApplicationPermissions.TenderEvaluate,
                 ApplicationPermissions.TenderApproveWinner,
-                ApplicationPermissions.PurchaseFileView
+                ApplicationPermissions.PurchaseFileView,
+                ApplicationPermissions.SupplierView,
+                ApplicationPermissions.SupplierEvaluate,
+                ApplicationPermissions.InquiryView,
+                ApplicationPermissions.InquiryCompareQuotes
             ],
             [ApplicationRoles.TenderCommissionMember] =
             [

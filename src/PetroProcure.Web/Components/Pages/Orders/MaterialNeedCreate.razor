@@ -1,0 +1,49 @@
+@page "/orders/material-needs/create"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject IUserAccessContext Access
+
+<PageHeader Title="ثبت نیاز کالا" Subtitle="نیاز جدید را با انتخاب قلم MESC ثبت کنید" />
+
+<MudPaper Class="pa-4">
+    <MudForm @ref="_form">
+        <MescItemSelector @bind-Value="_item" Required="true" />
+        <MudGrid Class="mt-3">
+            <MudItem xs="12" md="4"><MudNumericField @bind-Value="_quantity" Label="مقدار مورد نیاز" Required="true" RequiredError="مقدار الزامی است" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_neededBy" Label="تاریخ نیاز" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudSelect @bind-Value="_priority" Label="اولویت" Variant="Variant.Outlined">@foreach (var p in Enum.GetValues<MaterialNeedPriority>()) { <MudSelectItem Value="@p">@OrdersUiPolicy.PriorityText(p)</MudSelectItem> }</MudSelect></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Lines="4" Variant="Variant.Outlined" /></MudItem>
+        </MudGrid>
+        <MudButton Disabled="_saving" OnClick="Save" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save">ثبت نیاز</MudButton>
+        <MudButton Href="/orders/material-needs">بازگشت</MudButton>
+    </MudForm>
+</MudPaper>
+
+@code {
+    private MudForm? _form;
+    private MescItemDto? _item;
+    private decimal _quantity = 1;
+    private DateTime? _neededBy;
+    private MaterialNeedPriority _priority = MaterialNeedPriority.Normal;
+    private string? _description;
+    private bool _saving;
+
+    private async Task Save()
+    {
+        await _form!.Validate();
+        if (!_form.IsValid || _item is null) { Snackbar.Add("انتخاب کالا و مقدار الزامی است.", Severity.Warning); return; }
+        _saving = true;
+        try
+        {
+            var need = await Api.CreateMaterialNeedAsync(new CreateMaterialNeedRequest(_item.Id, _quantity,
+                _neededBy.HasValue ? DateOnly.FromDateTime(_neededBy.Value) : null, Access.CurrentDepartment.Id,
+                null, _priority, _description));
+            Snackbar.Add($"نیاز {need.NeedNumber} ثبت شد.", Severity.Success);
+            Nav.NavigateTo($"/orders/material-needs/{need.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add($"ثبت نیاز ناموفق بود: {ex.Message}", Severity.Error); }
+        finally { _saving = false; }
+    }
+}

@@ -23,7 +23,14 @@ else if (_summary.Data is { } file)
                 <div class="summary-item"><span>تاریخ ایجاد</span><strong><DateDisplay Value="@file.CreatedAt" /></strong></div>
                 <SummaryItem Label="تعداد اقلام" Value="@file.Items.Count.ToString()" />
             </div><MudDivider Class="my-4" /><MudText Typo="Typo.subtitle2">شرح پرونده</MudText>
-            <MudText Typo="Typo.body2">@(file.Description ?? "شرحی ثبت نشده است.")</MudText></MudPaper>
+            <MudText Typo="Typo.body2">@(file.Description ?? "شرحی ثبت نشده است.")</MudText>
+            <PermissionView Permission="@InquiryUiPolicy.Create">
+                <MudButton Class="mt-4" Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.RequestQuote"
+                           Href="@($"/purchase/inquiries/from-purchase-file/{file.Id}")">
+                    ایجاد استعلام از پرونده خرید
+                </MudButton>
+            </PermissionView></MudPaper>
         </MudTabPanel>
 
         <MudTabPanel Text="اقلام" Icon="@Icons.Material.Filled.Inventory2">

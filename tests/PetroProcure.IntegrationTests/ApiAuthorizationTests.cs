@@ -20,6 +20,11 @@ using PetroProcure.Infrastructure.Persistence.Seeding;
 using PetroProcure.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using PetroProcure.Contracts.V1.Identity;
+using PetroProcure.Contracts.V1.Suppliers;
+using PetroProcure.Contracts.V1.Inquiry;
+using PetroProcure.Contracts.V1.Orders;
+using PetroProcure.Domain.Enums;
+using PetroProcure.Domain.Modules.Orders;
 
 namespace PetroProcure.IntegrationTests;
 
@@ -119,6 +124,158 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
         var client = factory.CreateAuthenticatedClient(ApplicationPermissions.ItemView);
         var response = await client.GetAsync("/api/users");
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SupplierListRequiresSupplierView()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.ItemView);
+        var response = await client.GetAsync("/api/suppliers");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateSupplierThroughApi()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.SupplierCreate, userId: IdentitySeedData.DefaultAdminUserId);
+        var response = await client.PostAsJsonAsync("/api/suppliers", new CreateSupplierRequest(
+            $"SUP-T-{Guid.NewGuid():N}"[..16], "تأمین‌کننده تست", null, null, null, null, null, null, null,
+            "بوشهر", "ایران", null, SupplierType.Distributor, null, [], null));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var supplier = await response.Content.ReadFromJsonAsync<SupplierDetailDto>();
+        Assert.Equal("تأمین‌کننده تست", supplier!.Supplier.Name);
+        Assert.Equal(IdentitySeedData.DefaultAdminUserId, supplier.Supplier.CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task SupplierLookupExcludesBlacklistedByDefault()
+    {
+        var creator = factory.CreateAuthenticatedClient(ApplicationPermissions.SupplierCreate, userId: IdentitySeedData.DefaultAdminUserId);
+        var code = $"SUP-B-{Guid.NewGuid():N}"[..16];
+        var created = await creator.PostAsJsonAsync("/api/suppliers", new CreateSupplierRequest(
+            code, "تأمین‌کننده مسدود", null, null, null, null, null, null, null,
+            "تهران", "ایران", null, SupplierType.Distributor, null, [], null));
+        var detail = await created.Content.ReadFromJsonAsync<SupplierDetailDto>();
+
+        var blacklister = factory.CreateAuthenticatedClient(ApplicationPermissions.SupplierBlacklist, userId: IdentitySeedData.DefaultAdminUserId);
+        var blacklist = await blacklister.PostAsJsonAsync($"/api/suppliers/{detail!.Supplier.Id}/blacklist", new ChangeSupplierStatusRequest("ریسک"));
+        Assert.Equal(HttpStatusCode.NoContent, blacklist.StatusCode);
+
+        var viewer = factory.CreateAuthenticatedClient(ApplicationPermissions.SupplierView);
+        var lookup = await viewer.GetFromJsonAsync<List<SupplierLookupDto>>($"/api/suppliers/lookup?term={code}");
+
+        Assert.DoesNotContain(lookup!, x => x.SupplierCode == code);
+    }
+
+    [Fact]
+    public async Task UserWithoutInquiryViewCannotListInquiries()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.SupplierView);
+        var response = await client.GetAsync("/api/inquiries");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateInquiryFromPurchaseFileAndSend()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.InquiryCreate, userId: IdentitySeedData.DefaultAdminUserId);
+        var response = await client.PostAsJsonAsync($"/api/inquiries/from-purchase-file/{SeedDataIds.SamplePurchaseFileId}",
+            new CreateInquiryFromPurchaseFileRequest("استعلام تست", InquiryType.PriceInquiry, DateTime.UtcNow.AddDays(7), null, [], [Guid.Parse("a2000000-0000-0000-0000-000000000001")]));
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var inquiry = await response.Content.ReadFromJsonAsync<InquiryDetailDto>();
+        Assert.NotEmpty(inquiry!.Items);
+        Assert.NotEmpty(inquiry.Suppliers);
+
+        var sender = factory.CreateAuthenticatedClient(ApplicationPermissions.InquirySend, userId: IdentitySeedData.DefaultAdminUserId);
+        var send = await sender.PostAsJsonAsync($"/api/inquiries/{inquiry.Inquiry.Id}/send", new SendInquiryRequest());
+        Assert.Equal(HttpStatusCode.NoContent, send.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddSupplierQuoteAndGetComparison()
+    {
+        var creator = factory.CreateAuthenticatedClient(ApplicationPermissions.InquiryCreate, userId: IdentitySeedData.DefaultAdminUserId);
+        var created = await creator.PostAsJsonAsync($"/api/inquiries/from-purchase-file/{SeedDataIds.SamplePurchaseFileId}",
+            new CreateInquiryFromPurchaseFileRequest("استعلام مقایسه", InquiryType.PriceInquiry, DateTime.UtcNow.AddDays(7), null, [], [Guid.Parse("a2000000-0000-0000-0000-000000000002")]));
+        var inquiry = await created.Content.ReadFromJsonAsync<InquiryDetailDto>();
+
+        var quoteClient = factory.CreateAuthenticatedClient(ApplicationPermissions.InquiryReceiveQuote, userId: IdentitySeedData.DefaultAdminUserId);
+        var quoteResponse = await quoteClient.PostAsJsonAsync($"/api/inquiries/{inquiry!.Inquiry.Id}/quotes",
+            new AddSupplierQuoteRequest(inquiry.Suppliers[0].Id, "Q-1", DateTime.UtcNow, DateTime.UtcNow.AddDays(30), "IRR", "تحویل انبار", "نقدی", null, 1000, 90, 10, null, null));
+        Assert.Equal(HttpStatusCode.Created, quoteResponse.StatusCode);
+
+        var compareClient = factory.CreateAuthenticatedClient(ApplicationPermissions.InquiryCompareQuotes);
+        var comparison = await compareClient.GetFromJsonAsync<InquiryComparisonDto>($"/api/inquiries/{inquiry.Inquiry.Id}/comparison");
+        Assert.NotNull(comparison);
+        Assert.NotEmpty(comparison!.Suppliers);
+    }
+
+    [Fact]
+    public async Task UserWithoutOrdersViewInventoryCannotViewInventoryControl()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.ItemView);
+        var response = await client.GetAsync("/api/orders/inventory-control");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateSubmitApproveAndConvertMaterialNeedToIndent()
+    {
+        var creator = factory.CreateAuthenticatedClient(ApplicationPermissions.OrdersCreateMaterialNeed,
+            departmentId: SeedDataIds.OrdersAndInventoryControlId,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var created = await creator.PostAsJsonAsync("/api/orders/material-needs", new CreateMaterialNeedRequest(
+            SeedDataIds.PipeItemId, 3, null, SeedDataIds.OrdersAndInventoryControlId, null,
+            MaterialNeedPriority.Normal, "Integration need"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var need = await created.Content.ReadFromJsonAsync<MaterialNeedDto>();
+        Assert.NotNull(need);
+
+        var submit = await creator.PostAsJsonAsync($"/api/orders/material-needs/{need!.Id}/submit", new SubmitMaterialNeedRequest());
+        Assert.Equal(HttpStatusCode.NoContent, submit.StatusCode);
+
+        var approver = factory.CreateAuthenticatedClient(ApplicationPermissions.OrdersApproveMaterialNeed,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var approve = await approver.PostAsJsonAsync($"/api/orders/material-needs/{need.Id}/approve", new ApproveMaterialNeedRequest());
+        Assert.Equal(HttpStatusCode.NoContent, approve.StatusCode);
+
+        var converter = factory.CreateAuthenticatedClient(ApplicationPermissions.OrdersConvertNeedToIndent,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var convert = await converter.PostAsJsonAsync($"/api/orders/material-needs/{need.Id}/convert-to-indent",
+            new ConvertMaterialNeedToIndentRequest(97, 3, "Converted need"));
+        Assert.Equal(HttpStatusCode.OK, convert.StatusCode);
+    }
+
+    [Fact]
+    public async Task DetectShortageAlertAndConvertToIndent()
+    {
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PetroProcureDbContext>();
+            var exists = db.InventoryControlItems.Any(x => x.MescItemId == SeedDataIds.GateValveItemId);
+            if (!exists)
+            {
+                db.InventoryControlItems.Add(new InventoryControlItem(Guid.NewGuid(), SeedDataIds.GateValveItemId,
+                    "2001000001", "200100", "Valves", "Gate valve", SeedDataIds.EachUnitId, 1, 10, null, null, true));
+                db.StockBalances.Add(new StockBalance(Guid.NewGuid(), SeedDataIds.GateValveItemId, null, 2));
+                await db.SaveChangesAsync();
+            }
+        }
+
+        var detector = factory.CreateAuthenticatedClient(ApplicationPermissions.OrdersManageShortageAlerts,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var detected = await detector.PostAsJsonAsync("/api/orders/shortage-alerts/detect", new DetectShortageAlertsRequest());
+        Assert.Equal(HttpStatusCode.OK, detected.StatusCode);
+        var alerts = await detected.Content.ReadFromJsonAsync<List<ShortageAlertDto>>();
+        Assert.NotEmpty(alerts!);
+
+        var converter = factory.CreateAuthenticatedClient(ApplicationPermissions.OrdersConvertShortageToIndent,
+            departmentId: SeedDataIds.OrdersAndInventoryControlId,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var convert = await converter.PostAsJsonAsync($"/api/orders/shortage-alerts/{alerts![0].Id}/convert-to-indent",
+            new ConvertShortageToIndentRequest(96, 3, SeedDataIds.OrdersAndInventoryControlId, "Shortage indent"));
+        Assert.Equal(HttpStatusCode.OK, convert.StatusCode);
     }
 
     private sealed record IndentCreatedResponse(Guid Id, Guid CreatedByUserId);

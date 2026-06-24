@@ -9,7 +9,9 @@ internal static class DatabaseSchemas
     public const string Purchase = "purchase";
     public const string Document = "doc";
     public const string Workflow = "workflow";
+    public const string Inquiry = "inquiry";
     public const string Supplier = "supplier";
+    public const string Orders = "orders";
     public const string Tender = "tender";
     public const string Warehouse = "warehouse";
     public const string Report = "report";

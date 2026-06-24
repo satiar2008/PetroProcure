@@ -1,0 +1,25 @@
+@page "/purchase/inquiries/create"
+@inject IPetroProcureApiClient Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد استعلام</PageTitle>
+<PageHeader Title="ایجاد استعلام" Subtitle="ثبت استعلام دستی برای یک پرونده خرید" />
+
+<MudForm @ref="_form">
+<MudPaper Class="form-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان" Required="true" RequiredError="عنوان الزامی است" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><MudSelect T="InquiryType" @bind-Value="_type" Label="نوع" Variant="Variant.Outlined">@foreach(var t in Enum.GetValues<InquiryType>()){<MudSelectItem Value="@t">@InquiryUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_deadline" Label="مهلت پاسخ" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Lines="3" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12"><MudTextField @bind-Value="_purchaseFileIdText" Label="شناسه پرونده خرید" Required="true" RequiredError="پرونده خرید الزامی است" Variant="Variant.Outlined" /></MudItem>
+    </MudGrid>
+</MudPaper>
+<div class="form-actions"><MudButton Disabled="_saving" Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">ذخیره</MudButton><MudButton Href="/purchase/inquiries">بازگشت</MudButton></div>
+</MudForm>
+
+@code {
+    private MudForm? _form; private bool _saving; private string _title="",_description="",_purchaseFileIdText=""; private InquiryType _type=InquiryType.PriceInquiry; private DateTime? _deadline;
+    private async Task Save(){await _form!.Validate();if(!_form.IsValid||_saving)return;if(!Guid.TryParse(_purchaseFileIdText,out var pf)){Snackbar.Add("شناسه پرونده خرید معتبر نیست.",Severity.Warning);return;}_saving=true;try{var result=await Api.CreateInquiryAsync(new(pf,_title,_type,_deadline,_description));Snackbar.Add("استعلام ایجاد شد.",Severity.Success);Navigation.NavigateTo($"/purchase/inquiries/{result.Inquiry.Id}");}catch(Exception ex){Snackbar.Add("ایجاد استعلام ناموفق بود: "+ex.Message,Severity.Error);}finally{_saving=false;}}
+}

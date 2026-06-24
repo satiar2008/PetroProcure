@@ -9,6 +9,9 @@ using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Workflow;
 using PetroProcure.Contracts.V1.Identity;
 using PetroProcure.Contracts.V1.Organization;
+using PetroProcure.Contracts.V1.Suppliers;
+using PetroProcure.Contracts.V1.Inquiry;
+using PetroProcure.Contracts.V1.Orders;
 using PetroProcure.Web.Services.Auth;
 
 namespace PetroProcure.Web.Services.Api;
@@ -89,6 +92,44 @@ public interface IPetroProcureApiClient
     Task<List<AdminAuditLogDto>> GetAdminAuditLogsAsync(CancellationToken ct = default);
     Task<List<SystemSettingDto>> GetSystemSettingsAsync(CancellationToken ct = default);
     Task<SystemSettingDto> UpdateSystemSettingAsync(string key, UpdateSystemSettingRequest request, CancellationToken ct = default);
+    Task<PagedResult<SupplierSummaryDto>> GetSuppliersAsync(SupplierListRequest request, CancellationToken ct = default);
+    Task<SupplierDetailDto?> GetSupplierAsync(Guid id, CancellationToken ct = default);
+    Task<SupplierDetailDto> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken ct = default);
+    Task<SupplierDetailDto> UpdateSupplierAsync(Guid id, UpdateSupplierRequest request, CancellationToken ct = default);
+    Task SetSupplierActiveAsync(Guid id, bool active, CancellationToken ct = default);
+    Task BlacklistSupplierAsync(Guid id, string reason, CancellationToken ct = default);
+    Task RemoveSupplierFromBlacklistAsync(Guid id, CancellationToken ct = default);
+    Task<List<SupplierCategoryDto>> GetSupplierCategoriesAsync(CancellationToken ct = default);
+    Task<SupplierContactDto> AddSupplierContactAsync(Guid supplierId, AddSupplierContactRequest request, CancellationToken ct = default);
+    Task<SupplierContactDto> UpdateSupplierContactAsync(Guid supplierId, Guid contactId, UpdateSupplierContactRequest request, CancellationToken ct = default);
+    Task DeactivateSupplierContactAsync(Guid supplierId, Guid contactId, CancellationToken ct = default);
+    Task AssignSupplierCategoryAsync(Guid supplierId, Guid categoryId, CancellationToken ct = default);
+    Task RemoveSupplierCategoryAsync(Guid supplierId, Guid categoryId, CancellationToken ct = default);
+    Task<SupplierEvaluationDto> AddSupplierEvaluationAsync(Guid supplierId, AddSupplierEvaluationRequest request, CancellationToken ct = default);
+    Task<List<SupplierLookupDto>> SearchSupplierLookupAsync(string? term, bool includeInactive = false, bool includeBlacklisted = false, CancellationToken ct = default);
+    Task<PagedResult<InquirySummaryDto>> GetInquiriesAsync(InquiryListRequest request, CancellationToken ct = default);
+    Task<InquiryDetailDto?> GetInquiryAsync(Guid id, CancellationToken ct = default);
+    Task<List<InquirySummaryDto>> GetPurchaseFileInquiriesAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<InquiryDetailDto> CreateInquiryAsync(CreateInquiryRequest request, CancellationToken ct = default);
+    Task<InquiryDetailDto> CreateInquiryFromPurchaseFileAsync(Guid purchaseFileId, CreateInquiryFromPurchaseFileRequest request, CancellationToken ct = default);
+    Task SendInquiryAsync(Guid id, CancellationToken ct = default);
+    Task CancelInquiryAsync(Guid id, string reason, CancellationToken ct = default);
+    Task<InquirySupplierDto> AddInquirySupplierAsync(Guid id, AddInquirySupplierRequest request, CancellationToken ct = default);
+    Task<SupplierQuoteDto> AddSupplierQuoteAsync(Guid id, AddSupplierQuoteRequest request, CancellationToken ct = default);
+    Task<InquiryComparisonDto?> GetInquiryComparisonAsync(Guid id, CancellationToken ct = default);
+    Task SelectSupplierQuoteAsync(Guid inquiryId, Guid quoteId, string? reason, CancellationToken ct = default);
+    Task<OrdersDashboardDto> GetOrdersDashboardAsync(CancellationToken ct = default);
+    Task<PagedResult<InventoryControlItemDto>> GetInventoryControlItemsAsync(InventoryControlListRequest request, CancellationToken ct = default);
+    Task<InventoryControlItemDto> UpdateInventoryControlItemAsync(Guid id, UpdateInventoryControlItemRequest request, CancellationToken ct = default);
+    Task<PagedResult<MaterialNeedDto>> GetMaterialNeedsAsync(MaterialNeedListRequest request, CancellationToken ct = default);
+    Task<MaterialNeedDetailDto?> GetMaterialNeedAsync(Guid id, CancellationToken ct = default);
+    Task<MaterialNeedDto> CreateMaterialNeedAsync(CreateMaterialNeedRequest request, CancellationToken ct = default);
+    Task ChangeMaterialNeedStatusAsync(Guid id, string action, object? body = null, CancellationToken ct = default);
+    Task<Guid> ConvertMaterialNeedToIndentAsync(Guid id, ConvertMaterialNeedToIndentRequest request, CancellationToken ct = default);
+    Task<PagedResult<ShortageAlertDto>> GetShortageAlertsAsync(ShortageAlertListRequest request, CancellationToken ct = default);
+    Task<List<ShortageAlertDto>> DetectShortagesAsync(DetectShortageAlertsRequest request, CancellationToken ct = default);
+    Task<Guid> ConvertShortageToIndentAsync(Guid id, ConvertShortageToIndentRequest request, CancellationToken ct = default);
+    Task ResolveShortageAlertAsync(Guid id, ResolveShortageAlertRequest request, CancellationToken ct = default);
 }
 
 public sealed class PetroProcureApiClient(
@@ -358,6 +399,191 @@ public sealed class PetroProcureApiClient(
         var response = await Client().PutAsJsonAsync($"/api/admin/settings/{Uri.EscapeDataString(key)}", request, ct); await Ensure(response, ct);
         return (await response.Content.ReadFromJsonAsync<SystemSettingDto>(cancellationToken: ct))!;
     }
+
+    public async Task<PagedResult<SupplierSummaryDto>> GetSuppliersAsync(SupplierListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["SearchTerm"] = r.SearchTerm,
+            ["Status"] = r.Status?.ToString(),
+            ["SupplierType"] = r.SupplierType?.ToString(),
+            ["CategoryId"] = r.CategoryId?.ToString(),
+            ["IsActive"] = r.IsActive?.ToString(),
+            ["IsBlacklisted"] = r.IsBlacklisted?.ToString(),
+            ["City"] = r.City,
+            ["HasPrimaryContact"] = r.HasPrimaryContact?.ToString(),
+            ["SortBy"] = r.SortBy,
+            ["SortDescending"] = r.SortDescending.ToString(),
+            ["PageNumber"] = r.PageNumber.ToString(),
+            ["PageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/suppliers?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<SupplierSummaryDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public Task<SupplierDetailDto?> GetSupplierAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<SupplierDetailDto>($"/api/suppliers/{id}", ct);
+
+    public async Task<SupplierDetailDto> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/suppliers", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<SupplierDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<SupplierDetailDto> UpdateSupplierAsync(Guid id, UpdateSupplierRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/suppliers/{id}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<SupplierDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task SetSupplierActiveAsync(Guid id, bool active, CancellationToken ct = default)
+    { var response = await Client().PostAsync($"/api/suppliers/{id}/{(active ? "activate" : "deactivate")}", null, ct); await Ensure(response, ct); }
+
+    public async Task BlacklistSupplierAsync(Guid id, string reason, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/suppliers/{id}/blacklist", new ChangeSupplierStatusRequest(reason), ct); await Ensure(response, ct); }
+
+    public async Task RemoveSupplierFromBlacklistAsync(Guid id, CancellationToken ct = default)
+    { var response = await Client().PostAsync($"/api/suppliers/{id}/remove-from-blacklist", null, ct); await Ensure(response, ct); }
+
+    public async Task<List<SupplierCategoryDto>> GetSupplierCategoriesAsync(CancellationToken ct = default) =>
+        await GetJsonAsync<List<SupplierCategoryDto>>("/api/suppliers/categories", ct) ?? [];
+
+    public async Task<SupplierContactDto> AddSupplierContactAsync(Guid supplierId, AddSupplierContactRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/suppliers/{supplierId}/contacts", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<SupplierContactDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<SupplierContactDto> UpdateSupplierContactAsync(Guid supplierId, Guid contactId, UpdateSupplierContactRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/suppliers/{supplierId}/contacts/{contactId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<SupplierContactDto>(cancellationToken: ct))!;
+    }
+
+    public async Task DeactivateSupplierContactAsync(Guid supplierId, Guid contactId, CancellationToken ct = default)
+    { var response = await Client().PostAsync($"/api/suppliers/{supplierId}/contacts/{contactId}/deactivate", null, ct); await Ensure(response, ct); }
+
+    public async Task AssignSupplierCategoryAsync(Guid supplierId, Guid categoryId, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/suppliers/{supplierId}/categories", new AssignSupplierCategoryRequest(categoryId), ct); await Ensure(response, ct); }
+
+    public async Task RemoveSupplierCategoryAsync(Guid supplierId, Guid categoryId, CancellationToken ct = default)
+    { var response = await Client().DeleteAsync($"/api/suppliers/{supplierId}/categories/{categoryId}", ct); await Ensure(response, ct); }
+
+    public async Task<SupplierEvaluationDto> AddSupplierEvaluationAsync(Guid supplierId, AddSupplierEvaluationRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/suppliers/{supplierId}/evaluations", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<SupplierEvaluationDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<List<SupplierLookupDto>> SearchSupplierLookupAsync(string? term, bool includeInactive = false, bool includeBlacklisted = false, CancellationToken ct = default) =>
+        await GetJsonAsync<List<SupplierLookupDto>>($"/api/suppliers/lookup?term={Uri.EscapeDataString(term ?? string.Empty)}&includeInactive={includeInactive.ToString().ToLowerInvariant()}&includeBlacklisted={includeBlacklisted.ToString().ToLowerInvariant()}", ct) ?? [];
+
+    public async Task<PagedResult<InquirySummaryDto>> GetInquiriesAsync(InquiryListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["SearchTerm"] = r.SearchTerm, ["InquiryNumber"] = r.InquiryNumber, ["PurchaseFileNumber"] = r.PurchaseFileNumber,
+            ["Status"] = r.Status?.ToString(), ["InquiryType"] = r.InquiryType?.ToString(), ["SupplierId"] = r.SupplierId?.ToString(),
+            ["CreatedDateFrom"] = r.CreatedDateFrom?.ToString("O"), ["CreatedDateTo"] = r.CreatedDateTo?.ToString("O"),
+            ["DeadlineDateFrom"] = r.DeadlineDateFrom?.ToString("O"), ["DeadlineDateTo"] = r.DeadlineDateTo?.ToString("O"),
+            ["SortBy"] = r.SortBy, ["SortDescending"] = r.SortDescending.ToString(), ["PageNumber"] = r.PageNumber.ToString(), ["PageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/inquiries?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value)).Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<InquirySummaryDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+    public Task<InquiryDetailDto?> GetInquiryAsync(Guid id, CancellationToken ct = default) => GetJsonAsync<InquiryDetailDto>($"/api/inquiries/{id}", ct);
+    public async Task<List<InquirySummaryDto>> GetPurchaseFileInquiriesAsync(Guid purchaseFileId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<InquirySummaryDto>>($"/api/purchase-files/{purchaseFileId}/inquiries", ct) ?? [];
+    public async Task<InquiryDetailDto> CreateInquiryAsync(CreateInquiryRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync("/api/inquiries", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<InquiryDetailDto>(cancellationToken: ct))!; }
+    public async Task<InquiryDetailDto> CreateInquiryFromPurchaseFileAsync(Guid purchaseFileId, CreateInquiryFromPurchaseFileRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/inquiries/from-purchase-file/{purchaseFileId}", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<InquiryDetailDto>(cancellationToken: ct))!; }
+    public async Task SendInquiryAsync(Guid id, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/send", new SendInquiryRequest(), ct); await Ensure(response, ct); }
+    public async Task CancelInquiryAsync(Guid id, string reason, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/cancel", new CancelInquiryRequest(reason), ct); await Ensure(response, ct); }
+    public async Task<InquirySupplierDto> AddInquirySupplierAsync(Guid id, AddInquirySupplierRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/suppliers", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<InquirySupplierDto>(cancellationToken: ct))!; }
+    public async Task<SupplierQuoteDto> AddSupplierQuoteAsync(Guid id, AddSupplierQuoteRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/quotes", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<SupplierQuoteDto>(cancellationToken: ct))!; }
+    public Task<InquiryComparisonDto?> GetInquiryComparisonAsync(Guid id, CancellationToken ct = default) => GetJsonAsync<InquiryComparisonDto>($"/api/inquiries/{id}/comparison", ct);
+    public async Task SelectSupplierQuoteAsync(Guid inquiryId, Guid quoteId, string? reason, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/inquiries/{inquiryId}/quotes/{quoteId}/select", new SelectSupplierQuoteRequest(reason), ct); await Ensure(response, ct); }
+
+    public async Task<OrdersDashboardDto> GetOrdersDashboardAsync(CancellationToken ct = default) =>
+        await GetJsonAsync<OrdersDashboardDto>("/api/orders/dashboard", ct) ?? new(0, 0, 0, 0, 0, [], []);
+
+    public async Task<PagedResult<InventoryControlItemDto>> GetInventoryControlItemsAsync(InventoryControlListRequest r, CancellationToken ct = default)
+    {
+        var url = $"/api/orders/inventory-control?SearchTerm={Uri.EscapeDataString(r.SearchTerm ?? "")}&IncludeInactive={r.IncludeInactive}&PageNumber={r.PageNumber}&PageSize={r.PageSize}";
+        return await GetJsonAsync<PagedResult<InventoryControlItemDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public async Task<InventoryControlItemDto> UpdateInventoryControlItemAsync(Guid id, UpdateInventoryControlItemRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/orders/inventory-control/{id}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<InventoryControlItemDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PagedResult<MaterialNeedDto>> GetMaterialNeedsAsync(MaterialNeedListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["Status"] = r.Status?.ToString(), ["Priority"] = r.Priority?.ToString(), ["MescCode"] = r.MescCode,
+            ["ApplicantDepartmentId"] = r.ApplicantDepartmentId?.ToString(), ["CreatedDateFrom"] = r.CreatedDateFrom?.ToString("O"),
+            ["CreatedDateTo"] = r.CreatedDateTo?.ToString("O"), ["PageNumber"] = r.PageNumber.ToString(), ["PageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/orders/material-needs?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value)).Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<MaterialNeedDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public Task<MaterialNeedDetailDto?> GetMaterialNeedAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<MaterialNeedDetailDto>($"/api/orders/material-needs/{id}", ct);
+
+    public async Task<MaterialNeedDto> CreateMaterialNeedAsync(CreateMaterialNeedRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/orders/material-needs", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<MaterialNeedDto>(cancellationToken: ct))!;
+    }
+
+    public async Task ChangeMaterialNeedStatusAsync(Guid id, string action, object? body = null, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/orders/material-needs/{id}/{action}", body ?? new { }, ct); await Ensure(response, ct);
+    }
+
+    public async Task<Guid> ConvertMaterialNeedToIndentAsync(Guid id, ConvertMaterialNeedToIndentRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/orders/material-needs/{id}/convert-to-indent", request, ct); await Ensure(response, ct);
+        var payload = await response.Content.ReadFromJsonAsync<IndentReference>(cancellationToken: ct);
+        return payload!.IndentId;
+    }
+
+    public async Task<PagedResult<ShortageAlertDto>> GetShortageAlertsAsync(ShortageAlertListRequest r, CancellationToken ct = default)
+    {
+        var url = $"/api/orders/shortage-alerts?Status={r.Status?.ToString()}&MescCode={Uri.EscapeDataString(r.MescCode ?? "")}&PageNumber={r.PageNumber}&PageSize={r.PageSize}";
+        return await GetJsonAsync<PagedResult<ShortageAlertDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public async Task<List<ShortageAlertDto>> DetectShortagesAsync(DetectShortageAlertsRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/orders/shortage-alerts/detect", request, ct); await Ensure(response, ct);
+        return await response.Content.ReadFromJsonAsync<List<ShortageAlertDto>>(cancellationToken: ct) ?? [];
+    }
+
+    public async Task<Guid> ConvertShortageToIndentAsync(Guid id, ConvertShortageToIndentRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/orders/shortage-alerts/{id}/convert-to-indent", request, ct); await Ensure(response, ct);
+        var payload = await response.Content.ReadFromJsonAsync<IndentReference>(cancellationToken: ct);
+        return payload!.IndentId;
+    }
+
+    public async Task ResolveShortageAlertAsync(Guid id, ResolveShortageAlertRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/orders/shortage-alerts/{id}/resolve", request, ct); await Ensure(response, ct);
+    }
+
+    private sealed record IndentReference(Guid IndentId);
 
     private HttpClient Client()
     {

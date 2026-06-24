@@ -1,0 +1,19 @@
+@page "/purchase/suppliers/categories"
+@inject IPetroProcureApiClient Api
+
+<PageTitle>دسته‌بندی تأمین‌کنندگان</PageTitle>
+<PageHeader Title="دسته‌بندی تأمین‌کنندگان" Subtitle="فهرست دسته‌بندی‌های پایه برای طبقه‌بندی تأمین‌کنندگان" />
+
+<DataStateView TItem="SupplierCategoryDto" Loading="_loading" Error="_error" Retry="Load">
+    <MudTable Items="_items" Dense="true" Hover="true" Elevation="0" Class="data-panel">
+        <HeaderContent><MudTh>کد</MudTh><MudTh>عنوان</MudTh><MudTh>شرح</MudTh><MudTh>وضعیت</MudTh></HeaderContent>
+        <RowTemplate><MudTd>@context.Code</MudTd><MudTd>@context.Title</MudTd><MudTd>@(context.Description??"—")</MudTd><MudTd>@(context.IsActive?"فعال":"غیرفعال")</MudTd></RowTemplate>
+        <NoRecordsContent><EmptyState Title="دسته‌بندی‌ای ثبت نشده است" Description="Seed اولیه باید دسته‌بندی‌های پایه را ایجاد کند." /></NoRecordsContent>
+    </MudTable>
+</DataStateView>
+
+@code {
+    private bool _loading=true; private string? _error; private List<SupplierCategoryDto> _items=[];
+    protected override Task OnInitializedAsync()=>Load();
+    private async Task Load(){_loading=true;_error=null;try{_items=await Api.GetSupplierCategoriesAsync();}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+}

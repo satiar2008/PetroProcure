@@ -1,0 +1,85 @@
+@page "/orders/material-needs"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+@inject IUserAccessContext Access
+
+<PageHeader Title="نیازهای کالا" Subtitle="ثبت، بررسی، تأیید و تبدیل نیازهای کالا به تقاضای خرید">
+    <Actions>
+        @if (Access.HasPermission(OrdersUiPolicy.CreateMaterialNeed))
+        {
+            <MudButton Href="/orders/material-needs/create" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add">ثبت نیاز جدید</MudButton>
+        }
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="3"><MudSelect T="MaterialNeedStatus?" @bind-Value="_status" Label="وضعیت" Clearable="true" Variant="Variant.Outlined">@foreach (var s in Enum.GetValues<MaterialNeedStatus>()) { <MudSelectItem T="MaterialNeedStatus?" Value="@s">@OrdersUiPolicy.StatusText(s)</MudSelectItem> }</MudSelect></MudItem>
+        <MudItem xs="12" md="3"><MudSelect T="MaterialNeedPriority?" @bind-Value="_priority" Label="اولویت" Clearable="true" Variant="Variant.Outlined">@foreach (var p in Enum.GetValues<MaterialNeedPriority>()) { <MudSelectItem T="MaterialNeedPriority?" Value="@p">@OrdersUiPolicy.PriorityText(p)</MudSelectItem> }</MudSelect></MudItem>
+        <MudItem xs="12" md="4"><MudTextField @bind-Value="_mescCode" Label="کد MESC" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="2"><MudButton OnClick="Load" FullWidth="true" Variant="Variant.Filled" Color="Color.Primary">اعمال فیلتر</MudButton></MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading) { <LoadingOverlay Text="در حال دریافت نیازها..." /> }
+else
+{
+    <MudTable Items="_needs" Dense="true" Hover="true">
+        <HeaderContent><MudTh>شماره نیاز</MudTh><MudTh>کد MESC</MudTh><MudTh>شرح کالا</MudTh><MudTh>مقدار</MudTh><MudTh>اولویت</MudTh><MudTh>وضعیت</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd><MudLink Href="@($"/orders/material-needs/{context.Id}")">@context.NeedNumber</MudLink></MudTd>
+            <MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.RequestedQuantity</MudTd>
+            <MudTd>@OrdersUiPolicy.PriorityText(context.Priority)</MudTd><MudTd>@OrdersUiPolicy.StatusText(context.Status)</MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" OnClick="@(()=>Nav.NavigateTo($"/orders/material-needs/{context.Id}"))">مشاهده</MudButton>
+                @if (context.Status == MaterialNeedStatus.Draft)
+                {
+                    <MudButton Size="Size.Small" Color="Color.Info" OnClick="@(()=>Submit(context.Id))">ارسال</MudButton>
+                }
+                @if (Access.HasPermission(OrdersUiPolicy.ApproveMaterialNeed) && context.Status is MaterialNeedStatus.Submitted or MaterialNeedStatus.UnderReview)
+                {
+                    <MudButton Size="Size.Small" Color="Color.Success" OnClick="@(()=>Approve(context.Id))">تأیید</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Error" OnClick="@(()=>Reject(context.Id))">رد</MudButton>
+                }
+                @if (Access.HasPermission(OrdersUiPolicy.ConvertNeedToIndent) && context.Status == MaterialNeedStatus.Approved)
+                {
+                    <MudButton Size="Size.Small" Color="Color.Primary" OnClick="@(()=>Convert(context.Id))">تبدیل به Indent</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><EmptyState Title="نیاز کالایی یافت نشد" /></NoRecordsContent>
+    </MudTable>
+}
+
+@code {
+    private List<MaterialNeedDto> _needs = [];
+    private bool _loading = true;
+    private MaterialNeedStatus? _status;
+    private MaterialNeedPriority? _priority;
+    private string? _mescCode;
+
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        _loading = true;
+        try { _needs = (await Api.GetMaterialNeedsAsync(new MaterialNeedListRequest(_status, _priority, _mescCode, null, null, null, 1, 100))).Items.ToList(); }
+        catch (Exception ex) { Snackbar.Add($"دریافت نیازها ناموفق بود: {ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+    private async Task Submit(Guid id) => await Run(async () => await Api.ChangeMaterialNeedStatusAsync(id, "submit"), "نیاز ارسال شد.");
+    private async Task Approve(Guid id) => await Run(async () => await Api.ChangeMaterialNeedStatusAsync(id, "approve", new ApproveMaterialNeedRequest()), "نیاز تأیید شد.");
+    private async Task Reject(Guid id) => await Run(async () => await Api.ChangeMaterialNeedStatusAsync(id, "reject", new RejectMaterialNeedRequest("رد توسط کاربر")), "نیاز رد شد.");
+    private async Task Convert(Guid id)
+    {
+        var indentId = await Api.ConvertMaterialNeedToIndentAsync(id, new ConvertMaterialNeedToIndentRequest(DateTime.UtcNow.Year % 100, 3));
+        Snackbar.Add("نیاز به تقاضای خرید تبدیل شد.", Severity.Success);
+        Nav.NavigateTo($"/orders/indents/{indentId}");
+    }
+    private async Task Run(Func<Task> action, string success)
+    {
+        try { await action(); Snackbar.Add(success, Severity.Success); await Load(); }
+        catch (Exception ex) { Snackbar.Add($"عملیات ناموفق بود: {ex.Message}", Severity.Error); }
+    }
+}

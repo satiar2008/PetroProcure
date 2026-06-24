@@ -1,0 +1,60 @@
+@page "/purchase/suppliers"
+@inject IPetroProcureApiClient Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IUserAccessContext Access
+
+<PageTitle>تأمین‌کنندگان</PageTitle>
+<PageHeader Title="تأمین‌کنندگان" Subtitle="مدیریت اطلاعات پایه تأمین‌کنندگان پالایشگاه">
+    <PermissionView Permission="@SupplierUiPolicy.Create">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" Href="/purchase/suppliers/create">ایجاد تأمین‌کننده</MudButton>
+    </PermissionView>
+</PageHeader>
+
+<MudPaper Class="filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_search" Label="جستجو" Variant="Variant.Outlined" Immediate="true" /></MudItem>
+        <MudItem xs="12" md="2"><MudSelect T="SupplierStatus?" @bind-Value="_status" Label="وضعیت" Variant="Variant.Outlined" Clearable="true">@foreach(var s in Enum.GetValues<SupplierStatus>()){<MudSelectItem T="SupplierStatus?" Value="@s">@SupplierUiPolicy.StatusText(s)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="2"><MudSelect T="SupplierType?" @bind-Value="_type" Label="نوع" Variant="Variant.Outlined" Clearable="true">@foreach(var t in Enum.GetValues<SupplierType>()){<MudSelectItem T="SupplierType?" Value="@t">@SupplierUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="2"><MudSelect T="bool?" @bind-Value="_blacklisted" Label="فهرست سیاه" Variant="Variant.Outlined" Clearable="true"><MudSelectItem T="bool?" Value="true">بله</MudSelectItem><MudSelectItem T="bool?" Value="false">خیر</MudSelectItem></MudSelect></MudItem>
+        <MudItem xs="12" md="2"><MudTextField @bind-Value="_city" Label="شهر" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="1" Class="d-flex align-center"><MudButton Variant="Variant.Outlined" OnClick="Reload">اعمال</MudButton></MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudTable ServerData="LoadServerData" @ref="_table" Dense="true" Hover="true" Elevation="0" Class="data-panel">
+    <HeaderContent>
+        <MudTh><MudTableSortLabel T="SupplierSummaryDto" SortLabel="SupplierCode">کد</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="SupplierSummaryDto" SortLabel="Name">نام</MudTableSortLabel></MudTh>
+        <MudTh>نوع</MudTh><MudTh>وضعیت</MudTh><MudTh>دسته‌بندی‌ها</MudTh><MudTh>شهر</MudTh><MudTh>تماس اصلی</MudTh><MudTh>عملیات</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.SupplierCode</MudTd>
+        <MudTd>@context.Name</MudTd>
+        <MudTd>@SupplierUiPolicy.TypeText(context.SupplierType)</MudTd>
+        <MudTd><StatusChip Text="@SupplierUiPolicy.StatusText(context.Status)" Color="@(context.IsBlacklisted ? Color.Error : context.IsActive ? Color.Success : Color.Default)" /></MudTd>
+        <MudTd>@string.Join("، ", context.Categories.Select(x=>x.Title))</MudTd>
+        <MudTd>@(context.City ?? "—")</MudTd>
+        <MudTd>@(context.PrimaryContact?.FullName ?? "—")</MudTd>
+        <MudTd>
+            <MudIconButton Icon="@Icons.Material.Filled.Visibility" OnClick="@(()=>Navigation.NavigateTo($"/purchase/suppliers/{context.Id}"))" />
+            <PermissionView Permission="@SupplierUiPolicy.Edit"><MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="@(()=>Navigation.NavigateTo($"/purchase/suppliers/{context.Id}/edit"))" /></PermissionView>
+            <PermissionView Permission="@SupplierUiPolicy.ActivateDeactivate"><MudIconButton Icon="@(context.IsActive?Icons.Material.Filled.Block:Icons.Material.Filled.CheckCircle)" Color="@(context.IsActive?Color.Warning:Color.Success)" OnClick="@(()=>SetActive(context))" /></PermissionView>
+            <PermissionView Permission="@SupplierUiPolicy.Blacklist"><MudIconButton Icon="@Icons.Material.Filled.Report" Color="Color.Error" OnClick="@(()=>ToggleBlacklist(context))" /></PermissionView>
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><EmptyState Title="تأمین‌کننده‌ای یافت نشد" Description="فیلترها را تغییر دهید یا تأمین‌کننده جدید ثبت کنید." /></NoRecordsContent>
+</MudTable>
+
+@code {
+    private MudTable<SupplierSummaryDto>? _table;
+    private string? _search; private SupplierStatus? _status; private SupplierType? _type; private bool? _blacklisted; private string? _city;
+    private Task Reload()=>_table?.ReloadServerData()??Task.CompletedTask;
+    private async Task<TableData<SupplierSummaryDto>> LoadServerData(TableState state, CancellationToken ct)
+    {
+        var result=await Api.GetSuppliersAsync(new(_search,_status,_type,null,null,_blacklisted,_city,null,state.SortLabel??"Name",state.SortDirection==SortDirection.Descending,state.Page+1,state.PageSize),ct);
+        return new(){Items=result.Items,TotalItems=(int)result.TotalCount};
+    }
+    private async Task SetActive(SupplierSummaryDto supplier){try{await Api.SetSupplierActiveAsync(supplier.Id,!supplier.IsActive);Snackbar.Add("وضعیت تأمین‌کننده به‌روزرسانی شد.",Severity.Success);await Reload();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task ToggleBlacklist(SupplierSummaryDto supplier){try{if(supplier.IsBlacklisted)await Api.RemoveSupplierFromBlacklistAsync(supplier.Id);else await Api.BlacklistSupplierAsync(supplier.Id,"ثبت از رابط کاربری");Snackbar.Add("وضعیت فهرست سیاه به‌روزرسانی شد.",Severity.Success);await Reload();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+}

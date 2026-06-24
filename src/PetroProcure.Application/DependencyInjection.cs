@@ -5,6 +5,9 @@ using PetroProcure.Application.Indents;
 using PetroProcure.Application.PurchaseFiles;
 using PetroProcure.Application.Documents;
 using PetroProcure.Application.Workflow;
+using PetroProcure.Application.Suppliers;
+using PetroProcure.Application.Inquiries;
+using PetroProcure.Application.Orders;
 
 namespace PetroProcure.Application;
 
@@ -24,6 +27,13 @@ public static class DependencyInjection
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.AddScoped<WorkflowCommandHandler>();
         services.AddScoped<WorkflowQueryHandler>();
+        services.AddScoped<SupplierCommandHandler>();
+        services.AddScoped<SupplierQueryHandler>();
+        services.AddScoped<IInquiryNumberService, InquiryNumberService>();
+        services.AddScoped<InquiryCommandHandler>();
+        services.AddScoped<InquiryQueryHandler>();
+        services.AddScoped<OrdersCommandHandler>();
+        services.AddScoped<OrdersQueryHandler>();
         return services;
     }
 }

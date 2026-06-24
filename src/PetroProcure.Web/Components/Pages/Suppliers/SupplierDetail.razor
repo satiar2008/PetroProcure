@@ -1,0 +1,51 @@
+@page "/purchase/suppliers/{Id:guid}"
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+<PageTitle>جزئیات تأمین‌کننده</PageTitle>
+<PageHeader Title="@(_detail?.Supplier.Name ?? "جزئیات تأمین‌کننده")" Subtitle="اطلاعات، تماس‌ها، دسته‌بندی و ارزیابی">
+    <PermissionView Permission="@SupplierUiPolicy.Edit"><MudButton Variant="Variant.Outlined" Href="@($"/purchase/suppliers/{Id}/edit")" StartIcon="@Icons.Material.Filled.Edit">ویرایش</MudButton></PermissionView>
+</PageHeader>
+
+<DataStateView TItem="SupplierContactDto" Loading="_loading" Error="_error" Retry="Load">
+@if(_detail is not null)
+{
+<MudTabs Rounded="true" Elevation="0">
+<MudTabPanel Text="خلاصه">
+    <MudPaper Class="data-panel" Elevation="0"><div class="summary-grid">
+        @Info("کد",_detail.Supplier.SupplierCode) @Info("نام",_detail.Supplier.Name)
+        @Info("نوع",SupplierUiPolicy.TypeText(_detail.Supplier.SupplierType)) @Info("وضعیت",SupplierUiPolicy.StatusText(_detail.Supplier.Status))
+        @Info("فعال",_detail.Supplier.IsActive?"بله":"خیر") @Info("فهرست سیاه",_detail.Supplier.IsBlacklisted?"بله":"خیر")
+        @Info("شناسه ملی",_detail.Supplier.NationalId??"—") @Info("کد اقتصادی",_detail.Supplier.EconomicCode??"—")
+        @Info("شهر",_detail.Supplier.City??"—") @Info("تلفن",_detail.Supplier.Phone??"—")
+        <div class="summary-item"><span>تاریخ ایجاد</span><strong><DateDisplay Value="@_detail.Supplier.CreatedAt" /></strong></div>
+        <div class="summary-item"><span>آخرین ویرایش</span><strong><DateDisplay Value="@_detail.Supplier.UpdatedAt" /></strong></div>
+    </div></MudPaper>
+</MudTabPanel>
+<MudTabPanel Text="تماس‌ها">
+    <PermissionView Permission="@SupplierUiPolicy.ManageContacts"><MudButton Class="mb-3" OnClick="AddContact" StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary">افزودن تماس</MudButton></PermissionView>
+    <MudTable Items="_detail.Contacts" Dense="true"><HeaderContent><MudTh>نام</MudTh><MudTh>سمت</MudTh><MudTh>تلفن</MudTh><MudTh>ایمیل</MudTh><MudTh>اصلی</MudTh><MudTh>وضعیت</MudTh></HeaderContent><RowTemplate><MudTd>@context.FullName</MudTd><MudTd>@(context.Position??"—")</MudTd><MudTd>@(context.Phone??context.Mobile??"—")</MudTd><MudTd>@(context.Email??"—")</MudTd><MudTd>@(context.IsPrimary?"بله":"خیر")</MudTd><MudTd>@(context.IsActive?"فعال":"غیرفعال")</MudTd></RowTemplate></MudTable>
+</MudTabPanel>
+<MudTabPanel Text="دسته‌بندی‌ها">
+    <MudChipSet T="string">@foreach(var c in _detail.Categories){<MudChip T="string" Color="Color.Info">@c.Title</MudChip>}</MudChipSet>
+</MudTabPanel>
+<MudTabPanel Text="ارزیابی‌ها">
+    <PermissionView Permission="@SupplierUiPolicy.Evaluate"><MudButton Class="mb-3" OnClick="AddEvaluation" StartIcon="@Icons.Material.Filled.Add" Color="Color.Primary">افزودن ارزیابی</MudButton></PermissionView>
+    <MudTable Items="_detail.Evaluations" Dense="true"><HeaderContent><MudTh>تاریخ</MudTh><MudTh>نتیجه</MudTh><MudTh>امتیاز</MudTh><MudTh>ارزیاب</MudTh><MudTh>شرح</MudTh></HeaderContent><RowTemplate><MudTd><DateDisplay Value="@context.EvaluationDate" /></MudTd><MudTd>@SupplierUiPolicy.EvaluationText(context.Result)</MudTd><MudTd>@(context.Score?.ToString()??"—")</MudTd><MudTd><UserDisplay UserId="@context.EvaluatedByUserId" /></MudTd><MudTd>@(context.Description??"—")</MudTd></RowTemplate></MudTable>
+</MudTabPanel>
+<MudTabPanel Text="اسناد"><EmptyState Title="اسناد تأمین‌کننده" Description="اتصال کامل اسناد تأمین‌کننده به مخزن فایل در فاز بعدی تکمیل می‌شود." /></MudTabPanel>
+<MudTabPanel Text="پرونده‌های مرتبط"><EmptyState Title="پرونده‌های مرتبط" Description="ارتباط با پرونده‌های خرید در فازهای Inquiry/Tender/Contract تکمیل می‌شود." /></MudTabPanel>
+</MudTabs>
+}
+</DataStateView>
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private bool _loading=true; private string? _error; private SupplierDetailDto? _detail;
+    protected override Task OnInitializedAsync()=>Load();
+    private async Task Load(){_loading=true;_error=null;try{_detail=await Api.GetSupplierAsync(Id);if(_detail is null)_error="تأمین‌کننده یافت نشد.";}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
+    private RenderFragment Info(string label,string value)=>@<div class="summary-item"><span>@label</span><strong>@value</strong></div>;
+    private async Task AddContact(){try{await Api.AddSupplierContactAsync(Id,new("تماس جدید",null,null,null,null,false,null));Snackbar.Add("تماس افزوده شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task AddEvaluation(){try{await Api.AddSupplierEvaluationAsync(Id,new(DateTime.UtcNow,null,SupplierEvaluationResult.NeedsReview,"ارزیابی اولیه"));Snackbar.Add("ارزیابی افزوده شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+}

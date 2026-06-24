@@ -1,0 +1,82 @@
+@page "/orders/inventory-control"
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject IUserAccessContext Access
+
+<PageHeader Title="کنترل موجودی" Subtitle="تنظیمات برنامه‌ریزی و کنترل موجودی برای اقلام MESC" />
+
+<MudPaper Class="pa-4 mb-4">
+    <MudTextField @bind-Value="_search" Label="جستجو در کد یا شرح کالا" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+    <MudButton OnClick="Load" StartIcon="@Icons.Material.Filled.Search" Class="mt-2">جستجو</MudButton>
+</MudPaper>
+
+@if (_loading) { <LoadingOverlay Text="در حال دریافت اقلام..." /> }
+else
+{
+    <MudTable Items="_items" Dense="true" Hover="true">
+        <HeaderContent><MudTh>کد MESC</MudTh><MudTh>گروه</MudTh><MudTh>شرح عمومی</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>موجودی</MudTh><MudTh>حداقل</MudTh><MudTh>نقطه سفارش</MudTh><MudTh>در راه</MudTh><MudTh>وضعیت</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.MescCode</MudTd><MudTd>@context.MescGeneralGroupCode</MudTd><MudTd>@context.GeneralDescription</MudTd><MudTd>@context.SpecificDescription</MudTd>
+            <MudTd>@context.CurrentStock</MudTd><MudTd>@context.MinimumStockLevel</MudTd><MudTd>@context.ReorderPoint</MudTd><MudTd>@context.OnOrderQuantity</MudTd>
+            <MudTd><StatusChip Text="@(context.IsActive ? "فعال" : "غیرفعال")" Color="@(context.IsActive ? Color.Success : Color.Default)" /></MudTd>
+            <MudTd>
+                @if (Access.HasPermission(OrdersUiPolicy.ManageInventoryControl))
+                {
+                    <MudButton Size="Size.Small" OnClick="@(()=>OpenEdit(context))">ویرایش</MudButton>
+                }
+            </MudTd>
+        </RowTemplate>
+        <NoRecordsContent><EmptyState Title="قلمی برای کنترل موجودی یافت نشد" /></NoRecordsContent>
+    </MudTable>
+}
+
+<MudDialog @bind-Visible="_editOpen">
+    <DialogContent>
+        <MudText Typo="Typo.h6">ویرایش کنترل موجودی</MudText>
+        <MudNumericField @bind-Value="_min" Label="حداقل موجودی" Variant="Variant.Outlined" />
+        <MudNumericField @bind-Value="_reorder" Label="نقطه سفارش" Variant="Variant.Outlined" />
+        <MudNumericField @bind-Value="_max" Label="حداکثر موجودی" Variant="Variant.Outlined" />
+        <MudNumericField @bind-Value="_safety" Label="موجودی اطمینان" Variant="Variant.Outlined" />
+        <MudSwitch @bind-Value="_controlled" Label="مشمول کنترل موجودی" Color="Color.Primary" />
+        <MudSwitch @bind-Value="_active" Label="فعال" Color="Color.Success" />
+        <MudTextField @bind-Value="_notes" Label="یادداشت" Lines="3" Variant="Variant.Outlined" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(()=>_editOpen=false)">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveEdit">ذخیره</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private List<InventoryControlItemDto> _items = [];
+    private string? _search;
+    private bool _loading = true, _editOpen, _controlled, _active;
+    private Guid _editId;
+    private decimal _min, _reorder;
+    private decimal? _max, _safety;
+    private string? _notes;
+
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        _loading = true;
+        try { _items = (await Api.GetInventoryControlItemsAsync(new InventoryControlListRequest(_search, true, 1, 100))).Items.ToList(); }
+        catch (Exception ex) { Snackbar.Add($"دریافت کنترل موجودی ناموفق بود: {ex.Message}", Severity.Error); }
+        finally { _loading = false; }
+    }
+    private void OpenEdit(InventoryControlItemDto item)
+    {
+        _editId = item.Id; _min = item.MinimumStockLevel; _reorder = item.ReorderPoint; _max = item.MaximumStockLevel;
+        _safety = item.SafetyStock; _controlled = item.IsStockControlled; _active = item.IsActive; _notes = item.Notes; _editOpen = true;
+    }
+    private async Task SaveEdit()
+    {
+        try
+        {
+            await Api.UpdateInventoryControlItemAsync(_editId, new UpdateInventoryControlItemRequest(_min, _reorder, _max, _safety, _controlled, _active, _notes));
+            Snackbar.Add("تنظیمات کنترل موجودی ذخیره شد.", Severity.Success); _editOpen = false; await Load();
+        }
+        catch (Exception ex) { Snackbar.Add($"ذخیره ناموفق بود: {ex.Message}", Severity.Error); }
+    }
+}

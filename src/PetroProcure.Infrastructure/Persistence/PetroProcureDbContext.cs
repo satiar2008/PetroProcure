@@ -5,11 +5,15 @@ using PetroProcure.Domain.Modules.Security;
 using PetroProcure.Infrastructure.Identity;
 using PetroProcure.Domain.Modules.Documents;
 using PetroProcure.Domain.Modules.Indents;
+using PetroProcure.Domain.Modules.Inquiries;
 using PetroProcure.Domain.Modules.Items;
+using PetroProcure.Domain.Modules.Orders;
 using PetroProcure.Domain.Modules.Organization;
 using PetroProcure.Domain.Modules.PurchaseFiles;
+using PetroProcure.Domain.Modules.Suppliers;
 using PetroProcure.Domain.Modules.Workflow;
 using PetroProcure.AI;
+using PetroProcure.Domain.Common;
 
 namespace PetroProcure.Infrastructure.Persistence;
 
@@ -65,6 +69,24 @@ public sealed class PetroProcureDbContext : IdentityDbContext<ApplicationUser, I
     public DbSet<AuthRefreshToken> AuthRefreshTokens => Set<AuthRefreshToken>();
     public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    public DbSet<Inquiry> Inquiries => Set<Inquiry>();
+    public DbSet<InquiryItem> InquiryItems => Set<InquiryItem>();
+    public DbSet<InquirySupplier> InquirySuppliers => Set<InquirySupplier>();
+    public DbSet<SupplierQuote> SupplierQuotes => Set<SupplierQuote>();
+    public DbSet<SupplierQuoteItem> SupplierQuoteItems => Set<SupplierQuoteItem>();
+    public DbSet<InquiryDocument> InquiryDocuments => Set<InquiryDocument>();
+    public DbSet<InquirySequence> InquirySequences => Set<InquirySequence>();
+    public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<SupplierContact> SupplierContacts => Set<SupplierContact>();
+    public DbSet<SupplierCategory> SupplierCategories => Set<SupplierCategory>();
+    public DbSet<SupplierCategoryAssignment> SupplierCategoryAssignments => Set<SupplierCategoryAssignment>();
+    public DbSet<SupplierDocument> SupplierDocuments => Set<SupplierDocument>();
+    public DbSet<SupplierEvaluation> SupplierEvaluations => Set<SupplierEvaluation>();
+    public DbSet<InventoryControlItem> InventoryControlItems => Set<InventoryControlItem>();
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<MaterialNeed> MaterialNeeds => Set<MaterialNeed>();
+    public DbSet<ShortageAlert> ShortageAlerts => Set<ShortageAlert>();
+    public DbSet<MaterialNeedSequence> MaterialNeedSequences => Set<MaterialNeedSequence>();
     public DbSet<AiProvider> AiProviders => Set<AiProvider>();
     public DbSet<AiModel> AiModels => Set<AiModel>();
     public DbSet<AiAgentDefinition> AiAgentDefinitions => Set<AiAgentDefinition>();
@@ -83,6 +105,7 @@ public sealed class PetroProcureDbContext : IdentityDbContext<ApplicationUser, I
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.HasDefaultSchema(DatabaseSchemas.Purchase);
+        modelBuilder.Ignore<DomainEvent>();
 
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PetroProcureDbContext).Assembly);
     }

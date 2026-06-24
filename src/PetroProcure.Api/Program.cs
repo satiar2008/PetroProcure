@@ -125,6 +125,9 @@ app.MapDocumentEndpoints();
 app.MapWorkflowEndpoints();
 app.MapReportEndpoints();
 app.MapAiEndpoints();
+app.MapSupplierEndpoints();
+app.MapInquiryEndpoints();
+app.MapOrdersEndpoints();
 
 app.MapDefaultEndpoints();
 

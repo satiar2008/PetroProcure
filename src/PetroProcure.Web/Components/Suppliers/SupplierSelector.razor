@@ -1,0 +1,31 @@
+@inject IPetroProcureApiClient Api
+
+<MudAutocomplete T="SupplierLookupDto" Label="@Label" Disabled="@Disabled" Required="@Required"
+                 SearchFunc="Search" ToStringFunc="Display" Value="@Value" ValueChanged="OnChanged"
+                 Variant="Variant.Outlined" Dense="true" Clearable="true"
+                 Placeholder="جستجو بر اساس کد یا نام تأمین‌کننده" />
+
+@if (Value is not null)
+{
+    <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+        @Value.SupplierCode - @Value.Name · @SupplierUiPolicy.TypeText(Value.SupplierType) · @SupplierUiPolicy.StatusText(Value.Status)
+    </MudAlert>
+}
+
+@code {
+    [Parameter] public string Label { get; set; } = "تأمین‌کننده";
+    [Parameter] public SupplierLookupDto? Value { get; set; }
+    [Parameter] public EventCallback<SupplierLookupDto?> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public bool IncludeInactive { get; set; }
+    [Parameter] public bool IncludeBlacklisted { get; set; }
+
+    private async Task<IEnumerable<SupplierLookupDto>> Search(string value, CancellationToken ct) =>
+        (await Api.SearchSupplierLookupAsync(value, IncludeInactive, IncludeBlacklisted, ct))
+        .Where(x => SupplierUiPolicy.IsSelectable(x, IncludeInactive, IncludeBlacklisted));
+
+    private async Task OnChanged(SupplierLookupDto? supplier) => await ValueChanged.InvokeAsync(supplier);
+    private static string Display(SupplierLookupDto? supplier) =>
+        supplier is null ? string.Empty : $"{supplier.SupplierCode} - {supplier.Name}";
+}
