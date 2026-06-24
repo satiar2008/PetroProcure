@@ -15,7 +15,7 @@ else
         <MudTable Items="_logs" Dense="true" Hover="true">
             <HeaderContent><MudTh>زمان</MudTh><MudTh>کاربر</MudTh><MudTh>عملیات</MudTh><MudTh>موجودیت</MudTh><MudTh>شرح</MudTh></HeaderContent>
             <RowTemplate>
-                <MudTd>@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudTd>
+                <MudTd><DateDisplay Value="@context.CreatedAt" IncludeTime="true" /></MudTd>
                 <MudTd><UserDisplay UserId="@context.ActorUserId" /></MudTd>
                 <MudTd>@context.Action</MudTd>
                 <MudTd>@context.EntityType</MudTd>

@@ -9,8 +9,8 @@
         <MudTd>@InboxUiPolicy.EntityType(context.Task)</MudTd>
         <MudTd>@(context.RelatedNumber ?? "—")</MudTd><MudTd>@FakeDirectory.DepartmentName(context.Task.AssignedDepartmentId)</MudTd>
         <MudTd><StatusChip Text="@InboxUiPolicy.StatusText(context.Task.Status)" /></MudTd>
-        <MudTd>@context.Task.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
-        <MudTd>@(context.Task.DueDate?.ToString("yyyy/MM/dd") ?? "—")</MudTd>
+        <MudTd><DateDisplay Value="@context.Task.CreatedAt" /></MudTd>
+        <MudTd><DateDisplay DateOnlyValue="@context.Task.DueDate" /></MudTd>
         <MudTd>
             <MudIconButton Icon="@Icons.Material.Filled.Visibility" Href="@($"/inbox/tasks/{context.Task.Id}")" />
             @if (CanAssignSelf(context.Task)) { <MudIconButton Icon="@Icons.Material.Filled.PersonAdd" Color="Color.Primary" OnClick="@(()=>AssignSelf.InvokeAsync(context.Task))" /> }

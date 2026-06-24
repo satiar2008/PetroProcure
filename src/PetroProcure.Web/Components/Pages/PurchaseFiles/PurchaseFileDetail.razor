@@ -20,7 +20,7 @@ else if (_summary.Data is { } file)
                 <SummaryItem Label="وضعیت" Value="@PurchaseFileList.StatusText(file.Status)" />
                 <SummaryItem Label="اولویت" Value="@PurchaseFileList.PriorityText(file.Priority)" />
                 <SummaryItem Label="واحد جاری" Value="@DepartmentName(file.CurrentDepartmentId)" />
-                <SummaryItem Label="تاریخ ایجاد" Value="@file.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")" />
+                <div class="summary-item"><span>تاریخ ایجاد</span><strong><DateDisplay Value="@file.CreatedAt" /></strong></div>
                 <SummaryItem Label="تعداد اقلام" Value="@file.Items.Count.ToString()" />
             </div><MudDivider Class="my-4" /><MudText Typo="Typo.subtitle2">شرح پرونده</MudText>
             <MudText Typo="Typo.body2">@(file.Description ?? "شرحی ثبت نشده است.")</MudText></MudPaper>
@@ -49,7 +49,7 @@ else if (_summary.Data is { } file)
             else if (_notes.Data is null || _notes.Data.Count == 0) { <EmptyState Title="یادداشتی وجود ندارد" Description="اولین یادداشت پرونده را ثبت کنید." /> }
             else { @foreach (var note in _notes.Data.OrderByDescending(x=>x.CreatedAt)) {
                 <MudAlert Severity="@(note.IsInternal ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined" Class="mb-2">
-                    @note.NoteText<br /><small><DepartmentDisplay DepartmentId="@note.DepartmentId" /> · @note.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small>
+                    @note.NoteText<br /><small><DepartmentDisplay DepartmentId="@note.DepartmentId" /> · <DateDisplay Value="@note.CreatedAt" IncludeTime="true" /></small>
                 </MudAlert> } }
         </MudTabPanel>
 
@@ -159,7 +159,7 @@ else if (_summary.Data is { } file)
         </MudGrid>@if(_uploadLimits is not null){<MudText Typo="Typo.caption">حداکثر @_uploadLimits.MaxFileSizeMb مگابایت؛ پسوندهای مجاز: @string.Join("، ",_uploadLimits.AllowedExtensions)</MudText>}</MudPaper>}
         @if(docs.Count==0){<EmptyState Title="سندی ثبت نشده است" Description="فایل مورد نظر را با نوع سند مناسب بارگذاری کنید." />}
         else {<MudTable Items="docs"><HeaderContent><MudTh>نام فایل</MudTh><MudTh>نوع</MudTh><MudTh>نسخه</MudTh><MudTh>حجم</MudTh><MudTh>بارگذار</MudTh><MudTh>تاریخ</MudTh><MudTh></MudTh></HeaderContent>
-        <RowTemplate><MudTd>@context.OriginalFileName</MudTd><MudTd>@DocumentTypeText(context.DocumentType)</MudTd><MudTd>@context.VersionNo</MudTd><MudTd>@FormatSize(context.Size)</MudTd><MudTd><UserDisplay UserId="@context.UploadedByUserId" /></MudTd><MudTd>@context.UploadedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
+        <RowTemplate><MudTd>@context.OriginalFileName</MudTd><MudTd>@DocumentTypeText(context.DocumentType)</MudTd><MudTd>@context.VersionNo</MudTd><MudTd>@FormatSize(context.Size)</MudTd><MudTd><UserDisplay UserId="@context.UploadedByUserId" /></MudTd><MudTd><DateDisplay Value="@context.UploadedAt" /></MudTd>
         <MudTd><MudIconButton Icon="@Icons.Material.Filled.Download" Href="@($"/document-download/{context.Id}")" Target="_blank" />@if(CanEdit){<label class="mud-button-root mud-icon-button"><InputFile OnChange="@(e=>UploadVersion(context.Id,e))" style="display:none" /><MudIcon Icon="@Icons.Material.Filled.UploadFile" /></label><MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(()=>DeleteDocument(context.Id))" />}</MudTd></RowTemplate></MudTable>}
     </div>;
     private RenderFragment<PurchaseFileWorkflowStateDto> WorkflowContent => state => @<div>
@@ -176,7 +176,7 @@ else if (_summary.Data is { } file)
         }
         </MudPaper>
         @if(state.Steps.Count==0){<EmptyState Title="گردش کاری ثبت نشده" Description="پس از شروع گردش، اقدامات اینجا نمایش داده می‌شوند." />}
-        @foreach(var step in state.Steps.OrderByDescending(x=>x.CreatedAt)){<div class="timeline-row"><div class="timeline-marker"></div><div><strong>@step.ActionName</strong><small><DepartmentDisplay DepartmentId="@step.FromDepartmentId" /> ← <DepartmentDisplay DepartmentId="@step.ToDepartmentId" /> · @step.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</small></div></div>}
+        @foreach(var step in state.Steps.OrderByDescending(x=>x.CreatedAt)){<div class="timeline-row"><div class="timeline-marker"></div><div><strong>@step.ActionName</strong><small><DepartmentDisplay DepartmentId="@step.FromDepartmentId" /> ← <DepartmentDisplay DepartmentId="@step.ToDepartmentId" /> · <DateDisplay Value="@step.CreatedAt" IncludeTime="true" /></small></div></div>}
     </div>;
     private async Task AddNote(){_noteBusy=true;try{var department=_summary.Data!.CurrentDepartmentId;var note=await Api.AddNoteAsync(Id,new(department,_noteText!,_internalNote));_notes.Data??=[];_notes.Data.Insert(0,note);_noteText=null;Snackbar.Add("یادداشت ثبت شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_noteBusy=false;}}
     private async Task UploadDocument(InputFileChangeEventArgs e){_uploadBusy=true;try{var file=e.File;var max=(_uploadLimits?.MaxFileSizeMb??25)*1024L*1024L;await using var stream=file.OpenReadStream(max);await Api.UploadDocumentAsync(Id,stream,file.Name,file.ContentType,new(_documentType,_summary.Data?.CurrentDepartmentId,_documentDescription));await LoadDocuments();_documentDescription=null;Snackbar.Add("سند بارگذاری شد.",Severity.Success);}catch(Exception ex){Snackbar.Add("بارگذاری ناموفق بود: "+ex.Message,Severity.Error);}finally{_uploadBusy=false;}}

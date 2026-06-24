@@ -21,7 +21,7 @@
                         <MudTd>@context.MescGeneralGroupCode</MudTd><MudTd>@context.GeneralDescription</MudTd>
                         <MudTd>@context.SpecificDescription</MudTd><MudTd>@UnitName(context.UnitOfMeasureId)</MudTd>
                         <MudTd>@context.RequestedQuantity</MudTd><MudTd>@(context.TechnicalDescription ?? "—")</MudTd>
-                        <MudTd>@(context.RequiredDate?.ToString("yyyy/MM/dd") ?? "—")</MudTd>
+                        <MudTd><DateDisplay DateOnlyValue="@context.RequiredDate" /></MudTd>
                     </RowTemplate>
                 </MudTable>
             </ChildContent>

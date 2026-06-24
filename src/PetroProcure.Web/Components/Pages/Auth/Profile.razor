@@ -33,8 +33,8 @@
                 <MudTable Items="_sessions" Dense="true">
                     <HeaderContent><MudTh>ایجاد</MudTh><MudTh>انقضا</MudTh><MudTh>وضعیت</MudTh></HeaderContent>
                     <RowTemplate>
-                        <MudTd>@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudTd>
-                        <MudTd>@context.ExpiresAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm")</MudTd>
+                        <MudTd><DateDisplay Value="@context.CreatedAt" IncludeTime="true" /></MudTd>
+                        <MudTd><DateDisplay Value="@context.ExpiresAt" IncludeTime="true" /></MudTd>
                         <MudTd><StatusChip Text="@(context.IsActive ? "فعال" : "لغوشده/منقضی")" Color="@(context.IsActive ? Color.Success : Color.Default)" /></MudTd>
                     </RowTemplate>
                 </MudTable>

@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 
-builder.Services.AddLocalization();
+builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 builder.Services.AddMudServices();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthSession>();
@@ -20,6 +20,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
     sp.GetRequiredService<PetroProcureAuthenticationStateProvider>());
 builder.Services.AddScoped<IUserAccessContext, UserAccessContext>();
 builder.Services.AddScoped<ILookupCacheService, LookupCacheService>();
+builder.Services.AddSingleton<IPersianDateService, PersianDateService>();
 var apiBaseUrl = ResolveApiBaseUrl(builder.Configuration, builder.Environment);
 builder.Services.AddHttpClient("PetroProcure.Auth", client => client.BaseAddress = new Uri(apiBaseUrl));
 builder.Services.AddHttpClient<IPetroProcureApiClient, PetroProcureApiClient>(
@@ -37,9 +38,16 @@ if (!app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+var persianCulture = new CultureInfo("fa-IR");
+persianCulture.DateTimeFormat.Calendar = new PersianCalendar();
+persianCulture.DateTimeFormat.ShortDatePattern = "yyyy/MM/dd";
+persianCulture.DateTimeFormat.LongDatePattern = "dddd، dd MMMM yyyy";
+CultureInfo.DefaultThreadCurrentCulture = persianCulture;
+CultureInfo.DefaultThreadCurrentUICulture = persianCulture;
+
 var supportedCultures = new[]
 {
-    new CultureInfo("fa-IR"),
+    persianCulture,
     new CultureInfo("en-US")
 };
 

@@ -1,0 +1,13 @@
+@inject IPersianDateService Dates
+
+<span>@Text</span>
+
+@code {
+    [Parameter] public DateTime? Value { get; set; }
+    [Parameter] public DateOnly? DateOnlyValue { get; set; }
+    [Parameter] public bool IncludeTime { get; set; }
+
+    private string Text => DateOnlyValue.HasValue
+        ? Dates.FormatDate(DateOnlyValue)
+        : IncludeTime ? Dates.FormatDateTime(Value) : Dates.FormatDate(Value);
+}

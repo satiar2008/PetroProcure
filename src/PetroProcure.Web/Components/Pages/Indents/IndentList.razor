@@ -25,7 +25,7 @@ else{
 <RowTemplate>
 <MudTd><MudLink Href="@($"/orders/indents/{context.Id}")"><strong>@IndentUiPolicy.FormatNumber(context.IndentNumber)</strong></MudLink><MudText Typo="Typo.caption">@context.IndentNumber</MudText></MudTd>
 <MudTd>@context.Title</MudTd><MudTd>@IndentUiPolicy.TypeText(context.IndentType)</MudTd><MudTd>@FakeDirectory.DepartmentName(context.RequestingDepartmentId)</MudTd>
-<MudTd><StatusChip Text="@IndentUiPolicy.StatusText(context.Status)" /></MudTd><MudTd>@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
+<MudTd><StatusChip Text="@IndentUiPolicy.StatusText(context.Status)" /></MudTd><MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
 <MudTd><MudIconButton Icon="@Icons.Material.Filled.Visibility" Href="@($"/orders/indents/{context.Id}")" />
 @if(IndentUiPolicy.CanEdit(context.Status,Access.HasPermission)){<MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@($"/orders/indents/{context.Id}/edit")" />}
 @if(IndentUiPolicy.CanSubmit(context.Status,Access.HasPermission)){<MudIconButton Icon="@Icons.Material.Filled.Send" Color="Color.Primary" OnClick="@(()=>Action(context,"submit","ارسال تقاضا","تقاضا برای بررسی ارسال شود؟"))" />}

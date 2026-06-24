@@ -48,7 +48,7 @@
             <MudTd>@PriorityText(context.Priority)</MudTd>
             <MudTd>@DepartmentName(context.CurrentDepartmentId)</MudTd>
             <MudTd>@(context.SourceIndentNumber ?? "—")</MudTd>
-            <MudTd>@context.CreatedAt.ToLocalTime().ToString("yyyy/MM/dd")</MudTd>
+            <MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
             <MudTd>@context.ItemCount</MudTd>
             <MudTd><MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Href="@($"/purchase/files/{context.Id}")" /></MudTd>
         </RowTemplate>

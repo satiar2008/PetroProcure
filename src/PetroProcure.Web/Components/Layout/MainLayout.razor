@@ -119,20 +119,48 @@
     private void UpdateBreadcrumbs()
     {
         var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
-        var title = path switch
+        _breadcrumbs = path switch
         {
-            "purchase" => "داشبورد واحد خرید",
-            "orders" => "داشبورد سفارشات و کنترل موجودی",
-            "warehouse" => "داشبورد انبار",
-            "applicant" => "داشبورد متقاضی",
-            "tender-commission" => "داشبورد کمیسیون مناقصه",
-            "admin" => "مدیریت سامانه",
-            "reports" => "گزارش‌ها",
-            "ai" => "دستیار هوشمند",
-            _ => "داشبورد"
+            "" => [new("خانه", href: null, disabled: true)],
+            "purchase" => Crumbs(("خانه", "/"), ("واحد خرید", null)),
+            "purchase/files" => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("پرونده‌های خرید", null)),
+            var p when p.StartsWith("purchase/files/") => Crumbs(("خانه", "/"), ("واحد خرید", "/purchase"), ("پرونده‌های خرید", "/purchase/files"), ("جزئیات پرونده", null)),
+            "orders" => Crumbs(("خانه", "/"), ("سفارشات و کنترل موجودی", null)),
+            "orders/mesc" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", null)),
+            "orders/mesc/groups" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", "/orders/mesc"), ("گروه‌های عمومی", null)),
+            "orders/mesc/items" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", "/orders/mesc"), ("اقلام کالا", null)),
+            "orders/mesc/grouped" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("کاتالوگ MESC", "/orders/mesc"), ("نمای گروه‌بندی", null)),
+            "orders/indents" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("تقاضاهای خرید", null)),
+            "orders/indents/create" => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("تقاضاهای خرید", "/orders/indents"), ("ایجاد تقاضا", null)),
+            var p when p.StartsWith("orders/indents/") => Crumbs(("خانه", "/"), ("سفارشات", "/orders"), ("تقاضاهای خرید", "/orders/indents"), ("جزئیات تقاضا", null)),
+            "inbox/my" => Crumbs(("خانه", "/"), ("کارتابل", null), ("کارتابل من", null)),
+            "inbox/department" => Crumbs(("خانه", "/"), ("کارتابل", null), ("کارتابل واحد", null)),
+            var p when p.StartsWith("inbox/tasks/") => Crumbs(("خانه", "/"), ("کارتابل", "/inbox/my"), ("جزئیات کار", null)),
+            "admin" => Crumbs(("خانه", "/"), ("مدیریت سامانه", null)),
+            var p when p.StartsWith("admin/") => Crumbs(("خانه", "/"), ("مدیریت سامانه", "/admin"), (AdminTitle(p), null)),
+            "warehouse" => Crumbs(("خانه", "/"), ("انبار", null)),
+            "applicant" => Crumbs(("خانه", "/"), ("متقاضی", null)),
+            "tender-commission" => Crumbs(("خانه", "/"), ("کمیسیون مناقصه", null)),
+            "reports" => Crumbs(("خانه", "/"), ("گزارش‌ها", null)),
+            "ai" => Crumbs(("خانه", "/"), ("دستیار هوشمند", null)),
+            _ => Crumbs(("خانه", "/"), ("داشبورد", null))
         };
-        _breadcrumbs = [new("خانه", href: "/"), new(title, href: null, disabled: true)];
     }
+
+    private static List<BreadcrumbItem> Crumbs(params (string Text, string? Href)[] items) =>
+        items.Select(item => new BreadcrumbItem(item.Text, item.Href, disabled: item.Href is null)).ToList();
+
+    private static string AdminTitle(string path) => path switch
+    {
+        "admin/users" => "کاربران",
+        "admin/roles" => "نقش‌ها",
+        "admin/departments" => "واحدهای سازمانی",
+        "admin/permissions" => "مجوزها",
+        "admin/workflow-matrix" => "ماتریس گردش کار",
+        "admin/settings" => "تنظیمات سیستم",
+        "admin/audit-log" => "گزارش ممیزی",
+        _ => "مدیریت"
+    };
     public void Dispose()
     {
         Access.Changed -= OnAccessChanged;
