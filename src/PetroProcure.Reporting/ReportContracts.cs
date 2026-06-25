@@ -12,6 +12,7 @@ public static class ReportNames
     public const string TenderWinnerDecision = "TenderWinnerDecisionReport";
     public const string CommissionSessionMinutes = "CommissionSessionMinutesReport";
     public const string CommissionDecision = "CommissionDecisionReport";
+    public const string Contract = "ContractReport";
 }
 
 public sealed record ReportPreviewModel(string ReportName, string PreviewUrl, string Title);
@@ -33,6 +34,7 @@ public interface IReportDataProvider
     Task<TenderWinnerDecisionReportData?> GetTenderWinnerDecisionAsync(Guid id, CancellationToken cancellationToken);
     Task<CommissionSessionReportData?> GetCommissionSessionAsync(Guid id, CancellationToken cancellationToken);
     Task<CommissionDecisionReportData?> GetCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken cancellationToken);
+    Task<ContractReportData?> GetContractAsync(Guid id, CancellationToken cancellationToken);
 }
 
 public sealed record ReportItemData(string MescCode, string GeneralGroupCode, string GeneralDescription,
@@ -77,3 +79,12 @@ public sealed record CommissionMinuteReportData(string AgendaTitle, string Text,
 public sealed record CommissionDecisionReportData(Guid Id, string SessionNumber, string TenderNumber, string PurchaseFileNumber,
     string DecisionType, string Status, string SelectedSupplier, string SelectedBid, string DecisionText, string Reason,
     string CreatedBy, string ApprovedBy, string ApprovedAt);
+
+public sealed record ContractReportData(Guid Id, string ContractNumber, string PurchaseFileNumber, string SupplierName,
+    string TenderNumber, string CommissionDecisionReference, string Title, string Subject, string Status,
+    string ContractType, string Currency, string TotalAmount, string TaxAmount, string FinalAmount,
+    string StartDate, string EndDate, string DeliveryDeadline, string PaymentTerms, string DeliveryTerms,
+    string WarrantyTerms, string PenaltyTerms, IReadOnlyList<ReportItemGroupData> Groups,
+    IReadOnlyList<ContractClauseReportData> Clauses);
+
+public sealed record ContractClauseReportData(int OrderNo, string Title, string Body, string ClauseType, bool IsRequired);

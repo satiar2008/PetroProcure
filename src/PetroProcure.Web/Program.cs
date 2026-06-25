@@ -72,6 +72,8 @@ app.MapGet("/report-preview/commission/{id:guid}/minutes", async (Guid id, IPetr
     Results.File(await api.GetCommissionMinutesReportPdfAsync(id, ct), "application/pdf", $"commission-minutes-{id}.pdf", enableRangeProcessing: true));
 app.MapGet("/report-preview/commission/{id:guid}/decision/{decisionId:guid}", async (Guid id, Guid decisionId, IPetroProcureApiClient api, CancellationToken ct) =>
     Results.File(await api.GetCommissionDecisionReportPdfAsync(id, decisionId, ct), "application/pdf", $"commission-decision-{decisionId}.pdf", enableRangeProcessing: true));
+app.MapGet("/report-preview/contract/{id:guid}", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
+    Results.File(await api.GetContractPdfAsync(id, ct), "application/pdf", $"contract-{id}.pdf", enableRangeProcessing: true));
 app.MapGet("/document-download/{id:guid}", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
 {
     var file = await api.DownloadDocumentAsync(id, ct);
@@ -85,6 +87,11 @@ app.MapGet("/tender-document-download/{tenderId:guid}/{documentId:guid}", async 
 app.MapGet("/commission-attachment-download/{sessionId:guid}/{attachmentId:guid}", async (Guid sessionId, Guid attachmentId, IPetroProcureApiClient api, CancellationToken ct) =>
 {
     var file = await api.DownloadCommissionAttachmentAsync(sessionId, attachmentId, ct);
+    return Results.File(file.Content, file.ContentType, file.FileName);
+});
+app.MapGet("/contract-document-download/{contractId:guid}/{documentId:guid}", async (Guid contractId, Guid documentId, IPetroProcureApiClient api, CancellationToken ct) =>
+{
+    var file = await api.DownloadContractDocumentAsync(contractId, documentId, ct);
     return Results.File(file.Content, file.ContentType, file.FileName);
 });
 app.MapGet("/report-preview/indent/{id:guid}", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>

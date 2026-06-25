@@ -61,6 +61,8 @@ public sealed class UserAccessContext : IUserAccessContext, IDisposable
         new("استعلام‌ها", "/purchase/inquiries", Icons.Material.Filled.RequestQuote, "purchase", "Inquiry.View"),
         new("مناقصات", "/purchase/tenders", Icons.Material.Filled.Gavel, "purchase", "Tender.View"),
         new("فهرست مناقصات", "/purchase/tenders", Icons.Material.Filled.FormatListBulleted, "purchase", "Tender.View"),
+        new("قراردادها", "/purchase/contracts", Icons.Material.Filled.AssignmentTurnedIn, "purchase", "Contract.View"),
+        new("قالب‌های قرارداد", "/purchase/contracts/templates", Icons.Material.Filled.Article, "purchase", "Contract.ManageTemplates"),
         new("تأمین‌کنندگان", "/purchase/suppliers", Icons.Material.Filled.Business, "purchase", "Supplier.View"),
         new("دسته‌بندی تأمین‌کنندگان", "/purchase/suppliers/categories", Icons.Material.Filled.Category, "purchase", "Supplier.View"),
         new("کارتابل من", "/inbox/my", Icons.Material.Filled.Inbox, null, null),

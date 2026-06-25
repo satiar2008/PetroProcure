@@ -1,0 +1,132 @@
+@page "/purchase/contracts/from-tender/{TenderId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد قرارداد از مناقصه</PageTitle>
+<PageHeader Title="ایجاد قرارداد از مناقصه" Subtitle="@(_detail is null ? "در حال دریافت مناقصه" : $"{_detail.Tender.TenderNumber} — {_detail.Tender.Title}")" />
+
+<DataStateView TItem="TenderItemDto" Loading="_loading" Error="_error" Retry="Load">
+    @if (_detail is not null)
+    {
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                <MudPaper Class="form-panel" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-4">مشخصات قرارداد</MudText>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
+                        مناقصه مبنا: @_detail.Tender.TenderNumber — پرونده خرید: @_detail.Tender.PurchaseFileNumber
+                    </MudAlert>
+                    <MudSelect T="Guid?" @bind-Value="_tenderBidId" Label="پیشنهاد منتخب/مبنا" Variant="Variant.Outlined" Clearable="true">
+                        @foreach (var bid in _detail.Bids)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)bid.Id)">@BidText(bid)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <SupplierSelector Value="_supplier" ValueChanged="OnSupplierChanged" Label="تأمین‌کننده جایگزین/انتخابی" />
+                    <MudTextField @bind-Value="_title" Label="عنوان قرارداد" Required="true" Variant="Variant.Outlined" Class="mt-3" />
+                    <MudTextField @bind-Value="_subject" Label="موضوع قرارداد" Required="true" Variant="Variant.Outlined" Lines="2" Class="mt-3" />
+                    <MudSelect T="Guid?" @bind-Value="_templateId" Label="قالب قرارداد" Variant="Variant.Outlined" Class="mt-3" Clearable="true">
+                        @foreach (var template in _templates)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)template.Id)">@template.TemplateCode — @template.Title</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mt-4">
+                        اگر پیشنهاد مبنا انتخاب شود، اقلام و قیمت‌های همان پیشنهاد به قرارداد منتقل می‌شود؛ در غیر این صورت اقلام مناقصه بدون قیمت کپی می‌شوند.
+                    </MudAlert>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="7">
+                <MudPaper Class="data-panel" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-3">اقلام مناقصه</MudText>
+                    @foreach (var group in _detail.Items.GroupBy(x => new { x.MescGeneralGroupCode, x.GeneralDescription }))
+                    {
+                        <MudExpansionPanel Text="@($"{group.Key.MescGeneralGroupCode} — {group.Key.GeneralDescription}")">
+                            <MudTable Items="group" Dense="true">
+                                <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>مقدار</MudTh><MudTh>شرح فنی</MudTh></HeaderContent>
+                                <RowTemplate>
+                                    <MudTd>@context.MescCode</MudTd>
+                                    <MudTd>@context.SpecificDescription</MudTd>
+                                    <MudTd>@context.Quantity</MudTd>
+                                    <MudTd>@(context.TechnicalDescription ?? "—")</MudTd>
+                                </RowTemplate>
+                            </MudTable>
+                        </MudExpansionPanel>
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+        <div class="form-actions">
+            <MudButton Variant="Variant.Text" Href="@($"/purchase/tenders/{TenderId}")">بازگشت</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving" OnClick="Save">ایجاد قرارداد</MudButton>
+        </div>
+    }
+</DataStateView>
+
+@code {
+    [Parameter] public Guid TenderId { get; set; }
+    private bool _loading = true, _saving;
+    private string? _error;
+    private TenderDetailDto? _detail;
+    private List<ContractTemplateDto> _templates = [];
+    private SupplierLookupDto? _supplier;
+    private Guid? _tenderBidId, _templateId;
+    private string _title = "";
+    private string _subject = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(ContractUiPolicy.Create))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _detail = await Api.GetTenderAsync(TenderId);
+            if (_detail is null) throw new InvalidOperationException("مناقصه یافت نشد.");
+            _templates = (await Api.GetContractTemplatesAsync()).ToList();
+            _tenderBidId = _detail.Decisions.OrderByDescending(x => x.DecisionDate).FirstOrDefault(x => x.SelectedTenderBidId.HasValue)?.SelectedTenderBidId
+                ?? _detail.Bids.FirstOrDefault(x => x.Status == TenderBidStatus.Selected)?.Id
+                ?? _detail.Bids.FirstOrDefault()?.Id;
+            _title = $"قرارداد مناقصه {_detail.Tender.TenderNumber}";
+            _subject = $"قرارداد ناشی از مناقصه {_detail.Tender.TenderNumber}";
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void OnSupplierChanged(SupplierLookupDto? supplier) => _supplier = supplier;
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_subject))
+        {
+            Snackbar.Add("عنوان و موضوع قرارداد الزامی است.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var contract = await Api.CreateContractFromTenderAsync(TenderId,
+                new CreateContractFromTenderRequest(_supplier?.Id, _tenderBidId, _templateId, _title.Trim(), _subject.Trim()));
+            Snackbar.Add("قرارداد از مناقصه ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/contracts/{contract.Contract.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add("ایجاد قرارداد ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private static string BidText(TenderBidDto bid) =>
+        $"{bid.SupplierName ?? "تأمین‌کننده"} — {(bid.BidNumber ?? "بدون شماره")} — {bid.FinalAmount?.ToString("N0") ?? "بدون مبلغ"} {bid.Currency}";
+}

@@ -15,6 +15,7 @@ using PetroProcure.Contracts.V1.Orders;
 using PetroProcure.Contracts.V1.Tenders;
 using PetroProcure.Contracts.V1.Commission;
 using PetroProcure.Contracts.V1.Reports;
+using PetroProcure.Contracts.V1.Contracts;
 using PetroProcure.Web.Services.Auth;
 
 namespace PetroProcure.Web.Services.Api;
@@ -95,6 +96,32 @@ public interface IPetroProcureApiClient
     Task<List<AdminAuditLogDto>> GetAdminAuditLogsAsync(CancellationToken ct = default);
     Task<List<SystemSettingDto>> GetSystemSettingsAsync(CancellationToken ct = default);
     Task<SystemSettingDto> UpdateSystemSettingAsync(string key, UpdateSystemSettingRequest request, CancellationToken ct = default);
+    Task<PagedResult<PurchaseContractSummaryDto>> GetContractsAsync(ContractListRequest request, CancellationToken ct = default);
+    Task<PurchaseContractDetailDto?> GetContractAsync(Guid id, CancellationToken ct = default);
+    Task<List<PurchaseContractSummaryDto>> GetPurchaseFileContractsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<PurchaseContractDetailDto> CreateContractAsync(CreateContractRequest request, CancellationToken ct = default);
+    Task<PurchaseContractDetailDto> CreateContractFromPurchaseFileAsync(Guid purchaseFileId, CreateContractFromPurchaseFileRequest request, CancellationToken ct = default);
+    Task<PurchaseContractDetailDto> CreateContractFromTenderAsync(Guid tenderId, CreateContractFromTenderRequest request, CancellationToken ct = default);
+    Task<PurchaseContractDetailDto> CreateContractFromTenderBidAsync(Guid tenderBidId, CreateContractFromTenderBidRequest request, CancellationToken ct = default);
+    Task<PurchaseContractDetailDto> UpdateContractAsync(Guid id, UpdateContractRequest request, CancellationToken ct = default);
+    Task<PurchaseContractItemDto> AddContractItemAsync(Guid contractId, AddContractItemRequest request, CancellationToken ct = default);
+    Task RemoveContractItemAsync(Guid contractId, Guid itemId, CancellationToken ct = default);
+    Task ChangeContractStatusAsync(Guid id, string action, object body, CancellationToken ct = default);
+    Task<List<ContractTemplateDto>> GetContractTemplatesAsync(bool includeInactive = false, CancellationToken ct = default);
+    Task<ContractTemplateDto> CreateContractTemplateAsync(CreateContractTemplateRequest request, CancellationToken ct = default);
+    Task UpdateContractTemplateAsync(Guid id, UpdateContractTemplateRequest request, CancellationToken ct = default);
+    Task ApplyContractTemplateAsync(Guid contractId, Guid templateId, CancellationToken ct = default);
+    Task<ContractClauseDto> AddContractClauseAsync(Guid contractId, AddContractClauseRequest request, CancellationToken ct = default);
+    Task<ContractClauseDto> UpdateContractClauseAsync(Guid contractId, Guid clauseId, UpdateContractClauseRequest request, CancellationToken ct = default);
+    Task RemoveContractClauseAsync(Guid contractId, Guid clauseId, CancellationToken ct = default);
+    Task<List<ContractDocumentDto>> GetContractDocumentsAsync(Guid contractId, CancellationToken ct = default);
+    Task<ContractDocumentDto> UploadContractDocumentAsync(Guid contractId, Stream stream, string fileName,
+        string contentType, string documentType, string? description, CancellationToken ct = default);
+    Task DeleteContractDocumentAsync(Guid contractId, Guid documentId, CancellationToken ct = default);
+    string GetContractDocumentDownloadUrl(Guid contractId, Guid documentId);
+    Task<(byte[] Content, string ContentType, string FileName)> DownloadContractDocumentAsync(Guid contractId, Guid documentId, CancellationToken ct = default);
+    Task<byte[]> GetContractPdfAsync(Guid id, CancellationToken ct = default);
+    Task SaveContractPdfAsync(Guid id, CancellationToken ct = default);
     Task<PagedResult<SupplierSummaryDto>> GetSuppliersAsync(SupplierListRequest request, CancellationToken ct = default);
     Task<SupplierDetailDto?> GetSupplierAsync(Guid id, CancellationToken ct = default);
     Task<SupplierDetailDto> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken ct = default);
@@ -245,7 +272,7 @@ public sealed class PetroProcureApiClient(
     public async Task ChangeIndentStatusAsync(Guid id, string action, CancellationToken ct = default)
     { var response = await Client().PostAsync($"/api/indents/{id}/{action}", null, ct); await Ensure(response, ct); }
     public Task<byte[]> GetIndentPdfAsync(Guid id, CancellationToken ct = default) =>
-        Client().GetByteArrayAsync($"/api/reports/indent/{id}/pdf", ct);
+        GetBytesAsync($"/api/reports/indent/{id}/pdf", ct);
 
     public async Task<List<FileDocumentDto>> GetDocumentsAsync(Guid id, CancellationToken ct = default) =>
         await GetJsonAsync<List<FileDocumentDto>>(
@@ -273,7 +300,7 @@ public sealed class PetroProcureApiClient(
     }
 
     public Task<byte[]> GetPurchaseFileSummaryPdfAsync(Guid id, CancellationToken ct = default) =>
-        Client().GetByteArrayAsync($"/api/reports/purchase-file-summary/{id}/pdf", ct);
+        GetBytesAsync($"/api/reports/purchase-file-summary/{id}/pdf", ct);
 
     public async Task SavePurchaseFileSummaryAsync(Guid id, CancellationToken ct = default)
     {
@@ -352,11 +379,9 @@ public sealed class PetroProcureApiClient(
         new Uri(Client().BaseAddress!, $"/api/documents/{id}/download").ToString();
     public async Task<(byte[] Content, string ContentType, string FileName)> DownloadDocumentAsync(Guid id, CancellationToken ct = default)
     {
-        var response = await Client().GetAsync($"/api/documents/{id}/download", ct); await Ensure(response, ct);
-        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
-            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? "document";
-        return (await response.Content.ReadAsByteArrayAsync(ct),
-            response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream", fileName);
+        using var response = await SendGetAsync($"/api/documents/{id}/download", ct);
+        await Ensure(response, ct);
+        return await ReadFileResponseAsync(response, "document", ct);
     }
     public async Task<List<WorkflowActionDto>> GetAllowedWorkflowActionsAsync(Guid id, CancellationToken ct = default) =>
         await GetJsonAsync<List<WorkflowActionDto>>(
@@ -453,6 +478,158 @@ public sealed class PetroProcureApiClient(
     {
         var response = await Client().PutAsJsonAsync($"/api/admin/settings/{Uri.EscapeDataString(key)}", request, ct); await Ensure(response, ct);
         return (await response.Content.ReadFromJsonAsync<SystemSettingDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PagedResult<PurchaseContractSummaryDto>> GetContractsAsync(ContractListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["searchTerm"] = r.SearchTerm,
+            ["status"] = r.Status?.ToString(),
+            ["contractType"] = r.ContractType?.ToString(),
+            ["supplierId"] = r.SupplierId?.ToString(),
+            ["purchaseFileNumber"] = r.PurchaseFileNumber,
+            ["tenderNumber"] = r.TenderNumber,
+            ["createdDateFrom"] = r.CreatedDateFrom?.ToString("O"),
+            ["createdDateTo"] = r.CreatedDateTo?.ToString("O"),
+            ["sortBy"] = r.SortBy,
+            ["sortDescending"] = r.SortDescending.ToString().ToLowerInvariant(),
+            ["pageNumber"] = r.PageNumber.ToString(),
+            ["pageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/contracts?" + string.Join("&", query
+            .Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<PurchaseContractSummaryDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public Task<PurchaseContractDetailDto?> GetContractAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<PurchaseContractDetailDto>($"/api/contracts/{id}", ct);
+
+    public async Task<List<PurchaseContractSummaryDto>> GetPurchaseFileContractsAsync(Guid purchaseFileId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<PurchaseContractSummaryDto>>($"/api/purchase-files/{purchaseFileId}/contracts", ct) ?? [];
+
+    public async Task<PurchaseContractDetailDto> CreateContractAsync(CreateContractRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/contracts", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseContractDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PurchaseContractDetailDto> CreateContractFromPurchaseFileAsync(Guid purchaseFileId, CreateContractFromPurchaseFileRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/contracts/from-purchase-file/{purchaseFileId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseContractDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PurchaseContractDetailDto> CreateContractFromTenderAsync(Guid tenderId, CreateContractFromTenderRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/contracts/from-tender/{tenderId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseContractDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PurchaseContractDetailDto> CreateContractFromTenderBidAsync(Guid tenderBidId, CreateContractFromTenderBidRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/contracts/from-tender-bid/{tenderBidId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseContractDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PurchaseContractDetailDto> UpdateContractAsync(Guid id, UpdateContractRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/contracts/{id}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseContractDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PurchaseContractItemDto> AddContractItemAsync(Guid contractId, AddContractItemRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/contracts/{contractId}/items", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseContractItemDto>(cancellationToken: ct))!;
+    }
+
+    public async Task RemoveContractItemAsync(Guid contractId, Guid itemId, CancellationToken ct = default)
+    {
+        var response = await Client().DeleteAsync($"/api/contracts/{contractId}/items/{itemId}", ct); await Ensure(response, ct);
+    }
+
+    public async Task ChangeContractStatusAsync(Guid id, string action, object body, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/contracts/{id}/{action}", body, ct); await Ensure(response, ct);
+    }
+
+    public async Task<List<ContractTemplateDto>> GetContractTemplatesAsync(bool includeInactive = false, CancellationToken ct = default) =>
+        await GetJsonAsync<List<ContractTemplateDto>>($"/api/contracts/templates?includeInactive={includeInactive.ToString().ToLowerInvariant()}", ct) ?? [];
+
+    public async Task<ContractTemplateDto> CreateContractTemplateAsync(CreateContractTemplateRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/contracts/templates", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ContractTemplateDto>(cancellationToken: ct))!;
+    }
+
+    public async Task UpdateContractTemplateAsync(Guid id, UpdateContractTemplateRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/contracts/templates/{id}", request, ct); await Ensure(response, ct);
+    }
+
+    public async Task ApplyContractTemplateAsync(Guid contractId, Guid templateId, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsync($"/api/contracts/{contractId}/apply-template/{templateId}", null, ct); await Ensure(response, ct);
+    }
+
+    public async Task<ContractClauseDto> AddContractClauseAsync(Guid contractId, AddContractClauseRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/contracts/{contractId}/clauses", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ContractClauseDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<ContractClauseDto> UpdateContractClauseAsync(Guid contractId, Guid clauseId, UpdateContractClauseRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/contracts/{contractId}/clauses/{clauseId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ContractClauseDto>(cancellationToken: ct))!;
+    }
+
+    public async Task RemoveContractClauseAsync(Guid contractId, Guid clauseId, CancellationToken ct = default)
+    {
+        var response = await Client().DeleteAsync($"/api/contracts/{contractId}/clauses/{clauseId}", ct); await Ensure(response, ct);
+    }
+
+    public async Task<List<ContractDocumentDto>> GetContractDocumentsAsync(Guid contractId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<ContractDocumentDto>>($"/api/contracts/{contractId}/documents", ct) ?? [];
+
+    public async Task<ContractDocumentDto> UploadContractDocumentAsync(Guid contractId, Stream stream, string fileName,
+        string contentType, string documentType, string? description, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        var content = new StreamContent(stream);
+        content.Headers.ContentType = new(contentType);
+        form.Add(content, "file", fileName);
+        form.Add(new StringContent(documentType), "documentType");
+        if (!string.IsNullOrWhiteSpace(description)) form.Add(new StringContent(description), "description");
+        var response = await Client().PostAsync($"/api/contracts/{contractId}/documents/upload", form, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ContractDocumentDto>(cancellationToken: ct))!;
+    }
+
+    public async Task DeleteContractDocumentAsync(Guid contractId, Guid documentId, CancellationToken ct = default)
+    {
+        var response = await Client().DeleteAsync($"/api/contracts/{contractId}/documents/{documentId}", ct);
+        await Ensure(response, ct);
+    }
+
+    public string GetContractDocumentDownloadUrl(Guid contractId, Guid documentId) =>
+        $"/contract-document-download/{contractId}/{documentId}";
+
+    public async Task<(byte[] Content, string ContentType, string FileName)> DownloadContractDocumentAsync(Guid contractId, Guid documentId, CancellationToken ct = default)
+    {
+        using var response = await SendGetAsync($"/api/contracts/{contractId}/documents/{documentId}/download", ct);
+        await Ensure(response, ct);
+        return await ReadFileResponseAsync(response, "contract-document", ct);
+    }
+
+    public Task<byte[]> GetContractPdfAsync(Guid id, CancellationToken ct = default) =>
+        GetBytesAsync($"/api/contracts/{id}/reports/contract/pdf", ct);
+
+    public async Task SaveContractPdfAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsync($"/api/contracts/{id}/reports/contract/save-to-file", null, ct); await Ensure(response, ct);
     }
 
     public async Task<PagedResult<SupplierSummaryDto>> GetSuppliersAsync(SupplierListRequest r, CancellationToken ct = default)
@@ -734,17 +911,17 @@ public sealed class PetroProcureApiClient(
 
     public async Task<(byte[] Content, string ContentType, string FileName)> DownloadTenderDocumentAsync(Guid tenderId, Guid documentId, CancellationToken ct = default)
     {
-        var response = await Client().GetAsync($"/api/tenders/{tenderId}/documents/{documentId}/download", ct);
+        using var response = await SendGetAsync($"/api/tenders/{tenderId}/documents/{documentId}/download", ct);
         await Ensure(response, ct);
         return await ReadFileResponseAsync(response, "tender-document", ct);
     }
 
     public Task<byte[]> GetTenderSummaryReportPdfAsync(Guid tenderId, CancellationToken ct = default) =>
-        Client().GetByteArrayAsync($"/api/tenders/{tenderId}/reports/summary/pdf", ct);
+        GetBytesAsync($"/api/tenders/{tenderId}/reports/summary/pdf", ct);
     public Task<byte[]> GetTenderComparisonReportPdfAsync(Guid tenderId, CancellationToken ct = default) =>
-        Client().GetByteArrayAsync($"/api/tenders/{tenderId}/reports/comparison/pdf", ct);
+        GetBytesAsync($"/api/tenders/{tenderId}/reports/comparison/pdf", ct);
     public Task<byte[]> GetTenderWinnerDecisionReportPdfAsync(Guid tenderId, CancellationToken ct = default) =>
-        Client().GetByteArrayAsync($"/api/tenders/{tenderId}/reports/winner-decision/pdf", ct);
+        GetBytesAsync($"/api/tenders/{tenderId}/reports/winner-decision/pdf", ct);
     public async Task<GeneratedReportResultDto> SaveTenderSummaryReportAsync(Guid tenderId, CancellationToken ct = default)
     {
         var response = await Client().PostAsync($"/api/tenders/{tenderId}/reports/summary/save-to-file", null, ct);
@@ -900,15 +1077,15 @@ public sealed class PetroProcureApiClient(
 
     public async Task<(byte[] Content, string ContentType, string FileName)> DownloadCommissionAttachmentAsync(Guid sessionId, Guid attachmentId, CancellationToken ct = default)
     {
-        var response = await Client().GetAsync($"/api/commission/sessions/{sessionId}/attachments/{attachmentId}/download", ct);
+        using var response = await SendGetAsync($"/api/commission/sessions/{sessionId}/attachments/{attachmentId}/download", ct);
         await Ensure(response, ct);
         return await ReadFileResponseAsync(response, "commission-attachment", ct);
     }
 
     public Task<byte[]> GetCommissionMinutesReportPdfAsync(Guid sessionId, CancellationToken ct = default) =>
-        Client().GetByteArrayAsync($"/api/commission/sessions/{sessionId}/reports/minutes/pdf", ct);
+        GetBytesAsync($"/api/commission/sessions/{sessionId}/reports/minutes/pdf", ct);
     public Task<byte[]> GetCommissionDecisionReportPdfAsync(Guid sessionId, Guid decisionId, CancellationToken ct = default) =>
-        Client().GetByteArrayAsync($"/api/commission/sessions/{sessionId}/reports/decision/{decisionId}/pdf", ct);
+        GetBytesAsync($"/api/commission/sessions/{sessionId}/reports/decision/{decisionId}/pdf", ct);
     public async Task<GeneratedReportResultDto> SaveCommissionMinutesReportAsync(Guid sessionId, CancellationToken ct = default)
     {
         var response = await Client().PostAsync($"/api/commission/sessions/{sessionId}/reports/minutes/save-to-file", null, ct);
@@ -947,6 +1124,13 @@ public sealed class PetroProcureApiClient(
                 "ارتباط با سرویس برقرار نشد. لطفاً اتصال و وضعیت API را بررسی کنید.",
                 ex.Message));
         }
+    }
+
+    private async Task<byte[]> GetBytesAsync(string requestUri, CancellationToken ct = default)
+    {
+        using var response = await SendGetAsync(requestUri, ct);
+        await Ensure(response, ct);
+        return await response.Content.ReadAsByteArrayAsync(ct);
     }
 
     private async Task<HttpResponseMessage> SendGetAsync(string requestUri, CancellationToken ct)

@@ -61,6 +61,20 @@ public static class ApplicationPermissions
     public const string CommissionReportView = "Commission.ReportView";
     public const string CommissionReportExport = "Commission.ReportExport";
 
+    public const string ContractView = "Contract.View";
+    public const string ContractCreate = "Contract.Create";
+    public const string ContractEdit = "Contract.Edit";
+    public const string ContractSubmit = "Contract.Submit";
+    public const string ContractApprove = "Contract.Approve";
+    public const string ContractReject = "Contract.Reject";
+    public const string ContractSign = "Contract.Sign";
+    public const string ContractCancel = "Contract.Cancel";
+    public const string ContractManageClauses = "Contract.ManageClauses";
+    public const string ContractManageTemplates = "Contract.ManageTemplates";
+    public const string ContractManageDocuments = "Contract.ManageDocuments";
+    public const string ContractReportView = "Contract.ReportView";
+    public const string ContractReportExport = "Contract.ReportExport";
+
     public const string SupplierView = "Supplier.View";
     public const string SupplierCreate = "Supplier.Create";
     public const string SupplierEdit = "Supplier.Edit";
@@ -157,6 +171,19 @@ public static class ApplicationPermissions
         CommissionManageDocuments,
         CommissionReportView,
         CommissionReportExport,
+        ContractView,
+        ContractCreate,
+        ContractEdit,
+        ContractSubmit,
+        ContractApprove,
+        ContractReject,
+        ContractSign,
+        ContractCancel,
+        ContractManageClauses,
+        ContractManageTemplates,
+        ContractManageDocuments,
+        ContractReportView,
+        ContractReportExport,
         SupplierView,
         SupplierCreate,
         SupplierEdit,

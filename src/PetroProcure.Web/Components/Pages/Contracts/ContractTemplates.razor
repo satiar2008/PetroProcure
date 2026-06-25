@@ -1,0 +1,196 @@
+@page "/purchase/contracts/templates"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>قالب‌های قرارداد</PageTitle>
+<PageHeader Title="قالب‌های قرارداد" Subtitle="مدیریت قالب‌ها و بندهای پایه قراردادهای خرید">
+    <Actions>
+        <MudButton Variant="Variant.Outlined" Href="/purchase/contracts">بازگشت به قراردادها</MudButton>
+    </Actions>
+</PageHeader>
+
+<MudGrid>
+    <MudItem xs="12" md="4">
+        <MudPaper Class="form-panel" Elevation="0">
+            <MudText Typo="Typo.h6" Class="mb-4">@(_editing is null ? "قالب جدید" : "ویرایش قالب")</MudText>
+            <MudTextField @bind-Value="_templateCode" Label="کد قالب" Disabled="_editing is not null" Required="true" Variant="Variant.Outlined" />
+            <MudTextField @bind-Value="_title" Label="عنوان" Required="true" Variant="Variant.Outlined" Class="mt-3" />
+            <MudSelect T="ContractType" @bind-Value="_type" Label="نوع قرارداد" Variant="Variant.Outlined" Class="mt-3">
+                @foreach (var type in Enum.GetValues<ContractType>())
+                {
+                    <MudSelectItem Value="@type">@ContractUiPolicy.TypeText(type)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudTextField @bind-Value="_description" Label="توضیحات" Variant="Variant.Outlined" Lines="3" Class="mt-3" />
+            @if (_editing is not null)
+            {
+                <MudSwitch T="bool" @bind-Value="_isActive" Color="Color.Success" Label="فعال" Class="mt-2" />
+            }
+            else
+            {
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.subtitle2">بند پایه اولیه</MudText>
+                <MudTextField @bind-Value="_clauseTitle" Label="عنوان بند" Variant="Variant.Outlined" Class="mt-3" />
+                <MudTextField @bind-Value="_clauseBody" Label="متن بند" Variant="Variant.Outlined" Lines="4" Class="mt-3" />
+                <MudSelect T="ContractClauseType" @bind-Value="_clauseType" Label="نوع بند" Variant="Variant.Outlined" Class="mt-3">
+                    @foreach (var type in Enum.GetValues<ContractClauseType>())
+                    {
+                        <MudSelectItem Value="@type">@ContractUiPolicy.ClauseTypeText(type)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudCheckBox @bind-Value="_clauseRequired" Label="الزامی" />
+            }
+            <div class="form-actions">
+                @if (_editing is not null)
+                {
+                    <MudButton Variant="Variant.Text" OnClick="ResetForm">انصراف</MudButton>
+                }
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving" OnClick="Save">ذخیره</MudButton>
+            </div>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="8">
+        <DataStateView TItem="ContractTemplateDto" Loading="_loading" Error="_error" Items="_templates" Retry="Load"
+                       EmptyTitle="قالبی ثبت نشده" EmptyDescription="برای شروع یک قالب قرارداد بسازید.">
+            <MudTable Items="_templates" Dense="true" Hover="true" Elevation="0" Class="data-panel">
+                <HeaderContent>
+                    <MudTh>کد</MudTh><MudTh>عنوان</MudTh><MudTh>نوع</MudTh><MudTh>بندها</MudTh><MudTh>وضعیت</MudTh><MudTh>عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate Context="template">
+                    <MudTd>@template.TemplateCode</MudTd>
+                    <MudTd>@template.Title</MudTd>
+                    <MudTd>@ContractUiPolicy.TypeText(template.ContractType)</MudTd>
+                    <MudTd>@template.Clauses.Count</MudTd>
+                    <MudTd><StatusChip Text="@(template.IsActive ? "فعال" : "غیرفعال")" Color="@(template.IsActive ? Color.Success : Color.Default)" /></MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="@(() => Edit(template))" />
+                        <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => ToggleActive(template))">
+                            @(template.IsActive ? "غیرفعال‌سازی" : "فعال‌سازی")
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+                <ChildRowContent Context="template">
+                    @if (template.Clauses.Count > 0)
+                    {
+                        <MudTable Items="template.Clauses.OrderBy(x => x.OrderNo)" Dense="true" Elevation="0">
+                            <HeaderContent><MudTh>ترتیب</MudTh><MudTh>عنوان بند</MudTh><MudTh>نوع</MudTh><MudTh>الزامی</MudTh><MudTh>قابل ویرایش</MudTh></HeaderContent>
+                            <RowTemplate Context="clause">
+                                <MudTd>@clause.OrderNo</MudTd>
+                                <MudTd>@clause.Title</MudTd>
+                                <MudTd>@ContractUiPolicy.ClauseTypeText(clause.ClauseType)</MudTd>
+                                <MudTd>@(clause.IsRequired ? "بله" : "خیر")</MudTd>
+                                <MudTd>@(clause.IsEditable ? "بله" : "خیر")</MudTd>
+                            </RowTemplate>
+                        </MudTable>
+                    }
+                </ChildRowContent>
+            </MudTable>
+        </DataStateView>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _loading = true, _saving, _isActive = true, _clauseRequired = true;
+    private string? _error, _description, _clauseTitle, _clauseBody;
+    private string _templateCode = "";
+    private string _title = "";
+    private ContractType _type = ContractType.DirectPurchase;
+    private ContractClauseType _clauseType = ContractClauseType.General;
+    private ContractTemplateDto? _editing;
+    private List<ContractTemplateDto> _templates = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(ContractUiPolicy.ManageTemplates))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try { _templates = (await Api.GetContractTemplatesAsync(true)).ToList(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void Edit(ContractTemplateDto template)
+    {
+        _editing = template;
+        _templateCode = template.TemplateCode;
+        _title = template.Title;
+        _description = template.Description;
+        _type = template.ContractType;
+        _isActive = template.IsActive;
+    }
+
+    private async Task ToggleActive(ContractTemplateDto template)
+    {
+        try
+        {
+            await Api.UpdateContractTemplateAsync(template.Id, new UpdateContractTemplateRequest(
+                template.Title, template.Description, template.ContractType, !template.IsActive));
+            Snackbar.Add("وضعیت قالب به‌روزرسانی شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_templateCode) || string.IsNullOrWhiteSpace(_title))
+        {
+            Snackbar.Add("کد و عنوان قالب الزامی است.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            if (_editing is null)
+            {
+                var clauses = new List<AddContractTemplateClauseRequest>();
+                if (!string.IsNullOrWhiteSpace(_clauseTitle) || !string.IsNullOrWhiteSpace(_clauseBody))
+                {
+                    clauses.Add(new AddContractTemplateClauseRequest(1, _clauseTitle ?? "بند عمومی",
+                        _clauseBody ?? "", _clauseType, _clauseRequired, true));
+                }
+                await Api.CreateContractTemplateAsync(new CreateContractTemplateRequest(
+                    _templateCode.Trim(), _title.Trim(), _description, _type, clauses));
+                Snackbar.Add("قالب قرارداد ایجاد شد.", Severity.Success);
+            }
+            else
+            {
+                await Api.UpdateContractTemplateAsync(_editing.Id, new UpdateContractTemplateRequest(
+                    _title.Trim(), _description, _type, _isActive));
+                Snackbar.Add("قالب قرارداد به‌روزرسانی شد.", Severity.Success);
+            }
+
+            ResetForm();
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add("ذخیره قالب ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private void ResetForm()
+    {
+        _editing = null;
+        _templateCode = "";
+        _title = "";
+        _description = null;
+        _type = ContractType.DirectPurchase;
+        _isActive = true;
+        _clauseTitle = null;
+        _clauseBody = null;
+        _clauseType = ContractClauseType.General;
+        _clauseRequired = true;
+    }
+}

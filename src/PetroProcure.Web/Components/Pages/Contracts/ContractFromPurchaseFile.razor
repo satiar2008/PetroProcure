@@ -1,0 +1,135 @@
+@page "/purchase/contracts/from-purchase-file/{PurchaseFileId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد قرارداد از پرونده خرید</PageTitle>
+<PageHeader Title="ایجاد قرارداد از پرونده خرید" Subtitle="@(_file is null ? "در حال دریافت پرونده" : $"{_file.FileNumber} — {_file.Title}")" />
+
+<DataStateView TItem="PurchaseFileGroupedItemsDto" Loading="_loading" Error="_error" Retry="Load">
+    @if (_file is not null)
+    {
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                <MudPaper Class="form-panel" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-4">مشخصات قرارداد</MudText>
+                    <SupplierSelector Value="_supplier" ValueChanged="OnSupplierChanged" Required="true" />
+                    <MudTextField @bind-Value="_title" Label="عنوان قرارداد" Required="true" Variant="Variant.Outlined" Class="mt-3" />
+                    <MudTextField @bind-Value="_subject" Label="موضوع قرارداد" Required="true" Variant="Variant.Outlined" Class="mt-3" Lines="2" />
+                    <MudSelect T="ContractType" @bind-Value="_type" Label="نوع قرارداد" Variant="Variant.Outlined" Class="mt-3">
+                        @foreach (var type in Enum.GetValues<ContractType>())
+                        {
+                            <MudSelectItem Value="@type">@ContractUiPolicy.TypeText(type)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudSelect T="Guid?" @bind-Value="_templateId" Label="قالب قرارداد" Variant="Variant.Outlined" Class="mt-3" Clearable="true">
+                        @foreach (var template in _templates)
+                        {
+                            <MudSelectItem T="Guid?" Value="@((Guid?)template.Id)">@template.TemplateCode — @template.Title</MudSelectItem>
+                        }
+                    </MudSelect>
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+                        همه اقلام پرونده خرید با شرح‌های Snapshot به قرارداد کپی می‌شوند.
+                    </MudAlert>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="7">
+                <MudPaper Class="data-panel" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-3">اقلام پرونده خرید</MudText>
+                    @if (_groups.Count == 0)
+                    {
+                        <EmptyState Title="قلمی در پرونده وجود ندارد" Description="برای ایجاد قرارداد، پرونده خرید باید اقلام داشته باشد." />
+                    }
+                    else
+                    {
+                        @foreach (var group in _groups)
+                        {
+                            <MudExpansionPanel Text="@($"{group.MescGeneralGroupCode} — {group.GeneralDescription}")">
+                                <MudTable Items="group.Items" Dense="true">
+                                    <HeaderContent>
+                                        <MudTh>کد MESC</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>درخواستی</MudTh><MudTh>تأییدشده</MudTh>
+                                    </HeaderContent>
+                                    <RowTemplate>
+                                        <MudTd>@context.MescCode</MudTd>
+                                        <MudTd>@context.SpecificDescription</MudTd>
+                                        <MudTd>@context.RequestedQuantity</MudTd>
+                                        <MudTd>@context.ApprovedQuantity</MudTd>
+                                    </RowTemplate>
+                                </MudTable>
+                            </MudExpansionPanel>
+                        }
+                    }
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+        <div class="form-actions">
+            <MudButton Variant="Variant.Text" Href="@($"/purchase/files/{PurchaseFileId}")">بازگشت</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving || _groups.Count == 0" OnClick="Save">ایجاد قرارداد</MudButton>
+        </div>
+    }
+</DataStateView>
+
+@code {
+    [Parameter] public Guid PurchaseFileId { get; set; }
+    private bool _loading = true, _saving;
+    private string? _error;
+    private PurchaseFileDto? _file;
+    private List<PurchaseFileGroupedItemsDto> _groups = [];
+    private List<ContractTemplateDto> _templates = [];
+    private SupplierLookupDto? _supplier;
+    private Guid? _templateId;
+    private string _title = "";
+    private string _subject = "";
+    private ContractType _type = ContractType.DirectPurchase;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(ContractUiPolicy.Create))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _file = await Api.GetPurchaseFileAsync(PurchaseFileId);
+            if (_file is null) throw new InvalidOperationException("پرونده خرید یافت نشد.");
+            _groups = await Api.GetGroupedItemsAsync(PurchaseFileId);
+            _templates = (await Api.GetContractTemplatesAsync()).ToList();
+            _title = $"قرارداد {_file.FileNumber}";
+            _subject = $"تأمین اقلام پرونده خرید {_file.FileNumber}";
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void OnSupplierChanged(SupplierLookupDto? supplier) => _supplier = supplier;
+
+    private async Task Save()
+    {
+        if (_supplier is null || string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_subject))
+        {
+            Snackbar.Add("تأمین‌کننده، عنوان و موضوع قرارداد الزامی است.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var contract = await Api.CreateContractFromPurchaseFileAsync(PurchaseFileId,
+                new CreateContractFromPurchaseFileRequest(_supplier.Id, _templateId, _title.Trim(), _subject.Trim(), _type));
+            Snackbar.Add("قرارداد از پرونده خرید ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/contracts/{contract.Contract.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add("ایجاد قرارداد ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+}

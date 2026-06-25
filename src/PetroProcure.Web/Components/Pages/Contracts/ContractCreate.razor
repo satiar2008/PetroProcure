@@ -1,0 +1,153 @@
+@page "/purchase/contracts/create"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد قرارداد</PageTitle>
+<PageHeader Title="ایجاد قرارداد خرید" Subtitle="ثبت قرارداد دستی مرتبط با یک پرونده خرید" />
+
+@if (_loading)
+{
+    <LoadingOverlay Visible="true" Text="در حال آماده‌سازی فرم..." />
+}
+else
+{
+    <MudPaper Class="form-panel" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" md="6">
+                <MudAutocomplete T="PurchaseFileSummaryDto" Label="پرونده خرید" Required="true"
+                                 SearchFunc="SearchPurchaseFiles" ToStringFunc="DisplayPurchaseFile"
+                                 Value="_purchaseFile" ValueChanged="OnPurchaseFileChanged"
+                                 Variant="Variant.Outlined" Dense="true" Clearable="true"
+                                 Placeholder="جستجو با شماره یا عنوان پرونده" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <SupplierSelector Value="_supplier" ValueChanged="OnSupplierChanged" Required="true" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_title" Label="عنوان قرارداد" Required="true" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="6">
+                <MudTextField @bind-Value="_subject" Label="موضوع قرارداد" Required="true" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="ContractType" @bind-Value="_type" Label="نوع قرارداد" Variant="Variant.Outlined">
+                    @foreach (var type in Enum.GetValues<ContractType>())
+                    {
+                        <MudSelectItem Value="@type">@ContractUiPolicy.TypeText(type)</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudTextField @bind-Value="_currency" Label="ارز" Required="true" Variant="Variant.Outlined" />
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid?" @bind-Value="_templateId" Label="قالب قرارداد" Variant="Variant.Outlined" Clearable="true">
+                    @foreach (var template in _templates)
+                    {
+                        <MudSelectItem T="Guid?" Value="@((Guid?)template.Id)">@template.TemplateCode — @template.Title</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_totalAmount" Label="مبلغ کل" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_taxAmount" Label="مالیات/عوارض" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_finalAmount" Label="مبلغ نهایی" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_startDate" Label="تاریخ شروع" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_endDate" Label="تاریخ پایان" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_deliveryDeadline" Label="مهلت تحویل" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_paymentTerms" Label="شرایط پرداخت" Variant="Variant.Outlined" Lines="2" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_deliveryTerms" Label="شرایط تحویل" Variant="Variant.Outlined" Lines="2" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_warrantyTerms" Label="شرایط گارانتی" Variant="Variant.Outlined" Lines="2" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_penaltyTerms" Label="شرایط جرائم" Variant="Variant.Outlined" Lines="2" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Variant="Variant.Outlined" Lines="3" /></MudItem>
+        </MudGrid>
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-4">
+            برای قرارداد دستی، پس از ایجاد می‌توانید از صفحه جزئیات، اقلام پرونده خرید و بندهای قرارداد را تکمیل کنید.
+        </MudAlert>
+    </MudPaper>
+
+    <div class="form-actions">
+        <MudButton Variant="Variant.Text" Href="/purchase/contracts">بازگشت</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving" OnClick="Save">ثبت قرارداد</MudButton>
+    </div>
+}
+
+@code {
+    private bool _loading = true, _saving;
+    private PurchaseFileSummaryDto? _purchaseFile;
+    private SupplierLookupDto? _supplier;
+    private List<ContractTemplateDto> _templates = [];
+    private Guid? _templateId;
+    private string _title = "";
+    private string _subject = "";
+    private string _currency = "IRR";
+    private string? _paymentTerms, _deliveryTerms, _warrantyTerms, _penaltyTerms, _description;
+    private ContractType _type = ContractType.DirectPurchase;
+    private decimal? _totalAmount, _taxAmount, _finalAmount;
+    private DateTime? _startDate, _endDate, _deliveryDeadline;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(ContractUiPolicy.Create))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+
+        try { _templates = (await Api.GetContractTemplatesAsync()).ToList(); }
+        catch (Exception ex) { Snackbar.Add("دریافت قالب‌ها ناموفق بود: " + ex.Message, Severity.Warning); }
+        finally { _loading = false; }
+    }
+
+    private async Task<IEnumerable<PurchaseFileSummaryDto>> SearchPurchaseFiles(string value, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            var firstPage = await Api.GetPurchaseFilesAsync(new PurchaseFileListRequest(PageNumber: 1, PageSize: 20), ct);
+            return firstPage.Items;
+        }
+
+        var byNumber = await Api.GetPurchaseFilesAsync(new PurchaseFileListRequest(FileNumber: value, PageNumber: 1, PageSize: 20), ct);
+        if (byNumber.Items.Count > 0) return byNumber.Items;
+        var byTitle = await Api.GetPurchaseFilesAsync(new PurchaseFileListRequest(Title: value, PageNumber: 1, PageSize: 20), ct);
+        return byTitle.Items;
+    }
+
+    private void OnPurchaseFileChanged(PurchaseFileSummaryDto? file)
+    {
+        _purchaseFile = file;
+        if (file is null) return;
+        if (string.IsNullOrWhiteSpace(_title)) _title = $"قرارداد {file.FileNumber}";
+        if (string.IsNullOrWhiteSpace(_subject)) _subject = $"تأمین اقلام پرونده خرید {file.FileNumber}";
+    }
+
+    private void OnSupplierChanged(SupplierLookupDto? supplier) => _supplier = supplier;
+
+    private async Task Save()
+    {
+        if (_purchaseFile is null || _supplier is null || string.IsNullOrWhiteSpace(_title) ||
+            string.IsNullOrWhiteSpace(_subject) || string.IsNullOrWhiteSpace(_currency))
+        {
+            Snackbar.Add("پرونده خرید، تأمین‌کننده، عنوان، موضوع و ارز الزامی است.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        try
+        {
+            var contract = await Api.CreateContractAsync(new CreateContractRequest(
+                _purchaseFile.Id, _supplier.Id, null, null, null, _templateId, _title.Trim(), _subject.Trim(),
+                _type, _currency.Trim(), _totalAmount, _taxAmount, _finalAmount, _startDate, _endDate,
+                _deliveryDeadline, _paymentTerms, _deliveryTerms, _warrantyTerms, _penaltyTerms, _description));
+            Snackbar.Add("قرارداد ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/contracts/{contract.Contract.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add("ثبت قرارداد ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private static string DisplayPurchaseFile(PurchaseFileSummaryDto? file) =>
+        file is null ? string.Empty : $"{file.FileNumber} — {file.Title}";
+}

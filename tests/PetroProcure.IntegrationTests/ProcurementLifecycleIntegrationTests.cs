@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using PetroProcure.Application.Documents;
+using PetroProcure.Application.Contracts;
 using PetroProcure.Application.Indents;
 using PetroProcure.Application.Mesc;
 using PetroProcure.Application.PurchaseFiles;
 using PetroProcure.Application.Workflow;
+using PetroProcure.Contracts.V1.Contracts;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Infrastructure.Persistence;
 using PetroProcure.Infrastructure.Persistence.Seeding;
@@ -39,6 +41,7 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
         Assert.True(await db.PurchaseFiles.AnyAsync(x => x.FileNumber == "PF-2026-000001"));
         Assert.True(await db.InboxTasks.AnyAsync());
         Assert.True(await db.FileDocuments.AnyAsync());
+        Assert.True(await db.ContractTemplates.AnyAsync());
     }
 
     [Fact]
@@ -63,6 +66,7 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
         var mesc = sp.GetRequiredService<MescCommandHandler>();
         var indentHandler = sp.GetRequiredService<IndentCommandHandler>();
         var purchaseHandler = sp.GetRequiredService<PurchaseFileCommandHandler>();
+        var contractHandler = sp.GetRequiredService<ContractCommandHandler>();
         var workflow = sp.GetRequiredService<WorkflowCommandHandler>();
         var storage = sp.GetRequiredService<IFileStorageService>();
         var reports = sp.GetRequiredService<IReportGenerator>();
@@ -94,6 +98,22 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
             PurchaseFilePriority.Normal));
         Assert.Single(file.Items);
 
+        var contract = await contractHandler.Handle(new CreateContractFromPurchaseFileCommand(file.Id,
+            new CreateContractFromPurchaseFileRequest(Guid.Parse("a2000000-0000-0000-0000-000000000001"),
+                null, "Integration contract", "Supply approved purchase file items")));
+        Assert.Single(contract.Items);
+        Assert.Equal(file.Id, contract.Contract.PurchaseFileId);
+        Assert.Equal(file.Items.Single().MescGeneralGroupCode, contract.Items.Single().MescGeneralGroupCode);
+
+        await contractHandler.Handle(new AddContractClauseCommand(contract.Contract.Id,
+            new AddContractClauseRequest(1, "Subject", "Supplier shall deliver approved items.",
+                ContractClauseType.General, true, true)));
+        await contractHandler.Handle(new SubmitContractCommand(contract.Contract.Id, "Ready for approval"));
+        await contractHandler.Handle(new ApproveContractCommand(contract.Contract.Id, "Approved by integration test"));
+
+        var approvedContract = await db.PurchaseContracts.AsNoTracking().SingleAsync(x => x.Id == contract.Contract.Id);
+        Assert.Equal(ContractStatus.Approved, approvedContract.Status);
+
         await using var content = new MemoryStream([1, 2, 3, 4, 5]);
         var document = await storage.SaveFileAsync(file.Id, DocumentType.TechnicalSpecification,
             "technical.pdf", content, IdentitySeedData.DefaultAdminUserId);
@@ -112,6 +132,10 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
         var pdf = await reports.GeneratePdfAsync(ReportNames.PurchaseFileSummary,
             new Dictionary<string, object?> { ["PurchaseFileId"] = file.Id });
         Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(pdf, 0, 4));
+
+        var contractPdf = await reports.GeneratePdfAsync(ReportNames.Contract,
+            new Dictionary<string, object?> { ["ContractId"] = contract.Contract.Id });
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(contractPdf, 0, 4));
     }
 
     private static async Task<Dictionary<string, int>> CountSeededCoreData(PetroProcureDbContext db) =>
@@ -130,6 +154,7 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
             ["workflowInstances"] = await db.WorkflowInstances.CountAsync(),
             ["inboxTasks"] = await db.InboxTasks.CountAsync(),
             ["fileDocuments"] = await db.FileDocuments.CountAsync(),
-            ["workflowActions"] = await db.WorkflowActionDefinitions.CountAsync()
+            ["workflowActions"] = await db.WorkflowActionDefinitions.CountAsync(),
+            ["contractTemplates"] = await db.ContractTemplates.CountAsync()
         };
 }

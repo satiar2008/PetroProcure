@@ -110,6 +110,39 @@ public sealed class ReportGeneratorTests : IDisposable
         Assert.DoesNotContain(':', storage.LastOriginalFileName);
     }
 
+    [Fact]
+    public async Task ContractReportCreatesPdfBytes()
+    {
+        var generator = new ReportGenerator(new FakeDataProvider(), new CapturingStorage(),
+            new TestCurrentUser(Guid.NewGuid()));
+
+        var bytes = await generator.GeneratePdfAsync(ReportNames.Contract,
+            new Dictionary<string, object?> { ["ContractId"] = FakeDataProvider.ContractId });
+
+        Assert.True(bytes.Length > 100);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task ContractGeneratedReportUsesContractDocumentFolderAndSafeFileName()
+    {
+        var storage = new CapturingStorage();
+        var generator = new ReportGenerator(new FakeDataProvider(), storage,
+            new TestCurrentUser(Guid.NewGuid()));
+
+        await generator.SaveGeneratedReportToPurchaseFileAsync(FakeDataProvider.PurchaseFileId,
+            ReportNames.Contract,
+            new Dictionary<string, object?>
+            {
+                ["ContractId"] = FakeDataProvider.ContractId,
+                ["ContractNumber"] = "CNT/2026:000001"
+            });
+
+        Assert.Equal(DocumentType.Contract, storage.LastDocumentType);
+        Assert.DoesNotContain('/', storage.LastOriginalFileName);
+        Assert.DoesNotContain(':', storage.LastOriginalFileName);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, true);
@@ -121,6 +154,7 @@ public sealed class ReportGeneratorTests : IDisposable
         public static readonly Guid TenderId = Guid.NewGuid();
         public static readonly Guid CommissionSessionId = Guid.NewGuid();
         public static readonly Guid DecisionId = Guid.NewGuid();
+        public static readonly Guid ContractId = Guid.NewGuid();
         public Task<PurchaseFileReportData?> GetPurchaseFileAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<PurchaseFileReportData?>(new(
                 PurchaseFileId, "PF-2026-000001", "خرید لوله", "در واحد خرید", "واحد خرید",
@@ -165,6 +199,14 @@ public sealed class ReportGeneratorTests : IDisposable
             Task.FromResult<CommissionDecisionReportData?>(new(DecisionId, "TC-2026-000001", "TND-2026-000001",
                 "PF-2026-000001", "انتخاب برنده", "تصویب‌شده", "شرکت الف", "BID-001",
                 "شرکت الف انتخاب شد.", "امتیاز بالاتر", "admin", "manager", "1405/01/22"));
+        public Task<ContractReportData?> GetContractAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<ContractReportData?>(new(ContractId, "CNT-2026-000001", "PF-2026-000001", "شرکت الف",
+                "TND-2026-000001", "TC-2026-000001 / تصمیم", "قرارداد خرید", "تأمین اقلام", "پیش‌نویس",
+                "مبتنی بر مناقصه", "IRR", "1,000 IRR", "90 IRR", "1,090 IRR", "1405/01/01", "1405/12/29",
+                "1405/06/01", "پرداخت مرحله‌ای", "تحویل در انبار", "۱۲ ماه", "طبق قرارداد",
+                [new("123456", "لوله و اتصالات",
+                    [new("1234560001", "123456", "لوله و اتصالات", "لوله فولادی", "متر", 10)])],
+                [new(1, "موضوع قرارداد", "متن بند قرارداد", "عمومی", true)]));
     }
 
     private sealed class CapturingStorage : IFileStorageService

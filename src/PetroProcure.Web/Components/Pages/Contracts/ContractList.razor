@@ -1,0 +1,80 @@
+@page "/purchase/contracts"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>قراردادها</PageTitle>
+<PageHeader Title="قراردادها" Subtitle="مدیریت قراردادهای خرید مرتبط با پرونده‌های خرید">
+    <Actions>
+        <PermissionView Permission="@ContractUiPolicy.Create">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" Href="/purchase/contracts/create">ایجاد قرارداد</MudButton>
+        </PermissionView>
+        <PermissionView Permission="@ContractUiPolicy.ManageTemplates">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Article" Href="/purchase/contracts/templates">قالب‌های قرارداد</MudButton>
+        </PermissionView>
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_search" Label="جستجو" Variant="Variant.Outlined" Immediate="true" /></MudItem>
+        <MudItem xs="12" md="2"><MudSelect T="ContractStatus?" @bind-Value="_status" Label="وضعیت" Variant="Variant.Outlined" Clearable="true">@foreach(var s in Enum.GetValues<ContractStatus>()){<MudSelectItem T="ContractStatus?" Value="@s">@ContractUiPolicy.StatusText(s)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="2"><MudSelect T="ContractType?" @bind-Value="_type" Label="نوع" Variant="Variant.Outlined" Clearable="true">@foreach(var t in Enum.GetValues<ContractType>()){<MudSelectItem T="ContractType?" Value="@t">@ContractUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_purchaseFileNumber" Label="شماره پرونده خرید" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center"><MudButton Variant="Variant.Outlined" OnClick="Reload">اعمال</MudButton></MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudTable ServerData="LoadServerData" @ref="_table" Dense="true" Hover="true" Elevation="0" Class="data-panel">
+    <HeaderContent>
+        <MudTh><MudTableSortLabel T="PurchaseContractSummaryDto" SortLabel="ContractNumber">شماره قرارداد</MudTableSortLabel></MudTh>
+        <MudTh>پرونده خرید</MudTh>
+        <MudTh>تأمین‌کننده</MudTh>
+        <MudTh>عنوان</MudTh>
+        <MudTh>نوع</MudTh>
+        <MudTh><MudTableSortLabel T="PurchaseContractSummaryDto" SortLabel="Status">وضعیت</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="PurchaseContractSummaryDto" SortLabel="FinalAmount">مبلغ نهایی</MudTableSortLabel></MudTh>
+        <MudTh><MudTableSortLabel T="PurchaseContractSummaryDto" SortLabel="CreatedAt">تاریخ ایجاد</MudTableSortLabel></MudTh>
+        <MudTh>عملیات</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.ContractNumber</MudTd>
+        <MudTd>@context.PurchaseFileNumber</MudTd>
+        <MudTd>@context.SupplierName</MudTd>
+        <MudTd>@context.Title</MudTd>
+        <MudTd>@ContractUiPolicy.TypeText(context.ContractType)</MudTd>
+        <MudTd><StatusChip Text="@ContractUiPolicy.StatusText(context.Status)" /></MudTd>
+        <MudTd>@Money(context.FinalAmount, context.Currency)</MudTd>
+        <MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
+        <MudTd><MudIconButton Icon="@Icons.Material.Filled.Visibility" OnClick="@(()=>Navigation.NavigateTo($"/purchase/contracts/{context.Id}"))" /></MudTd>
+    </RowTemplate>
+    <NoRecordsContent><EmptyState Title="قراردادی یافت نشد" Description="هنوز قرارداد ثبت نشده یا فیلترها نتیجه‌ای ندارند." /></NoRecordsContent>
+</MudTable>
+
+@code {
+    private MudTable<PurchaseContractSummaryDto>? _table;
+    private string? _search, _purchaseFileNumber;
+    private ContractStatus? _status;
+    private ContractType? _type;
+
+    private Task Reload() => _table?.ReloadServerData() ?? Task.CompletedTask;
+
+    private async Task<TableData<PurchaseContractSummaryDto>> LoadServerData(TableState state, CancellationToken ct)
+    {
+        try
+        {
+            var result = await Api.GetContractsAsync(new ContractListRequest(_search, _status, _type, null,
+                _purchaseFileNumber, null, null, null, state.SortLabel ?? "CreatedAt",
+                state.SortDirection == SortDirection.Descending, state.Page + 1, state.PageSize), ct);
+            return new() { Items = result.Items, TotalItems = (int)result.TotalCount };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add(ex.Message, Severity.Error);
+            return new() { Items = [], TotalItems = 0 };
+        }
+    }
+
+    private static string Money(decimal? value, string currency) => value.HasValue ? $"{value.Value:N0} {currency}" : "—";
+}

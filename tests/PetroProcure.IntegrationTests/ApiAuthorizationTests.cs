@@ -138,6 +138,22 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
     }
 
     [Fact]
+    public async Task ContractListRequiresContractView()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.SupplierView);
+        var response = await client.GetAsync("/api/contracts");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserWithContractViewCanListContracts()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.ContractView);
+        var response = await client.GetAsync("/api/contracts");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
     public async Task CreateSupplierThroughApi()
     {
         var client = factory.CreateAuthenticatedClient(ApplicationPermissions.SupplierCreate, userId: IdentitySeedData.DefaultAdminUserId);

@@ -1,6 +1,7 @@
 @inject IPetroProcureApiClient Api
 @inject IUserAccessContext Access
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <MudAlert Severity="Severity.Warning" Class="mb-3">
     گزارش‌های کمیسیون برای چاپ و بایگانی رسمی آماده می‌شوند؛ تصمیم‌گیری نهایی همچنان انسانی و خارج از اختیار AI/سیستم است.
@@ -20,8 +21,8 @@ else
                     <MudText Typo="Typo.body2" Color="Color.Secondary">اعضا، دستورجلسه، صورتجلسه‌ها و تصمیمات ثبت‌شده</MudText>
                 </MudCardContent>
                 <MudCardActions>
-                    <MudButton Href="@($"/report-preview/commission/{SessionId}/minutes")" Target="_blank" Variant="Variant.Outlined"
-                               StartIcon="@Icons.Material.Filled.Visibility">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Visibility"
+                               Disabled="_opening" OnClick="OpenMinutes">
                         پیش‌نمایش / PDF
                     </MudButton>
                     @if (Access.HasPermission(CommissionUiPolicy.ReportExport))
@@ -58,8 +59,8 @@ else
                 <MudTd>@context.DecisionText</MudTd>
                 <MudTd><DateDisplay Value="@context.CreatedAt" IncludeTime="true" /></MudTd>
                 <MudTd>
-                    <MudButton Href="@($"/report-preview/commission/{SessionId}/decision/{context.Id}")" Target="_blank"
-                               Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Visibility">
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Filled.Visibility"
+                               Disabled="_opening" OnClick="@(() => OpenDecision(context.Id))">
                         PDF
                     </MudButton>
                     @if (Access.HasPermission(CommissionUiPolicy.ReportExport))
@@ -79,7 +80,32 @@ else
     [Parameter] public Guid SessionId { get; set; }
     [Parameter] public IReadOnlyList<TenderCommissionDecisionDto> Decisions { get; set; } = [];
 
-    private bool _saving;
+    private bool _saving, _opening;
+
+    private Task OpenMinutes() =>
+        OpenReport("صورتجلسه کمیسیون", () => Api.GetCommissionMinutesReportPdfAsync(SessionId));
+
+    private Task OpenDecision(Guid decisionId) =>
+        OpenReport("تصمیم کمیسیون", () => Api.GetCommissionDecisionReportPdfAsync(SessionId, decisionId));
+
+    private async Task OpenReport(string title, Func<Task<byte[]>> loadPdf)
+    {
+        _opening = true;
+        try
+        {
+            var bytes = await loadPdf();
+            var dataUrl = $"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";
+            await JS.InvokeVoidAsync("open", dataUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"دریافت گزارش «{title}» ناموفق بود: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _opening = false;
+        }
+    }
 
     private async Task SaveMinutes()
     {

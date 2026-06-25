@@ -1,6 +1,7 @@
 @inject IPetroProcureApiClient Api
 @inject IUserAccessContext Access
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <MudAlert Severity="Severity.Warning" Class="mb-3">
     گزارش‌ها سند رسمی برای چاپ و بایگانی هستند، اما انتخاب برنده و تصمیم نهایی همچنان با انسان و کمیسیون مجاز است.
@@ -13,18 +14,18 @@
 else
 {
     <MudGrid>
-        @ReportCard("خلاصه مناقصه", "مشخصات مناقصه، پرونده خرید، شرکت‌کنندگان و اقلام گروه‌بندی‌شده MESC", $"/report-preview/tender/{TenderId}/summary", SaveSummary)
-        @ReportCard("جدول مقایسه مناقصه", "مقایسه پیشنهادهای تأمین‌کنندگان و وضعیت فنی/مالی اقلام", $"/report-preview/tender/{TenderId}/comparison", SaveComparison)
-        @ReportCard("تصمیم برنده مناقصه", "خروجی رسمی انتخاب برنده و دلایل ثبت‌شده", $"/report-preview/tender/{TenderId}/winner-decision", SaveWinnerDecision)
+        @ReportCard("خلاصه مناقصه", "مشخصات مناقصه، پرونده خرید، شرکت‌کنندگان و اقلام گروه‌بندی‌شده MESC", () => Api.GetTenderSummaryReportPdfAsync(TenderId), SaveSummary)
+        @ReportCard("جدول مقایسه مناقصه", "مقایسه پیشنهادهای تأمین‌کنندگان و وضعیت فنی/مالی اقلام", () => Api.GetTenderComparisonReportPdfAsync(TenderId), SaveComparison)
+        @ReportCard("تصمیم برنده مناقصه", "خروجی رسمی انتخاب برنده و دلایل ثبت‌شده", () => Api.GetTenderWinnerDecisionReportPdfAsync(TenderId), SaveWinnerDecision)
     </MudGrid>
 }
 
 @code {
     [Parameter] public Guid TenderId { get; set; }
 
-    private bool _saving;
+    private bool _saving, _opening;
 
-    private RenderFragment ReportCard(string title, string description, string previewUrl, Func<Task> saveAction) =>
+    private RenderFragment ReportCard(string title, string description, Func<Task<byte[]>> loadPdf, Func<Task> saveAction) =>
         @<MudItem xs="12" md="4">
             <MudCard>
                 <MudCardContent>
@@ -32,8 +33,9 @@ else
                     <MudText Typo="Typo.body2" Color="Color.Secondary">@description</MudText>
                 </MudCardContent>
                 <MudCardActions>
-                    <MudButton Href="@previewUrl" Target="_blank" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Visibility"
-                               Disabled="@(!Access.HasPermission(TenderUiPolicy.ReportView) && !Access.HasPermission(TenderUiPolicy.ReportExport))">
+                    <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Visibility"
+                               Disabled="@(_opening || (!Access.HasPermission(TenderUiPolicy.ReportView) && !Access.HasPermission(TenderUiPolicy.ReportExport)))"
+                               OnClick="@(() => OpenReport(title, loadPdf))">
                         پیش‌نمایش / PDF
                     </MudButton>
                     @if (Access.HasPermission(TenderUiPolicy.ReportExport))
@@ -50,6 +52,25 @@ else
     private Task SaveSummary() => Save("خلاصه مناقصه", () => Api.SaveTenderSummaryReportAsync(TenderId));
     private Task SaveComparison() => Save("جدول مقایسه مناقصه", () => Api.SaveTenderComparisonReportAsync(TenderId));
     private Task SaveWinnerDecision() => Save("تصمیم برنده مناقصه", () => Api.SaveTenderWinnerDecisionReportAsync(TenderId));
+
+    private async Task OpenReport(string title, Func<Task<byte[]>> loadPdf)
+    {
+        _opening = true;
+        try
+        {
+            var bytes = await loadPdf();
+            var dataUrl = $"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";
+            await JS.InvokeVoidAsync("open", dataUrl, "_blank");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"دریافت گزارش «{title}» ناموفق بود: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _opening = false;
+        }
+    }
 
     private async Task Save(string title, Func<Task> action)
     {

@@ -10,6 +10,7 @@ using PetroProcure.Application.Inquiries;
 using PetroProcure.Application.Orders;
 using PetroProcure.Application.Tenders;
 using PetroProcure.Application.Commission;
+using PetroProcure.Application.Contracts;
 
 namespace PetroProcure.Application;
 
@@ -40,6 +41,12 @@ public static class DependencyInjection
         services.AddScoped<TenderQueryHandler>();
         services.AddScoped<CommissionCommandHandler>();
         services.AddScoped<CommissionQueryHandler>();
+        services.AddScoped<IContractNumberService, ContractNumberService>();
+        services.AddScoped<IContractEligibilityService, ContractEligibilityService>();
+        services.AddScoped<IContractTemplateService, ContractTemplateService>();
+        services.AddScoped<IContractReportDataSourceBuilder, ContractReportDataSourceBuilder>();
+        services.AddScoped<ContractCommandHandler>();
+        services.AddScoped<ContractQueryHandler>();
         return services;
     }
 }

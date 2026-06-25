@@ -12,6 +12,8 @@
         { <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Publish">انتشار</MudButton> }
         @if (_detail is not null && TenderUiPolicy.CanCancel(_detail.Tender.Status, Access.HasPermission))
         { <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="Cancel">لغو</MudButton> }
+        @if (_detail is not null && Access.HasPermission(ContractUiPolicy.Create))
+        { <MudButton Color="Color.Success" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.AssignmentTurnedIn" Href="@($"/purchase/contracts/from-tender/{Id}")">ایجاد قرارداد</MudButton> }
     </Actions>
 </PageHeader>
 
@@ -107,7 +109,15 @@
     <MudTabPanel Text="گزارش‌ها" Icon="@Icons.Material.Filled.PictureAsPdf">
         <TenderReportsPanel TenderId="Id" />
     </MudTabPanel>
-    <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link"><MudAlert Severity="Severity.Info">پرونده خرید، استعلام مبنا و جلسات کمیسیون از تب‌های همین صفحه قابل مشاهده هستند. اتصال به قرارداد و سفارش خرید در فازهای بعدی انجام می‌شود.</MudAlert></MudTabPanel>
+    <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link">
+        <MudAlert Severity="Severity.Info" Class="mb-3">پرونده خرید، استعلام مبنا و جلسات کمیسیون از تب‌های همین صفحه قابل مشاهده هستند.</MudAlert>
+        @if (Access.HasPermission(ContractUiPolicy.Create))
+        {
+            <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AssignmentTurnedIn"
+                       Href="@($"/purchase/contracts/from-tender/{Id}")">ایجاد قرارداد از این مناقصه</MudButton>
+        }
+        <MudAlert Severity="Severity.Warning" Class="mt-3">اتصال قرارداد به سفارش خرید در فازهای بعدی انجام می‌شود.</MudAlert>
+    </MudTabPanel>
 </MudTabs>
 }
 </DataStateView>

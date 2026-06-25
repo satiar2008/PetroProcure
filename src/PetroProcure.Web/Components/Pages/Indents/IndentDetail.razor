@@ -6,6 +6,7 @@
 @inject IDialogService Dialog
 @inject ISnackbar Snackbar
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 <PageTitle>جزئیات تقاضای خرید</PageTitle>
 <PageHeader Title="@(_indent is null?"جزئیات تقاضا":$"تقاضا {IndentUiPolicy.FormatNumber(_indent.IndentNumber)}")" Subtitle="@(_indent?.Title??"در حال دریافت اطلاعات")" />
 @if(_loading){<LoadingOverlay Visible="true" />}
@@ -28,10 +29,10 @@ else if(IndentUiPolicy.CanSubmit(_indent.Status,Access.HasPermission)){<MudButto
 <MudTabPanel Text="پرونده خرید مرتبط" Icon="@Icons.Material.Filled.FolderOpen">
 @if(_relatedLoading){<MudProgressLinear Indeterminate="true" />}else if(_relatedError is not null){<EmptyState Title="خطا در دریافت پرونده مرتبط" Description="@_relatedError"><Action><MudButton OnClick="LoadRelated">تلاش مجدد</MudButton></Action></EmptyState>}else if(_related is null){<EmptyState Title="پرونده خرید ایجاد نشده است" Description="پس از ارسال تقاضا به واحد خرید می‌توانید پرونده ایجاد کنید." />}else{<MudAlert Severity="Severity.Success"><MudLink Href="@($"/purchase/files/{_related.Id}")">@_related.FileNumber — @_related.Title</MudLink></MudAlert>}
 </MudTabPanel>
-<MudTabPanel Text="گزارش" Icon="@Icons.Material.Filled.PictureAsPdf"><div class="report-actions"><MudButton Variant="Variant.Filled" Color="Color.Primary" Href="@($"/report-preview/indent/{Id}")" Target="_blank">دریافت PDF</MudButton><MudButton Variant="Variant.Outlined" OnClick="@(()=>_preview=!_preview)">پیش‌نمایش</MudButton></div>@if(_preview){<div class="report-preview"><iframe src="@($"/report-preview/indent/{Id}")" title="پیش‌نمایش گزارش تقاضا"></iframe></div>}<MudAlert Severity="Severity.Info" Class="mt-3">ذخیره گزارش Indent در مخزن پرونده، پس از ایجاد پرونده خرید مرتبط قابل انجام است.</MudAlert></MudTabPanel>
+<MudTabPanel Text="گزارش" Icon="@Icons.Material.Filled.PictureAsPdf"><div class="report-actions"><MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="_pdfLoading" OnClick="OpenIndentPdf">دریافت PDF</MudButton><MudButton Variant="Variant.Outlined" Disabled="_pdfLoading" OnClick="ToggleIndentPreview">پیش‌نمایش</MudButton></div>@if(_pdfLoading){<MudProgressLinear Indeterminate="true" Class="mt-4" />}@if(_preview&&_indentPdfDataUrl is not null){<div class="report-preview"><iframe src="@_indentPdfDataUrl" title="پیش‌نمایش گزارش تقاضا"></iframe></div>}<MudAlert Severity="Severity.Info" Class="mt-3">ذخیره گزارش Indent در مخزن پرونده، پس از ایجاد پرونده خرید مرتبط قابل انجام است.</MudAlert></MudTabPanel>
 </MudTabs>}
 @code{
-[Parameter]public Guid Id{get;set;}private IndentDto?_indent;private bool _loading=true,_itemsLoading=true,_relatedLoading=true,_preview,_disposed;private string?_error,_itemsError,_relatedError;private List<IndentGroupedItemsDto>_groups=[];private PurchaseFileSummaryDto?_related;
+[Parameter]public Guid Id{get;set;}private IndentDto?_indent;private bool _loading=true,_itemsLoading=true,_relatedLoading=true,_preview,_disposed,_pdfLoading;private string?_error,_itemsError,_relatedError,_indentPdfDataUrl;private List<IndentGroupedItemsDto>_groups=[];private PurchaseFileSummaryDto?_related;
 private int ItemCount=>_groups.Sum(x=>x.Items.Count);
 protected override async Task OnParametersSetAsync(){if(_disposed)return;if(!IndentUiPolicy.CanView(Access.HasPermission)){Navigation.NavigateTo("/access-denied");return;}await Load();}
 private async Task Load(){if(_disposed)return;_loading=true;_error=null;try{_indent=await Api.GetIndentAsync(Id);if(_indent is null||_disposed)return;await Task.WhenAll(LoadItems(),LoadRelated());}catch(Exception ex){if(!_disposed)_error=ex.Message;}finally{if(!_disposed)_loading=false;}}
@@ -40,6 +41,9 @@ private async Task LoadRelated(){if(_indent is null||_disposed)return;_relatedLo
 private async Task ConfirmAction(string action,string title,string message){var d=await Dialog.ShowAsync<ConfirmDialog>(title,new DialogParameters{{"Message",message}});var r=await d.Result;if(r?.Canceled!=false)return;await Execute(action);}
 private async Task Reject(){var d=await Dialog.ShowAsync<RejectIndentDialog>("رد تقاضا");var r=await d.Result;if(r?.Canceled!=false)return;await Execute("reject");Snackbar.Add("Backend فعلی علت رد را نگهداری نمی‌کند.",Severity.Warning);}
 private async Task Execute(string action){if(action=="submit"&&ItemCount==0){Snackbar.Add("برای ارسال تقاضا، ثبت حداقل یک قلم کالا الزامی است.",Severity.Warning);return;}try{await Api.ChangeIndentStatusAsync(Id,action);Snackbar.Add("وضعیت تقاضا تغییر کرد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+private async Task ToggleIndentPreview(){_preview=!_preview;if(_preview)await EnsureIndentPdfLoaded();}
+private async Task OpenIndentPdf(){await EnsureIndentPdfLoaded();if(_indentPdfDataUrl is not null)await JS.InvokeVoidAsync("open",_indentPdfDataUrl,"_blank");}
+private async Task EnsureIndentPdfLoaded(){if(_indentPdfDataUrl is not null)return;_pdfLoading=true;try{var bytes=await Api.GetIndentPdfAsync(Id);_indentPdfDataUrl=$"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";}catch(Exception ex){Snackbar.Add("دریافت گزارش تقاضا ناموفق بود: "+ex.Message,Severity.Error);}finally{_pdfLoading=false;}}
 private static string? SourceRoute(IndentDto item)=>item.SourceType switch{IndentSourceType.MaterialNeed when item.SourceReferenceId.HasValue=>$"/orders/material-needs/{item.SourceReferenceId}",IndentSourceType.ShortageAlert=>"/orders/shortage-alerts",_=>null};
 private RenderFragment Info(string label,string value)=>@<MudPaper Class="pa-3" Elevation="0" Outlined="true"><MudText Typo="Typo.caption">@label</MudText><MudText Typo="Typo.body1"><strong>@value</strong></MudText></MudPaper>;
 public void Dispose()=>_disposed=true;

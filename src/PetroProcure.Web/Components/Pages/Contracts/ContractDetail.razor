@@ -1,0 +1,660 @@
+@page "/purchase/contracts/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject IJSRuntime JS
+
+<PageTitle>@(_detail?.Contract.ContractNumber ?? "قرارداد")</PageTitle>
+
+@if (_loading)
+{
+    <LoadingOverlay Visible="true" Text="در حال دریافت قرارداد..." />
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <EmptyState Icon="@Icons.Material.Filled.CloudOff" Title="دریافت قرارداد ناموفق بود" Description="@_error">
+        <Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action>
+    </EmptyState>
+}
+else if (_detail is not null)
+{
+    <PageHeader Title="@_detail.Contract.ContractNumber" Subtitle="@_detail.Contract.Title">
+        <Actions>
+            <StatusChip Text="@ContractUiPolicy.StatusText(_detail.Contract.Status)" Color="@StatusColor(_detail.Contract.Status)" />
+            <MudButton Variant="Variant.Outlined" Href="/purchase/contracts">بازگشت</MudButton>
+        </Actions>
+    </PageHeader>
+
+    <MudTabs Rounded="true" PanelClass="pa-4">
+        <MudTabPanel Text="خلاصه" Icon="@Icons.Material.Filled.Info">
+            @SummaryTab()
+        </MudTabPanel>
+        <MudTabPanel Text="اقلام" Icon="@Icons.Material.Filled.Inventory2">
+            @ItemsTab()
+        </MudTabPanel>
+        <MudTabPanel Text="بندهای قرارداد" Icon="@Icons.Material.Filled.Article">
+            @ClausesTab()
+        </MudTabPanel>
+        <MudTabPanel Text="اسناد" Icon="@Icons.Material.Filled.AttachFile">
+            @DocumentsTab()
+        </MudTabPanel>
+        <MudTabPanel Text="تأیید و وضعیت" Icon="@Icons.Material.Filled.Verified">
+            @ApprovalTab()
+        </MudTabPanel>
+        <MudTabPanel Text="گزارش" Icon="@Icons.Material.Filled.PictureAsPdf">
+            @ReportsTab()
+        </MudTabPanel>
+        <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link">
+            <MudPaper Class="form-panel" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-3">ارتباطات قرارداد</MudText>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-2">
+                    پرونده خرید:
+                    <MudLink Href="@($"/purchase/files/{_detail.Contract.PurchaseFileId}")">@(_detail.Contract.PurchaseFileNumber ?? "مشاهده پرونده")</MudLink>
+                </MudAlert>
+                @if (_detail.Contract.TenderId.HasValue)
+                {
+                    <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-2">
+                        مناقصه:
+                        <MudLink Href="@($"/purchase/tenders/{_detail.Contract.TenderId}")">@(_detail.Contract.TenderNumber ?? "مشاهده مناقصه")</MudLink>
+                    </MudAlert>
+                }
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined">
+                    اتصال قرارداد به سفارش خرید، دریافت انبار و امور مالی در فازهای بعدی تکمیل می‌شود.
+                </MudAlert>
+            </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PurchaseContractDetailDto? _detail;
+    private List<PurchaseFileGroupedItemsDto> _purchaseGroups = [];
+    private List<ContractTemplateDto> _templates = [];
+    private bool _loading = true, _saving, _editMode, _showPreview, _uploadBusy, _pdfLoading;
+    private string? _error, _actionComment, _documentDescription;
+    private string? _contractPdfDataUrl;
+    private string _documentType = "ContractAttachment";
+    private Guid? _selectedPurchaseFileItemId, _selectedTemplateId;
+
+    private string _editTitle = "";
+    private string _editSubject = "";
+    private ContractType _editType = ContractType.DirectPurchase;
+    private string _editCurrency = "IRR";
+    private decimal? _editTotal, _editTax, _editFinal;
+    private DateTime? _editStart, _editEnd, _editDelivery;
+    private string? _editPayment, _editDeliveryTerms, _editWarranty, _editPenalty, _editDescription;
+
+    private ContractClauseDto? _editingClause;
+    private int _clauseOrder = 1;
+    private string _clauseTitle = "";
+    private string _clauseBody = "";
+    private ContractClauseType _clauseType = ContractClauseType.General;
+    private bool _clauseRequired = true;
+    private bool _clauseEditable = true;
+
+    private bool CanEdit => _detail is not null && ContractUiPolicy.IsEditable(_detail.Contract.Status) && Access.HasPermission(ContractUiPolicy.Edit);
+    private bool CanManageClauses => _detail is not null && ContractUiPolicy.IsEditable(_detail.Contract.Status) && Access.HasPermission(ContractUiPolicy.ManageClauses);
+    private bool CanManageDocuments => _detail is not null && Access.HasPermission(ContractUiPolicy.ManageDocuments);
+
+    protected override async Task OnParametersSetAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            if (!Access.HasPermission(ContractUiPolicy.View))
+            {
+                Navigation.NavigateTo("/access-denied");
+                return;
+            }
+
+            _detail = await Api.GetContractAsync(Id);
+            if (_detail is null) throw new InvalidOperationException("قرارداد یافت نشد.");
+            _purchaseGroups = await Api.GetGroupedItemsAsync(_detail.Contract.PurchaseFileId);
+            _templates = (await Api.GetContractTemplatesAsync()).ToList();
+            FillEditForm();
+            ResetClauseForm();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private RenderFragment SummaryTab() => @<MudPaper Class="form-panel" Elevation="0">
+        @if (!_editMode)
+        {
+            <div class="summary-grid">
+                @Info("شماره قرارداد", _detail!.Contract.ContractNumber)
+                @Info("عنوان", _detail.Contract.Title)
+                @Info("موضوع", _detail.Contract.Subject)
+                @Info("نوع", ContractUiPolicy.TypeText(_detail.Contract.ContractType))
+                @Info("تأمین‌کننده", _detail.Contract.SupplierName ?? "—")
+                @Info("پرونده خرید", _detail.Contract.PurchaseFileNumber ?? "—")
+                @Info("ارز", _detail.Contract.Currency)
+                @Info("مبلغ نهایی", Money(_detail.Contract.FinalAmount, _detail.Contract.Currency))
+                <div class="summary-item"><span>تاریخ ایجاد</span><strong><DateDisplay Value="@_detail.Contract.CreatedAt" IncludeTime="true" /></strong></div>
+                <div class="summary-item"><span>شروع</span><strong><DateDisplay Value="@_detail.Contract.StartDate" /></strong></div>
+                <div class="summary-item"><span>پایان</span><strong><DateDisplay Value="@_detail.Contract.EndDate" /></strong></div>
+                <div class="summary-item"><span>مهلت تحویل</span><strong><DateDisplay Value="@_detail.Contract.DeliveryDeadline" /></strong></div>
+            </div>
+            <MudDivider Class="my-4" />
+            <MudText Typo="Typo.subtitle2">توضیحات</MudText>
+            <MudText Typo="Typo.body2">@(_detail.Contract.Description ?? "شرحی ثبت نشده است.")</MudText>
+            @if (CanEdit)
+            {
+                <MudButton Class="mt-4" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Edit" OnClick="@(() => _editMode = true)">ویرایش مشخصات</MudButton>
+            }
+        }
+        else
+        {
+            <MudGrid>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_editTitle" Label="عنوان" Required="true" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_editSubject" Label="موضوع" Required="true" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><MudSelect T="ContractType" @bind-Value="_editType" Label="نوع قرارداد" Variant="Variant.Outlined">@foreach(var type in Enum.GetValues<ContractType>()){<MudSelectItem Value="@type">@ContractUiPolicy.TypeText(type)</MudSelectItem>}</MudSelect></MudItem>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_editCurrency" Label="ارز" Required="true" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_editFinal" Label="مبلغ نهایی" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_editTotal" Label="مبلغ کل" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_editTax" Label="مالیات/عوارض" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_editDelivery" Label="مهلت تحویل" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudDatePicker @bind-Date="_editStart" Label="تاریخ شروع" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudDatePicker @bind-Date="_editEnd" Label="تاریخ پایان" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_editPayment" Label="شرایط پرداخت" Lines="2" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_editDeliveryTerms" Label="شرایط تحویل" Lines="2" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_editWarranty" Label="شرایط گارانتی" Lines="2" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="6"><MudTextField @bind-Value="_editPenalty" Label="شرایط جرائم" Lines="2" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12"><MudTextField @bind-Value="_editDescription" Label="توضیحات" Lines="3" Variant="Variant.Outlined" /></MudItem>
+            </MudGrid>
+            <div class="form-actions">
+                <MudButton Variant="Variant.Text" OnClick="@(() => { FillEditForm(); _editMode = false; })">انصراف</MudButton>
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving" OnClick="SaveContract">ذخیره</MudButton>
+            </div>
+        }
+    </MudPaper>;
+
+    private RenderFragment ItemsTab() => @<div>
+        @if (CanEdit)
+        {
+            <MudPaper Class="form-panel mb-4" Elevation="0">
+                <MudGrid>
+                    <MudItem xs="12" md="9">
+                        <MudSelect T="Guid?" @bind-Value="_selectedPurchaseFileItemId" Label="افزودن قلم از پرونده خرید" Variant="Variant.Outlined" Clearable="true">
+                            @foreach (var item in _purchaseGroups.SelectMany(x => x.Items))
+                            {
+                                <MudSelectItem T="Guid?" Value="@((Guid?)item.Id)">@item.MescCode — @item.SpecificDescription</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="3" Class="d-flex align-center">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="_selectedPurchaseFileItemId is null" OnClick="AddItemFromPurchaseFile">افزودن</MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+        @if (_detail!.Items.Count == 0)
+        {
+            <EmptyState Title="قلمی در قرارداد ثبت نشده" Description="برای ارسال قرارداد حداقل یک قلم لازم است." />
+        }
+        else
+        {
+            @foreach (var group in _detail.Items.GroupBy(x => new { x.MescGeneralGroupCode, x.GeneralDescription }))
+            {
+                <MudPaper Class="item-group" Elevation="0">
+                    <div class="group-header"><div><strong>@group.Key.MescGeneralGroupCode</strong><span>@group.Key.GeneralDescription</span></div><MudChip T="string">@group.Count() قلم</MudChip></div>
+                    <MudTable Items="group" Dense="true">
+                        <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح اختصاصی</MudTh><MudTh>مقدار</MudTh><MudTh>قیمت واحد</MudTh><MudTh>مبلغ</MudTh><MudTh></MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.MescCode</MudTd>
+                            <MudTd>@context.SpecificDescription</MudTd>
+                            <MudTd>@context.Quantity</MudTd>
+                            <MudTd>@(context.UnitPrice?.ToString("N0") ?? "—")</MudTd>
+                            <MudTd>@(context.TotalPrice?.ToString("N0") ?? "—")</MudTd>
+                            <MudTd>@if (CanEdit) { <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(() => RemoveItem(context.Id))" /> }</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                </MudPaper>
+            }
+        }
+    </div>;
+
+    private RenderFragment ClausesTab() => @<div>
+        @if (CanManageClauses)
+        {
+            <MudPaper Class="form-panel mb-4" Elevation="0">
+                <MudGrid>
+                    <MudItem xs="12" md="9">
+                        <MudSelect T="Guid?" @bind-Value="_selectedTemplateId" Label="اعمال قالب بندها" Variant="Variant.Outlined" Clearable="true">
+                            @foreach (var template in _templates)
+                            {
+                                <MudSelectItem T="Guid?" Value="@((Guid?)template.Id)">@template.TemplateCode — @template.Title</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="3" Class="d-flex align-center">
+                        <MudButton Variant="Variant.Outlined" Disabled="_selectedTemplateId is null" OnClick="ApplyTemplate">اعمال قالب</MudButton>
+                    </MudItem>
+                </MudGrid>
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.subtitle1">@(_editingClause is null ? "بند جدید" : "ویرایش بند")</MudText>
+                <MudGrid>
+                    <MudItem xs="12" md="2"><MudNumericField T="int" @bind-Value="_clauseOrder" Label="ترتیب" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="5"><MudTextField @bind-Value="_clauseTitle" Label="عنوان بند" Required="true" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="5"><MudSelect T="ContractClauseType" @bind-Value="_clauseType" Label="نوع بند" Variant="Variant.Outlined">@foreach(var type in Enum.GetValues<ContractClauseType>()){<MudSelectItem Value="@type">@ContractUiPolicy.ClauseTypeText(type)</MudSelectItem>}</MudSelect></MudItem>
+                    <MudItem xs="12"><MudTextField @bind-Value="_clauseBody" Label="متن بند" Required="true" Lines="5" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="3"><MudCheckBox @bind-Value="_clauseRequired" Label="الزامی" /></MudItem>
+                    <MudItem xs="12" md="3"><MudCheckBox @bind-Value="_clauseEditable" Label="قابل ویرایش" /></MudItem>
+                    <MudItem xs="12" md="6" Class="d-flex justify-end align-center gap-2">
+                        @if (_editingClause is not null) { <MudButton Variant="Variant.Text" OnClick="ResetClauseForm">انصراف</MudButton> }
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="SaveClause">@(_editingClause is null ? "افزودن بند" : "ذخیره بند")</MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+        @if (_detail!.Clauses.Count == 0)
+        {
+            <EmptyState Title="بندی ثبت نشده" Description="برای ارسال قرارداد حداقل یک بند الزامی با متن لازم است." />
+        }
+        else
+        {
+            @foreach (var clause in _detail.Clauses.OrderBy(x => x.OrderNo))
+            {
+                <MudPaper Class="form-panel mb-3" Elevation="0">
+                    <div class="d-flex justify-space-between align-center">
+                        <div>
+                            <MudText Typo="Typo.subtitle1">@clause.OrderNo. @clause.Title</MudText>
+                            <MudText Typo="Typo.caption">@ContractUiPolicy.ClauseTypeText(clause.ClauseType) · @(clause.IsRequired ? "الزامی" : "اختیاری")</MudText>
+                        </div>
+                        @if (CanManageClauses)
+                        {
+                            <div>
+                                <MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="@(() => EditClause(clause))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(() => RemoveClause(clause.Id))" />
+                            </div>
+                        }
+                    </div>
+                    <MudText Typo="Typo.body2" Class="mt-3">@clause.Body</MudText>
+                </MudPaper>
+            }
+        }
+    </div>;
+
+    private RenderFragment DocumentsTab() => @<div>
+        @if (CanManageDocuments)
+        {
+            <MudPaper Class="form-panel mb-4" Elevation="0">
+                <MudGrid>
+                    <MudItem xs="12" md="4">
+                        <MudSelect T="string" @bind-Value="_documentType" Label="نوع سند" Variant="Variant.Outlined">
+                            <MudSelectItem Value="@("ContractAttachment")">پیوست قرارداد</MudSelectItem>
+                            <MudSelectItem Value="@("SignedContract")">نسخه امضاشده</MudSelectItem>
+                            <MudSelectItem Value="@("ContractCorrespondence")">مکاتبات قرارداد</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" md="5"><MudTextField @bind-Value="_documentDescription" Label="توضیحات سند" Variant="Variant.Outlined" /></MudItem>
+                    <MudItem xs="12" md="3" Class="d-flex align-center"><InputFile OnChange="UploadDocument" disabled="@_uploadBusy" /></MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+        @if (_detail!.Documents.Count == 0)
+        {
+            <EmptyState Title="سندی ثبت نشده" Description="پیوست‌ها و نسخه امضاشده قرارداد از این بخش مدیریت می‌شوند." />
+        }
+        else
+        {
+            <MudTable Items="_detail.Documents" Dense="true" Hover="true">
+                <HeaderContent><MudTh>نوع</MudTh><MudTh>نام فایل</MudTh><MudTh>توضیحات</MudTh><MudTh>بارگذار</MudTh><MudTh>تاریخ</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@ContractDocumentTypeText(context.DocumentType)</MudTd>
+                    <MudTd>@(context.OriginalFileName ?? "—")</MudTd>
+                    <MudTd>@(context.Description ?? "—")</MudTd>
+                    <MudTd><UserDisplay UserId="@context.UploadedByUserId" /></MudTd>
+                    <MudTd><DateDisplay Value="@context.UploadedAt" IncludeTime="true" /></MudTd>
+                    <MudTd>
+                        <MudIconButton Icon="@Icons.Material.Filled.Download" OnClick="@(() => DownloadDocument(context.Id))" />
+                        @if (CanManageDocuments) { <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(() => DeleteDocument(context.Id))" /> }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </div>;
+
+    private RenderFragment ApprovalTab() => @<div>
+        <MudPaper Class="form-panel mb-4" Elevation="0">
+            <MudText Typo="Typo.h6">اقدامات وضعیت</MudText>
+            <MudTextField @bind-Value="_actionComment" Label="توضیح اقدام" Lines="2" Variant="Variant.Outlined" Class="mt-3" />
+            <div class="report-actions mt-3">
+                @if (ContractUiPolicy.CanSubmit(_detail!.Contract.Status, Access.HasPermission))
+                { <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => ChangeStatus("submit", new SubmitContractRequest(_actionComment), "قرارداد ارسال شد."))">ارسال برای بررسی</MudButton> }
+                @if (ContractUiPolicy.CanApprove(_detail!.Contract.Status, Access.HasPermission))
+                { <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@(() => ChangeStatus("approve", new ApproveContractRequest(_actionComment), "قرارداد تأیید شد."))">تأیید</MudButton> }
+                @if (ContractUiPolicy.CanReject(_detail!.Contract.Status, Access.HasPermission))
+                { <MudButton Color="Color.Warning" Variant="Variant.Outlined" OnClick="@(() => RejectContract())">رد قرارداد</MudButton> }
+                @if (ContractUiPolicy.CanSign(_detail!.Contract.Status, Access.HasPermission))
+                { <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="@(() => ChangeStatus("sign", new SignContractRequest(_actionComment), "قرارداد امضا شد."))">ثبت امضا</MudButton> }
+                @if (CanCancel())
+                { <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="CancelContract">لغو قرارداد</MudButton> }
+            </div>
+        </MudPaper>
+        @if (_detail!.Approvals.Count == 0)
+        {
+            <EmptyState Title="سوابق تأیید وجود ندارد" Description="پس از رد یا تأیید قرارداد، سوابق اینجا نمایش داده می‌شود." />
+        }
+        else
+        {
+            @foreach (var approval in _detail!.Approvals.OrderByDescending(x => x.CreatedAt))
+            {
+                <MudAlert Severity="@ApprovalSeverity(approval.Status)" Variant="Variant.Outlined" Class="mb-2">
+                    <strong>@approval.ApprovalStep</strong> · @ApprovalText(approval.Status)
+                    <br />
+                    @(approval.Comment ?? "بدون توضیح")
+                    <br />
+                    <small><DateDisplay Value="@approval.CreatedAt" IncludeTime="true" /></small>
+                </MudAlert>
+            }
+        }
+    </div>;
+
+    private RenderFragment ReportsTab() => @<MudPaper Class="form-panel" Elevation="0">
+        <MudText Typo="Typo.h6">گزارش رسمی قرارداد</MudText>
+        <MudText Typo="Typo.body2" Class="mt-2">گزارش شامل خلاصه قرارداد، تأمین‌کننده، اقلام گروه‌بندی‌شده MESC و بندهای قرارداد است.</MudText>
+        <div class="report-actions mt-4">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Preview" Disabled="_pdfLoading" OnClick="ToggleContractPreview">پیش‌نمایش</MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PictureAsPdf" Disabled="_pdfLoading" OnClick="OpenContractPdf">خروجی PDF</MudButton>
+            @if (Access.HasPermission(ContractUiPolicy.ReportExport))
+            {
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SaveAlt" OnClick="SaveReport">ذخیره در اسناد پرونده</MudButton>
+            }
+        </div>
+        @if (_pdfLoading)
+        {
+            <MudProgressLinear Indeterminate="true" Class="mt-4" />
+        }
+        @if (_showPreview && _contractPdfDataUrl is not null)
+        {
+            <div class="report-preview"><iframe src="@_contractPdfDataUrl" title="پیش‌نمایش قرارداد"></iframe></div>
+        }
+    </MudPaper>;
+
+    private async Task SaveContract()
+    {
+        if (_detail is null) return;
+        if (string.IsNullOrWhiteSpace(_editTitle) || string.IsNullOrWhiteSpace(_editSubject) || string.IsNullOrWhiteSpace(_editCurrency))
+        {
+            Snackbar.Add("عنوان، موضوع و ارز الزامی است.", Severity.Warning);
+            return;
+        }
+        _saving = true;
+        try
+        {
+            _detail = await Api.UpdateContractAsync(Id, new UpdateContractRequest(_editTitle.Trim(), _editSubject.Trim(),
+                _editType, _editCurrency.Trim(), _editTotal, _editTax, _editFinal, _editStart, _editEnd, _editDelivery,
+                _editPayment, _editDeliveryTerms, _editWarranty, _editPenalty, _editDescription));
+            _editMode = false;
+            Snackbar.Add("مشخصات قرارداد ذخیره شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add("ذخیره ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private async Task AddItemFromPurchaseFile()
+    {
+        if (_selectedPurchaseFileItemId is null) return;
+        var item = _purchaseGroups.SelectMany(x => x.Items).FirstOrDefault(x => x.Id == _selectedPurchaseFileItemId.Value);
+        if (item is null) return;
+        try
+        {
+            await Api.AddContractItemAsync(Id, new AddContractItemRequest(item.Id, null, item.MescItemId, item.MescCode,
+                item.MescGeneralGroupCode, item.GeneralDescription, item.SpecificDescription, item.UnitOfMeasureId,
+                item.ApprovedQuantity > 0 ? item.ApprovedQuantity : item.RequestedQuantity, null, null, item.TechnicalDescription));
+            _selectedPurchaseFileItemId = null;
+            await ReloadDetail();
+            Snackbar.Add("قلم به قرارداد اضافه شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task RemoveItem(Guid itemId)
+    {
+        if (!await Confirm("حذف قلم", "قلم از قرارداد حذف شود؟", Color.Error)) return;
+        try { await Api.RemoveContractItemAsync(Id, itemId); await ReloadDetail(); Snackbar.Add("قلم حذف شد.", Severity.Success); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task ApplyTemplate()
+    {
+        if (_selectedTemplateId is null) return;
+        if (!await Confirm("اعمال قالب", "بندهای قالب به قرارداد اضافه شود؟", Color.Primary)) return;
+        try { _detail = await Api.GetContractAsync(Id); await Api.ApplyContractTemplateAsync(Id, _selectedTemplateId.Value); await ReloadDetail(); Snackbar.Add("قالب اعمال شد.", Severity.Success); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task SaveClause()
+    {
+        if (string.IsNullOrWhiteSpace(_clauseTitle) || string.IsNullOrWhiteSpace(_clauseBody))
+        {
+            Snackbar.Add("عنوان و متن بند الزامی است.", Severity.Warning);
+            return;
+        }
+        try
+        {
+            if (_editingClause is null)
+                await Api.AddContractClauseAsync(Id, new AddContractClauseRequest(_clauseOrder, _clauseTitle.Trim(), _clauseBody.Trim(), _clauseType, _clauseRequired, _clauseEditable));
+            else
+                await Api.UpdateContractClauseAsync(Id, _editingClause.Id, new UpdateContractClauseRequest(_clauseOrder, _clauseTitle.Trim(), _clauseBody.Trim(), _clauseType, _clauseRequired, _clauseEditable));
+            ResetClauseForm();
+            await ReloadDetail();
+            Snackbar.Add("بند قرارداد ذخیره شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private void EditClause(ContractClauseDto clause)
+    {
+        _editingClause = clause;
+        _clauseOrder = clause.OrderNo;
+        _clauseTitle = clause.Title;
+        _clauseBody = clause.Body;
+        _clauseType = clause.ClauseType;
+        _clauseRequired = clause.IsRequired;
+        _clauseEditable = clause.IsEditable;
+    }
+
+    private async Task RemoveClause(Guid clauseId)
+    {
+        if (!await Confirm("حذف بند", "بند قرارداد حذف شود؟", Color.Error)) return;
+        try { await Api.RemoveContractClauseAsync(Id, clauseId); await ReloadDetail(); Snackbar.Add("بند حذف شد.", Severity.Success); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task UploadDocument(InputFileChangeEventArgs e)
+    {
+        _uploadBusy = true;
+        try
+        {
+            var file = e.File;
+            await using var stream = file.OpenReadStream(50 * 1024 * 1024);
+            await Api.UploadContractDocumentAsync(Id, stream, file.Name, file.ContentType, _documentType, _documentDescription);
+            _documentDescription = null;
+            await ReloadDetail();
+            Snackbar.Add("سند قرارداد بارگذاری شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add("بارگذاری سند ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _uploadBusy = false; }
+    }
+
+    private async Task DeleteDocument(Guid documentId)
+    {
+        if (!await Confirm("حذف سند", "سند قرارداد به‌صورت نرم حذف شود؟", Color.Error)) return;
+        try { await Api.DeleteContractDocumentAsync(Id, documentId); await ReloadDetail(); Snackbar.Add("سند حذف شد.", Severity.Success); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task DownloadDocument(Guid documentId)
+    {
+        try
+        {
+            var file = await Api.DownloadContractDocumentAsync(Id, documentId);
+            await JS.InvokeVoidAsync("petroProcureDownloadFile", file.Content, file.ContentType, file.FileName);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("دانلود سند قرارداد ناموفق بود: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private async Task ChangeStatus(string action, object body, string successMessage)
+    {
+        if (!await Confirm("تأیید اقدام", "این اقدام روی وضعیت قرارداد اعمال شود؟", Color.Primary)) return;
+        try { await Api.ChangeContractStatusAsync(Id, action, body); _actionComment = null; await ReloadDetail(); Snackbar.Add(successMessage, Severity.Success); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private Task RejectContract()
+    {
+        if (string.IsNullOrWhiteSpace(_actionComment))
+        {
+            Snackbar.Add("برای رد قرارداد، ثبت توضیح الزامی است.", Severity.Warning);
+            return Task.CompletedTask;
+        }
+        return ChangeStatus("reject", new RejectContractRequest(_actionComment), "قرارداد رد شد.");
+    }
+
+    private Task CancelContract()
+    {
+        if (string.IsNullOrWhiteSpace(_actionComment))
+        {
+            Snackbar.Add("برای لغو قرارداد، ثبت دلیل الزامی است.", Severity.Warning);
+            return Task.CompletedTask;
+        }
+        return ChangeStatus("cancel", new CancelContractRequest(_actionComment), "قرارداد لغو شد.");
+    }
+
+    private async Task SaveReport()
+    {
+        try { await Api.SaveContractPdfAsync(Id); await ReloadDetail(); Snackbar.Add("گزارش قرارداد در اسناد پرونده ذخیره شد.", Severity.Success); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+    }
+
+    private async Task ToggleContractPreview()
+    {
+        _showPreview = !_showPreview;
+        if (_showPreview)
+            await EnsureContractPdfLoaded();
+    }
+
+    private async Task OpenContractPdf()
+    {
+        await EnsureContractPdfLoaded();
+        if (_contractPdfDataUrl is not null)
+            await JS.InvokeVoidAsync("open", _contractPdfDataUrl, "_blank");
+    }
+
+    private async Task EnsureContractPdfLoaded()
+    {
+        if (_contractPdfDataUrl is not null) return;
+        _pdfLoading = true;
+        try
+        {
+            var bytes = await Api.GetContractPdfAsync(Id);
+            _contractPdfDataUrl = $"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("دریافت گزارش قرارداد ناموفق بود: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _pdfLoading = false;
+        }
+    }
+
+    private async Task ReloadDetail()
+    {
+        _detail = await Api.GetContractAsync(Id) ?? throw new InvalidOperationException("قرارداد یافت نشد.");
+        FillEditForm();
+    }
+
+    private async Task<bool> Confirm(string title, string message, Color color)
+    {
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>(title, new DialogParameters
+        {
+            ["Message"] = message,
+            ["ConfirmColor"] = color
+        });
+        var result = await dialog.Result;
+        return result is not null && !result.Canceled;
+    }
+
+    private void FillEditForm()
+    {
+        if (_detail is null) return;
+        var contract = _detail.Contract;
+        _editTitle = contract.Title;
+        _editSubject = contract.Subject;
+        _editType = contract.ContractType;
+        _editCurrency = contract.Currency;
+        _editTotal = contract.TotalAmount;
+        _editTax = contract.TaxAmount;
+        _editFinal = contract.FinalAmount;
+        _editStart = contract.StartDate;
+        _editEnd = contract.EndDate;
+        _editDelivery = contract.DeliveryDeadline;
+        _editPayment = contract.PaymentTerms;
+        _editDeliveryTerms = contract.DeliveryTerms;
+        _editWarranty = contract.WarrantyTerms;
+        _editPenalty = contract.PenaltyTerms;
+        _editDescription = contract.Description;
+    }
+
+    private void ResetClauseForm()
+    {
+        _editingClause = null;
+        _clauseOrder = (_detail?.Clauses.Count ?? 0) + 1;
+        _clauseTitle = "";
+        _clauseBody = "";
+        _clauseType = ContractClauseType.General;
+        _clauseRequired = true;
+        _clauseEditable = true;
+    }
+
+    private bool CanCancel() => _detail is not null && Access.HasPermission(ContractUiPolicy.Cancel) &&
+        _detail.Contract.Status is not ContractStatus.Completed and not ContractStatus.Archived and not ContractStatus.Cancelled;
+
+    private RenderFragment Info(string label, string value) => @<div class="summary-item"><span>@label</span><strong>@value</strong></div>;
+    private static string Money(decimal? value, string currency) => value.HasValue ? $"{value.Value:N0} {currency}" : "—";
+    private static Color StatusColor(ContractStatus status) => status switch
+    {
+        ContractStatus.Draft => Color.Default,
+        ContractStatus.UnderReview or ContractStatus.WaitingForApproval => Color.Warning,
+        ContractStatus.Approved or ContractStatus.Signed or ContractStatus.Active => Color.Success,
+        ContractStatus.Cancelled or ContractStatus.Archived => Color.Error,
+        _ => Color.Info
+    };
+    private static Severity ApprovalSeverity(ContractApprovalStatus status) => status switch
+    {
+        ContractApprovalStatus.Approved => Severity.Success,
+        ContractApprovalStatus.Rejected => Severity.Error,
+        ContractApprovalStatus.Pending => Severity.Warning,
+        _ => Severity.Info
+    };
+    private static string ApprovalText(ContractApprovalStatus status) => status switch
+    {
+        ContractApprovalStatus.Approved => "تأیید شده",
+        ContractApprovalStatus.Rejected => "رد شده",
+        ContractApprovalStatus.Pending => "در انتظار",
+        ContractApprovalStatus.Skipped => "رد شده از مسیر",
+        ContractApprovalStatus.Cancelled => "لغو شده",
+        _ => status.ToString()
+    };
+    private static string ContractDocumentTypeText(string type) => type switch
+    {
+        "SignedContract" => "نسخه امضاشده",
+        "ContractCorrespondence" => "مکاتبات قرارداد",
+        "ContractAttachment" => "پیوست قرارداد",
+        _ => type
+    };
+}

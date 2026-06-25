@@ -156,6 +156,53 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
     public async Task<CommissionDecisionReportData?> GetCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken ct) =>
         (await CommissionDecisions(sessionId, ct)).SingleOrDefault(x => x.Id == decisionId);
 
+    public async Task<ContractReportData?> GetContractAsync(Guid id, CancellationToken ct)
+    {
+        var contract = await db.PurchaseContracts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (contract is null) return null;
+        var fileNumber = await db.PurchaseFiles.AsNoTracking()
+            .Where(x => x.Id == contract.PurchaseFileId).Select(x => x.FileNumber).SingleOrDefaultAsync(ct) ?? "—";
+        var supplierName = await db.Suppliers.AsNoTracking()
+            .Where(x => x.Id == contract.SupplierId).Select(x => x.Name).SingleOrDefaultAsync(ct) ?? "—";
+        var tenderNumber = contract.TenderId.HasValue
+            ? await db.Tenders.AsNoTracking().Where(x => x.Id == contract.TenderId).Select(x => x.TenderNumber).SingleOrDefaultAsync(ct) ?? "—"
+            : "—";
+        var commissionReference = "—";
+        if (contract.CommissionDecisionId.HasValue)
+        {
+            var decision = await db.TenderCommissionDecisions.AsNoTracking()
+                .Where(x => x.Id == contract.CommissionDecisionId.Value)
+                .Select(x => new { x.Id, x.SessionId })
+                .SingleOrDefaultAsync(ct);
+            if (decision is not null)
+            {
+                var sessionNumber = await db.TenderCommissionSessions.AsNoTracking()
+                    .Where(x => x.Id == decision.SessionId).Select(x => x.SessionNumber).SingleOrDefaultAsync(ct);
+                commissionReference = $"{sessionNumber ?? "جلسه"} / {decision.Id.ToString("N")[..8]}";
+            }
+        }
+
+        var items = await db.PurchaseContractItems.AsNoTracking()
+            .Where(x => x.ContractId == id)
+            .OrderBy(x => x.MescCode)
+            .ToListAsync(ct);
+        var clauses = await db.ContractClauses.AsNoTracking()
+            .Where(x => x.ContractId == id)
+            .OrderBy(x => x.OrderNo)
+            .Select(x => new ContractClauseReportData(x.OrderNo, x.Title, x.Body, Text(x.ClauseType), x.IsRequired))
+            .ToListAsync(ct);
+
+        return new ContractReportData(contract.Id, contract.ContractNumber, fileNumber, supplierName,
+            tenderNumber, commissionReference, contract.Title, contract.Subject, Text(contract.Status),
+            Text(contract.ContractType), contract.Currency, Money(contract.TotalAmount, contract.Currency),
+            Money(contract.TaxAmount, contract.Currency), Money(contract.FinalAmount, contract.Currency),
+            Date(contract.StartDate), Date(contract.EndDate), Date(contract.DeliveryDeadline),
+            contract.PaymentTerms ?? "—", contract.DeliveryTerms ?? "—", contract.WarrantyTerms ?? "—",
+            contract.PenaltyTerms ?? "—", Group(items.Select(x => new ReportItemData(x.MescCode,
+                x.MescGeneralGroupCode, x.GeneralDescription, x.SpecificDescription, Unit(x.UnitOfMeasureId), x.Quantity))),
+            clauses);
+    }
+
     private static IReadOnlyList<ReportItemGroupData> Group(IEnumerable<ReportItemData> items) =>
         items.GroupBy(x => new { x.GeneralGroupCode, x.GeneralDescription }).OrderBy(x => x.Key.GeneralGroupCode)
             .Select(x => new ReportItemGroupData(x.Key.GeneralGroupCode, x.Key.GeneralDescription, x.ToArray())).ToArray();
@@ -306,6 +353,42 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
         TenderCommissionDecisionStatus.Approved => "تأییدشده",
         TenderCommissionDecisionStatus.Rejected => "ردشده",
         TenderCommissionDecisionStatus.Cancelled => "لغوشده",
+        _ => value.ToString()
+    };
+    private static string Text(ContractType value) => value switch
+    {
+        ContractType.DirectPurchase => "خرید مستقیم",
+        ContractType.TenderBased => "مبتنی بر مناقصه",
+        ContractType.Service => "خدمات",
+        ContractType.Framework => "چارچوب",
+        ContractType.Other => "سایر",
+        _ => value.ToString()
+    };
+    private static string Text(ContractStatus value) => value switch
+    {
+        ContractStatus.Draft => "پیش‌نویس",
+        ContractStatus.UnderReview => "در حال بررسی",
+        ContractStatus.WaitingForApproval => "در انتظار تأیید",
+        ContractStatus.Approved => "تأییدشده",
+        ContractStatus.Signed => "امضاشده",
+        ContractStatus.Active => "فعال",
+        ContractStatus.Completed => "تکمیل‌شده",
+        ContractStatus.Cancelled => "لغوشده",
+        ContractStatus.Archived => "بایگانی‌شده",
+        _ => value.ToString()
+    };
+    private static string Text(ContractClauseType value) => value switch
+    {
+        ContractClauseType.General => "عمومی",
+        ContractClauseType.Technical => "فنی",
+        ContractClauseType.Commercial => "بازرگانی",
+        ContractClauseType.Payment => "پرداخت",
+        ContractClauseType.Delivery => "تحویل",
+        ContractClauseType.Warranty => "گارانتی",
+        ContractClauseType.Penalty => "جریمه",
+        ContractClauseType.Legal => "حقوقی",
+        ContractClauseType.AttachmentReference => "ارجاع پیوست",
+        ContractClauseType.Other => "سایر",
         _ => value.ToString()
     };
 }

@@ -150,6 +150,19 @@ public static class IdentitySeedData
                 ApplicationPermissions.CommissionView,
                 ApplicationPermissions.CommissionReportView,
                 ApplicationPermissions.CommissionReportExport,
+                ApplicationPermissions.ContractView,
+                ApplicationPermissions.ContractCreate,
+                ApplicationPermissions.ContractEdit,
+                ApplicationPermissions.ContractSubmit,
+                ApplicationPermissions.ContractApprove,
+                ApplicationPermissions.ContractReject,
+                ApplicationPermissions.ContractSign,
+                ApplicationPermissions.ContractCancel,
+                ApplicationPermissions.ContractManageClauses,
+                ApplicationPermissions.ContractManageTemplates,
+                ApplicationPermissions.ContractManageDocuments,
+                ApplicationPermissions.ContractReportView,
+                ApplicationPermissions.ContractReportExport,
                 ApplicationPermissions.ReportView,
                 ApplicationPermissions.ReportPrint,
                 ApplicationPermissions.ReportExportPdf
@@ -184,7 +197,15 @@ public static class IdentitySeedData
                 ApplicationPermissions.TenderManageDocuments,
                 ApplicationPermissions.TenderReportView,
                 ApplicationPermissions.TenderReportExport,
-                ApplicationPermissions.CommissionView
+                ApplicationPermissions.CommissionView,
+                ApplicationPermissions.ContractView,
+                ApplicationPermissions.ContractCreate,
+                ApplicationPermissions.ContractEdit,
+                ApplicationPermissions.ContractSubmit,
+                ApplicationPermissions.ContractManageClauses,
+                ApplicationPermissions.ContractManageDocuments,
+                ApplicationPermissions.ContractReportView,
+                ApplicationPermissions.ContractReportExport
             ],
             [ApplicationRoles.OrdersManager] =
             [
@@ -266,6 +287,7 @@ public static class IdentitySeedData
                 ApplicationPermissions.CommissionReportView,
                 ApplicationPermissions.CommissionReportExport,
                 ApplicationPermissions.PurchaseFileView,
+                ApplicationPermissions.ContractView,
                 ApplicationPermissions.SupplierView,
                 ApplicationPermissions.SupplierEvaluate,
                 ApplicationPermissions.InquiryView,
@@ -294,7 +316,9 @@ public static class IdentitySeedData
                 ApplicationPermissions.TenderReportView,
                 ApplicationPermissions.TenderReportExport,
                 ApplicationPermissions.CommissionReportView,
-                ApplicationPermissions.CommissionReportExport
+                ApplicationPermissions.CommissionReportExport,
+                ApplicationPermissions.ContractReportView,
+                ApplicationPermissions.ContractReportExport
             ],
             [ApplicationRoles.AiAgentUser] =
             [
