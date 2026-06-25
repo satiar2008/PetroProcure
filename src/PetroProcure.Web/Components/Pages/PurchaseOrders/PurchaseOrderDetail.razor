@@ -1,0 +1,184 @@
+@page "/purchase/purchase-orders/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+@inject IJSRuntime JS
+
+<PageTitle>@(_detail?.PurchaseOrder.PurchaseOrderNumber ?? "سفارش خرید")</PageTitle>
+
+@if (_loading) { <LoadingOverlay Visible="true" Text="در حال دریافت سفارش خرید..." /> }
+else if (_error is not null) { <EmptyState Title="دریافت سفارش ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else if (_detail is not null)
+{
+    <PageHeader Title="@_detail.PurchaseOrder.PurchaseOrderNumber" Subtitle="@_detail.PurchaseOrder.Title">
+        <Actions>
+            <StatusChip Text="@PurchaseOrderUiPolicy.StatusText(_detail.PurchaseOrder.Status)" Color="@PurchaseOrderUiPolicy.StatusColor(_detail.PurchaseOrder.Status)" />
+            <MudButton Variant="Variant.Outlined" Href="/purchase/purchase-orders">بازگشت</MudButton>
+        </Actions>
+    </PageHeader>
+
+    <MudTabs Rounded="true" PanelClass="pa-4">
+        <MudTabPanel Text="خلاصه" Icon="@Icons.Material.Filled.Info">@SummaryTab()</MudTabPanel>
+        <MudTabPanel Text="اقلام" Icon="@Icons.Material.Filled.Inventory2">@ItemsTab()</MudTabPanel>
+        <MudTabPanel Text="تأییدها" Icon="@Icons.Material.Filled.Verified">@ApprovalTab()</MudTabPanel>
+        <MudTabPanel Text="اسناد" Icon="@Icons.Material.Filled.AttachFile">@DocumentsTab()</MudTabPanel>
+        <MudTabPanel Text="گزارش" Icon="@Icons.Material.Filled.PictureAsPdf">@ReportsTab()</MudTabPanel>
+        <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link">@LinksTab()</MudTabPanel>
+        <MudTabPanel Text="رسیدهای انبار آینده" Icon="@Icons.Material.Filled.Warehouse">
+            <EmptyState Title="دریافت انبار در فاز بعدی" Description="رسید انبار بعداً در برابر اقلام همین سفارش خرید ثبت خواهد شد." />
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PurchaseOrderDetailDto? _detail;
+    private bool _loading = true, _busy, _uploading, _pdfLoading, _showPreview;
+    private string? _error, _comment, _documentDescription, _pdfDataUrl;
+    private string _documentType = "PurchaseOrderAttachment";
+    private long _maxUploadBytes = 50L * 1024 * 1024;
+
+    private bool CanEdit => _detail is not null && PurchaseOrderUiPolicy.IsEditable(_detail.PurchaseOrder.Status) && Access.HasPermission(PurchaseOrderUiPolicy.Edit);
+    private bool CanManageItems => _detail is not null && PurchaseOrderUiPolicy.IsEditable(_detail.PurchaseOrder.Status) && Access.HasPermission(PurchaseOrderUiPolicy.ManageItems);
+    private bool CanManageDocuments => _detail is not null && Access.HasPermission(PurchaseOrderUiPolicy.ManageDocuments);
+
+    protected override async Task OnParametersSetAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            _detail = await Api.GetPurchaseOrderAsync(Id);
+            if (_detail is null) throw new InvalidOperationException("سفارش خرید یافت نشد.");
+            try
+            {
+                var limits = await Api.GetUploadLimitsAsync();
+                _maxUploadBytes = Math.Max(1, limits.MaxFileSizeMb) * 1024L * 1024L;
+            }
+            catch { _maxUploadBytes = 50L * 1024L * 1024L; }
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private RenderFragment SummaryTab() => @<MudPaper Class="form-panel" Elevation="0">
+        <div class="summary-grid">
+            @Info("شماره سفارش", _detail!.PurchaseOrder.PurchaseOrderNumber)
+            @Info("پرونده خرید", _detail.PurchaseOrder.PurchaseFileNumber ?? "—")
+            @Info("قرارداد", _detail.PurchaseOrder.ContractNumber ?? "—")
+            @Info("تأمین‌کننده", _detail.PurchaseOrder.SupplierName ?? "—")
+            @Info("نوع", PurchaseOrderUiPolicy.TypeText(_detail.PurchaseOrder.PurchaseOrderType))
+            @Info("ارز", _detail.PurchaseOrder.Currency)
+            @Info("مبلغ نهایی", $"{_detail.PurchaseOrder.FinalAmount?.ToString("N0") ?? "—"} {_detail.PurchaseOrder.Currency}")
+            <div class="summary-item"><span>تاریخ سفارش</span><strong><DateDisplay Value="@_detail.PurchaseOrder.OrderDate" /></strong></div>
+            <div class="summary-item"><span>موعد تحویل</span><strong><DateDisplay Value="@_detail.PurchaseOrder.ExpectedDeliveryDate" /></strong></div>
+            @Info("محل تحویل", _detail.PurchaseOrder.DeliveryLocation ?? "—")
+        </div>
+        <MudDivider Class="my-4" />
+        <MudText Typo="Typo.subtitle2">شرایط پرداخت</MudText>
+        <MudText Typo="Typo.body2">@(_detail.PurchaseOrder.PaymentTerms ?? "ثبت نشده")</MudText>
+        <MudText Typo="Typo.subtitle2" Class="mt-3">شرایط تحویل</MudText>
+        <MudText Typo="Typo.body2">@(_detail.PurchaseOrder.DeliveryTerms ?? "ثبت نشده")</MudText>
+    </MudPaper>;
+
+    private RenderFragment ItemsTab() => @<div>
+        @if (CanManageItems)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">افزودن قلم دستی از این صفحه در نسخه foundation ساده نگه داشته شده است؛ ایجاد از قرارداد یا پرونده اقلام را به‌صورت snapshot کپی می‌کند.</MudAlert>
+        }
+        @if (_detail!.Items.Count == 0) { <EmptyState Title="قلمی در سفارش وجود ندارد" Description="برای صدور سفارش حداقل یک قلم لازم است." /> }
+        @foreach (var group in _detail.Items.GroupBy(x => new { x.MescGeneralGroupCode, x.GeneralDescription }))
+        {
+            <MudPaper Class="item-group" Elevation="0"><div class="group-header"><div><strong>@group.Key.MescGeneralGroupCode</strong><span>@group.Key.GeneralDescription</span></div><MudChip T="string">@group.Count() قلم</MudChip></div>
+            <MudTable Items="group" Dense="true"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>سفارش</MudTh><MudTh>دریافت</MudTh><MudTh>مانده</MudTh><MudTh>قیمت واحد</MudTh><MudTh>مبلغ</MudTh><MudTh></MudTh></HeaderContent>
+            <RowTemplate><MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.OrderedQuantity</MudTd><MudTd>@context.ReceivedQuantity</MudTd><MudTd>@context.RemainingQuantity</MudTd><MudTd>@(context.UnitPrice?.ToString("N0") ?? "—")</MudTd><MudTd>@(context.TotalPrice?.ToString("N0") ?? "—")</MudTd>
+            <MudTd>@if(CanManageItems){<MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(()=>RemoveItem(context.Id))" />}</MudTd></RowTemplate></MudTable></MudPaper>
+        }
+    </div>;
+
+    private RenderFragment ApprovalTab() => @<div>
+        <MudPaper Class="form-panel mb-4" Elevation="0">
+            <MudText Typo="Typo.h6">اقدامات وضعیت</MudText>
+            <MudTextField @bind-Value="_comment" Label="توضیح اقدام" Lines="2" Variant="Variant.Outlined" Class="mt-3" />
+            <div class="report-actions mt-3">
+                @if (PurchaseOrderUiPolicy.CanSubmit(_detail!.PurchaseOrder.Status, Access.HasPermission))
+                { <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="@(()=>ChangeStatus("submit", new SubmitPurchaseOrderRequest(_comment), "سفارش ارسال شد."))">ارسال برای بررسی</MudButton> }
+                @if (PurchaseOrderUiPolicy.CanApprove(_detail!.PurchaseOrder.Status, Access.HasPermission))
+                { <MudButton Color="Color.Success" Variant="Variant.Filled" Disabled="_busy" OnClick="@(()=>ChangeStatus("approve", new ApprovePurchaseOrderRequest(_comment), "سفارش تأیید شد."))">تأیید</MudButton> }
+                @if (PurchaseOrderUiPolicy.CanReject(_detail!.PurchaseOrder.Status, Access.HasPermission))
+                { <MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy" OnClick="Reject">رد</MudButton> }
+                @if (PurchaseOrderUiPolicy.CanIssue(_detail!.PurchaseOrder.Status, Access.HasPermission))
+                { <MudButton Color="Color.Success" Variant="Variant.Filled" Disabled="_busy" OnClick="@(()=>ChangeStatus("issue", new IssuePurchaseOrderRequest(_comment), "سفارش صادر شد."))">صدور سفارش</MudButton> }
+                @if (PurchaseOrderUiPolicy.CanCancel(_detail!.PurchaseOrder.Status, Access.HasPermission))
+                { <MudButton Color="Color.Error" Variant="Variant.Outlined" Disabled="_busy" OnClick="Cancel">لغو</MudButton> }
+            </div>
+        </MudPaper>
+        @if (_detail!.Approvals.Count == 0) { <EmptyState Title="سوابق تأیید وجود ندارد" Description="پس از بررسی سفارش، سوابق در اینجا نمایش داده می‌شود." /> }
+        @foreach (var approval in _detail!.Approvals.OrderByDescending(x => x.CreatedAt))
+        {
+            <MudAlert Severity="@(approval.Status == PurchaseOrderApprovalStatus.Approved ? Severity.Success : approval.Status == PurchaseOrderApprovalStatus.Rejected ? Severity.Warning : Severity.Info)" Variant="Variant.Outlined" Class="mb-2">
+                <strong>@approval.ApprovalStep</strong> · @approval.Status<br />@(approval.Comment ?? "بدون توضیح")<br /><small><DateDisplay Value="@approval.CreatedAt" IncludeTime="true" /></small>
+            </MudAlert>
+        }
+    </div>;
+
+    private RenderFragment DocumentsTab() => @<div>
+        @if (CanManageDocuments)
+        {
+            <MudPaper Class="form-panel mb-4" Elevation="0"><MudGrid>
+                <MudItem xs="12" md="4"><MudTextField @bind-Value="_documentType" Label="نوع سند" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="5"><MudTextField @bind-Value="_documentDescription" Label="توضیحات سند" Variant="Variant.Outlined" /></MudItem>
+                <MudItem xs="12" md="3" Class="d-flex align-center"><InputFile OnChange="UploadDocument" disabled="@_uploading" /></MudItem>
+            </MudGrid></MudPaper>
+        }
+        @if (_detail!.Documents.Count == 0) { <EmptyState Title="سندی ثبت نشده" Description="پیوست‌ها و PDF سفارش خرید اینجا نمایش داده می‌شوند." /> }
+        else
+        {
+            <MudTable Items="_detail.Documents" Dense="true"><HeaderContent><MudTh>نوع</MudTh><MudTh>نام فایل</MudTh><MudTh>تاریخ</MudTh><MudTh>شرح</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+            <RowTemplate><MudTd>@context.DocumentType</MudTd><MudTd>@(context.OriginalFileName ?? "—")</MudTd><MudTd><DateDisplay Value="@context.UploadedAt" IncludeTime="true" /></MudTd><MudTd>@(context.Description ?? "—")</MudTd>
+            <MudTd><MudIconButton Icon="@Icons.Material.Filled.Download" OnClick="@(()=>DownloadDocument(context.Id))" />@if(CanManageDocuments){<MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(()=>DeleteDocument(context.Id))" />}</MudTd></RowTemplate></MudTable>
+        }
+    </div>;
+
+    private RenderFragment ReportsTab() => @<MudPaper Class="form-panel" Elevation="0">
+        <MudText Typo="Typo.h6">گزارش رسمی سفارش خرید</MudText>
+        <div class="report-actions mt-4">
+            <PermissionView Permission="@PurchaseOrderUiPolicy.ReportView"><MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Preview" Disabled="_pdfLoading" OnClick="TogglePreview">پیش‌نمایش</MudButton></PermissionView>
+            <PermissionView Permission="@PurchaseOrderUiPolicy.ReportView"><MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PictureAsPdf" Disabled="_pdfLoading" OnClick="OpenPdf">خروجی PDF</MudButton></PermissionView>
+            <PermissionView Permission="@PurchaseOrderUiPolicy.ReportExport"><MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.SaveAlt" OnClick="SaveReport">ذخیره در اسناد پرونده</MudButton></PermissionView>
+        </div>
+        @if (_pdfLoading) { <MudProgressLinear Indeterminate="true" Class="mt-4" /> }
+        @if (_showPreview && _pdfDataUrl is not null) { <div class="report-preview"><iframe src="@_pdfDataUrl" title="پیش‌نمایش سفارش خرید"></iframe></div> }
+    </MudPaper>;
+
+    private RenderFragment LinksTab() => @<MudPaper Class="form-panel" Elevation="0">
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">پرونده خرید: <MudLink Href="@($"/purchase/files/{_detail!.PurchaseOrder.PurchaseFileId}")">@(_detail.PurchaseOrder.PurchaseFileNumber ?? "مشاهده")</MudLink></MudAlert>
+        @if (_detail!.PurchaseOrder.ContractId.HasValue)
+        { <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mt-2">قرارداد: <MudLink Href="@($"/purchase/contracts/{_detail.PurchaseOrder.ContractId}")">@(_detail.PurchaseOrder.ContractNumber ?? "مشاهده")</MudLink></MudAlert> }
+    </MudPaper>;
+
+    private static RenderFragment Info(string label, string value) => @<div class="summary-item"><span>@label</span><strong>@value</strong></div>;
+
+    private async Task ChangeStatus(string action, object request, string success)
+    {
+        if (!await Confirm("تأیید اقدام", "این اقدام روی سفارش خرید اعمال شود؟", Color.Primary)) return;
+        _busy = true;
+        try { await Api.ChangePurchaseOrderStatusAsync(Id, action, request); _comment = null; await Load(); Snackbar.Add(success, Severity.Success); }
+        catch (Exception ex) { Snackbar.Add("اقدام ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+    private Task Reject(){ if(string.IsNullOrWhiteSpace(_comment)){Snackbar.Add("برای رد سفارش، توضیح الزامی است.",Severity.Warning);return Task.CompletedTask;} return ChangeStatus("reject", new RejectPurchaseOrderRequest(_comment), "سفارش رد شد."); }
+    private Task Cancel(){ if(string.IsNullOrWhiteSpace(_comment)){Snackbar.Add("برای لغو سفارش، دلیل الزامی است.",Severity.Warning);return Task.CompletedTask;} return ChangeStatus("cancel", new CancelPurchaseOrderRequest(_comment), "سفارش لغو شد."); }
+    private async Task RemoveItem(Guid itemId){ if(!await Confirm("حذف قلم","قلم از سفارش حذف شود؟",Color.Error))return;try{await Api.RemovePurchaseOrderItemAsync(Id,itemId);await Load();Snackbar.Add("قلم حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task UploadDocument(InputFileChangeEventArgs e){_uploading=true;try{var file=e.File;await using var stream=file.OpenReadStream(_maxUploadBytes);await Api.UploadPurchaseOrderDocumentAsync(Id,stream,file.Name,string.IsNullOrWhiteSpace(file.ContentType)?"application/octet-stream":file.ContentType,_documentType,_documentDescription);_documentDescription=null;await Load();Snackbar.Add("سند بارگذاری شد.",Severity.Success);}catch(Exception ex){Snackbar.Add("بارگذاری ناموفق بود: "+ex.Message,Severity.Error);}finally{_uploading=false;}}
+    private async Task DownloadDocument(Guid documentId){try{var file=await Api.DownloadPurchaseOrderDocumentAsync(Id,documentId);await JS.InvokeVoidAsync("petroProcureDownloadFile",file.Content,file.ContentType,file.FileName);}catch(Exception ex){Snackbar.Add("دانلود سند ناموفق بود: "+ex.Message,Severity.Error);}}
+    private async Task DeleteDocument(Guid documentId){if(!await Confirm("حذف سند","سند سفارش خرید حذف نرم شود؟",Color.Error))return;try{await Api.DeletePurchaseOrderDocumentAsync(Id,documentId);await Load();Snackbar.Add("سند حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task TogglePreview(){_showPreview=!_showPreview;if(_showPreview)await EnsurePdf();}
+    private async Task OpenPdf(){await EnsurePdf();if(_pdfDataUrl is not null)await JS.InvokeVoidAsync("open",_pdfDataUrl,"_blank");}
+    private async Task EnsurePdf(){if(_pdfDataUrl is not null)return;_pdfLoading=true;try{var bytes=await Api.GetPurchaseOrderPdfAsync(Id);_pdfDataUrl=$"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";}catch(Exception ex){Snackbar.Add("دریافت گزارش ناموفق بود: "+ex.Message,Severity.Error);}finally{_pdfLoading=false;}}
+    private async Task SaveReport(){try{await Api.SavePurchaseOrderPdfAsync(Id);await Load();Snackbar.Add("گزارش در اسناد پرونده ذخیره شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task<bool> Confirm(string title,string message,Color color){var dialog=await Dialog.ShowAsync<ConfirmDialog>(title,new DialogParameters{{"Message",message},{"ConfirmColor",color}});var result=await dialog.Result;return result is not null&&!result.Canceled;}
+}

@@ -11,6 +11,7 @@ using PetroProcure.Application.Orders;
 using PetroProcure.Application.Tenders;
 using PetroProcure.Application.Commission;
 using PetroProcure.Application.Contracts;
+using PetroProcure.Application.PurchaseOrders;
 
 namespace PetroProcure.Application;
 
@@ -47,6 +48,11 @@ public static class DependencyInjection
         services.AddScoped<IContractReportDataSourceBuilder, ContractReportDataSourceBuilder>();
         services.AddScoped<ContractCommandHandler>();
         services.AddScoped<ContractQueryHandler>();
+        services.AddScoped<IPurchaseOrderNumberService, PurchaseOrderNumberService>();
+        services.AddScoped<IPurchaseOrderEligibilityService, PurchaseOrderEligibilityService>();
+        services.AddScoped<IPurchaseOrderReportDataSourceBuilder, PurchaseOrderReportDataSourceBuilder>();
+        services.AddScoped<PurchaseOrderCommandHandler>();
+        services.AddScoped<PurchaseOrderQueryHandler>();
         return services;
     }
 }

@@ -24,6 +24,11 @@ else if (_detail is not null)
     <PageHeader Title="@_detail.Contract.ContractNumber" Subtitle="@_detail.Contract.Title">
         <Actions>
             <StatusChip Text="@ContractUiPolicy.StatusText(_detail.Contract.Status)" Color="@StatusColor(_detail.Contract.Status)" />
+            @if (Access.HasPermission(PurchaseOrderUiPolicy.Create) && _detail.Contract.Status is ContractStatus.Approved or ContractStatus.Signed or ContractStatus.Active)
+            {
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.ShoppingCart"
+                           Href="@($"/purchase/purchase-orders/from-contract/{Id}")">ایجاد سفارش خرید</MudButton>
+            }
             <MudButton Variant="Variant.Outlined" Href="/purchase/contracts">بازگشت</MudButton>
         </Actions>
     </PageHeader>

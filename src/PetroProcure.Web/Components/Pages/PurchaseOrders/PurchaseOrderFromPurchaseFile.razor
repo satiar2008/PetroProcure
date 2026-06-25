@@ -1,0 +1,82 @@
+@page "/purchase/purchase-orders/from-purchase-file/{PurchaseFileId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد سفارش از پرونده خرید</PageTitle>
+<PageHeader Title="ایجاد سفارش خرید از پرونده خرید" Subtitle="@(_file is null ? "در حال دریافت پرونده" : $"{_file.FileNumber} — {_file.Title}")" />
+
+@if (_loading) { <LoadingOverlay Visible="true" Text="در حال دریافت پرونده..." /> }
+else if (_error is not null) { <EmptyState Title="دریافت پرونده ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else if (_file is not null)
+{
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="form-panel" Elevation="0">
+                <MudText Typo="Typo.h6">مشخصات سفارش</MudText>
+                <SupplierSelector Value="_supplier" ValueChanged="OnSupplierChanged" Required="true" />
+                <MudTextField @bind-Value="_title" Label="عنوان سفارش" Required="true" Variant="Variant.Outlined" Class="mt-3" />
+                <MudSelect T="PurchaseOrderType" @bind-Value="_type" Label="نوع سفارش" Variant="Variant.Outlined" Class="mt-3">@foreach(var t in Enum.GetValues<PurchaseOrderType>()){<MudSelectItem Value="@t">@PurchaseOrderUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect>
+                <MudDatePicker @bind-Date="_orderDate" Label="تاریخ سفارش" Variant="Variant.Outlined" Class="mt-3" />
+                <MudDatePicker @bind-Date="_deliveryDate" Label="موعد تحویل" Variant="Variant.Outlined" Class="mt-3" />
+                <MudTextField @bind-Value="_deliveryLocation" Label="محل تحویل" Variant="Variant.Outlined" Class="mt-3" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="8">
+            @if (_groups.Count == 0) { <EmptyState Title="قلمی در پرونده وجود ندارد" Description="برای ایجاد سفارش خرید، پرونده باید اقلام داشته باشد." /> }
+            @foreach (var group in _groups)
+            {
+                <MudPaper Class="item-group" Elevation="0"><div class="group-header"><div><strong>@group.MescGeneralGroupCode</strong><span>@group.GeneralDescription</span></div><MudChip T="string">@group.Items.Count قلم</MudChip></div>
+                <MudTable Items="group.Items" Dense="true"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>درخواستی</MudTh><MudTh>تأییدشده</MudTh></HeaderContent>
+                <RowTemplate><MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.RequestedQuantity</MudTd><MudTd>@context.ApprovedQuantity</MudTd></RowTemplate></MudTable></MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+    <div class="form-actions">
+        <MudButton Variant="Variant.Text" Href="@($"/purchase/files/{PurchaseFileId}")">بازگشت</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving || _groups.Count == 0" OnClick="Save">ایجاد سفارش خرید</MudButton>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid PurchaseFileId { get; set; }
+    private PurchaseFileDto? _file;
+    private List<PurchaseFileGroupedItemsDto> _groups = [];
+    private SupplierLookupDto? _supplier;
+    private bool _loading = true, _saving;
+    private string? _error, _deliveryLocation;
+    private string _title = "";
+    private PurchaseOrderType _type = PurchaseOrderType.DirectPurchase;
+    private DateTime? _orderDate = DateTime.Today, _deliveryDate;
+
+    protected override async Task OnParametersSetAsync() => await Load();
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            _file = await Api.GetPurchaseFileAsync(PurchaseFileId);
+            if (_file is null) throw new InvalidOperationException("پرونده یافت نشد.");
+            _groups = await Api.GetGroupedItemsAsync(PurchaseFileId);
+            _title = $"سفارش خرید {_file.FileNumber}";
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+    private Task OnSupplierChanged(SupplierLookupDto? supplier) { _supplier = supplier; return Task.CompletedTask; }
+    private async Task Save()
+    {
+        if (_supplier is null) { Snackbar.Add("انتخاب تأمین‌کننده الزامی است.", Severity.Warning); return; }
+        _saving = true;
+        try
+        {
+            var result = await Api.CreatePurchaseOrderFromPurchaseFileAsync(PurchaseFileId,
+                new(_supplier.Id, _title, _type, "IRR", _orderDate, _deliveryDate, _deliveryLocation));
+            Snackbar.Add("سفارش خرید از پرونده ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/purchase-orders/{result.PurchaseOrder.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add("ایجاد سفارش ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+}

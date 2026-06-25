@@ -13,6 +13,7 @@ public static class ReportNames
     public const string CommissionSessionMinutes = "CommissionSessionMinutesReport";
     public const string CommissionDecision = "CommissionDecisionReport";
     public const string Contract = "ContractReport";
+    public const string PurchaseOrder = "PurchaseOrderReport";
 }
 
 public sealed record ReportPreviewModel(string ReportName, string PreviewUrl, string Title);
@@ -35,6 +36,7 @@ public interface IReportDataProvider
     Task<CommissionSessionReportData?> GetCommissionSessionAsync(Guid id, CancellationToken cancellationToken);
     Task<CommissionDecisionReportData?> GetCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken cancellationToken);
     Task<ContractReportData?> GetContractAsync(Guid id, CancellationToken cancellationToken);
+    Task<PurchaseOrderReportData?> GetPurchaseOrderAsync(Guid id, CancellationToken cancellationToken);
 }
 
 public sealed record ReportItemData(string MescCode, string GeneralGroupCode, string GeneralDescription,
@@ -88,3 +90,10 @@ public sealed record ContractReportData(Guid Id, string ContractNumber, string P
     IReadOnlyList<ContractClauseReportData> Clauses);
 
 public sealed record ContractClauseReportData(int OrderNo, string Title, string Body, string ClauseType, bool IsRequired);
+
+public sealed record PurchaseOrderReportData(Guid Id, string PurchaseOrderNumber, string PurchaseFileNumber,
+    string ContractNumber, string SupplierName, string SupplierCode, string Title, string Status,
+    string PurchaseOrderType, string Currency, string TotalAmount, string TaxAmount, string DiscountAmount,
+    string FinalAmount, string OrderDate, string ExpectedDeliveryDate, string DeliveryLocation,
+    string DeliveryTerms, string PaymentTerms, string WarrantyTerms, string Notes,
+    IReadOnlyList<ReportItemGroupData> Groups);

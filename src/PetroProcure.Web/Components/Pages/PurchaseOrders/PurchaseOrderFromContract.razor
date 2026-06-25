@@ -1,0 +1,85 @@
+@page "/purchase/purchase-orders/from-contract/{ContractId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ایجاد سفارش از قرارداد</PageTitle>
+<PageHeader Title="ایجاد سفارش خرید از قرارداد" Subtitle="@(_contract is null ? "در حال دریافت قرارداد" : $"{_contract.Contract.ContractNumber} — {_contract.Contract.Title}")" />
+
+@if (_loading) { <LoadingOverlay Visible="true" Text="در حال دریافت قرارداد..." /> }
+else if (_error is not null) { <EmptyState Title="دریافت قرارداد ناموفق بود" Description="@_error"><Action><MudButton OnClick="Load">تلاش مجدد</MudButton></Action></EmptyState> }
+else if (_contract is not null)
+{
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="form-panel" Elevation="0">
+                <MudText Typo="Typo.h6">مشخصات سفارش</MudText>
+                <MudTextField @bind-Value="_title" Label="عنوان سفارش" Required="true" Variant="Variant.Outlined" Class="mt-3" />
+                <MudDatePicker @bind-Date="_orderDate" Label="تاریخ سفارش" Variant="Variant.Outlined" Class="mt-3" />
+                <MudDatePicker @bind-Date="_deliveryDate" Label="موعد تحویل" Variant="Variant.Outlined" Class="mt-3" />
+                <MudTextField @bind-Value="_deliveryLocation" Label="محل تحویل" Variant="Variant.Outlined" Class="mt-3" />
+                <MudTextField @bind-Value="_notes" Label="یادداشت" Lines="3" Variant="Variant.Outlined" Class="mt-3" />
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="form-panel" Elevation="0">
+                <div class="summary-grid">
+                    @Info("شماره قرارداد", _contract.Contract.ContractNumber)
+                    @Info("پرونده خرید", _contract.Contract.PurchaseFileNumber ?? "—")
+                    @Info("تأمین‌کننده", _contract.Contract.SupplierName ?? "—")
+                    @Info("وضعیت", ContractUiPolicy.StatusText(_contract.Contract.Status))
+                    @Info("مبلغ نهایی", $"{_contract.Contract.FinalAmount?.ToString("N0") ?? "—"} {_contract.Contract.Currency}")
+                </div>
+                <MudDivider Class="my-4" />
+                @foreach (var group in _contract.Items.GroupBy(x => new { x.MescGeneralGroupCode, x.GeneralDescription }))
+                {
+                    <MudPaper Class="item-group" Elevation="0"><div class="group-header"><div><strong>@group.Key.MescGeneralGroupCode</strong><span>@group.Key.GeneralDescription</span></div><MudChip T="string">@group.Count() قلم</MudChip></div>
+                    <MudTable Items="group" Dense="true"><HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>مقدار</MudTh><MudTh>قیمت واحد</MudTh></HeaderContent>
+                    <RowTemplate><MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.Quantity</MudTd><MudTd>@(context.UnitPrice?.ToString("N0") ?? "—")</MudTd></RowTemplate></MudTable></MudPaper>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+    <div class="form-actions">
+        <MudButton Variant="Variant.Text" Href="@($"/purchase/contracts/{ContractId}")">بازگشت</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving || _contract.Items.Count == 0" OnClick="Save">ایجاد سفارش خرید</MudButton>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid ContractId { get; set; }
+    private PurchaseContractDetailDto? _contract;
+    private bool _loading = true, _saving;
+    private string? _error, _deliveryLocation, _notes;
+    private string _title = "";
+    private DateTime? _orderDate = DateTime.Today, _deliveryDate;
+
+    protected override async Task OnParametersSetAsync() => await Load();
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            _contract = await Api.GetContractAsync(ContractId);
+            if (_contract is null) throw new InvalidOperationException("قرارداد یافت نشد.");
+            _title = $"سفارش خرید قرارداد {_contract.Contract.ContractNumber}";
+            _deliveryDate = _contract.Contract.DeliveryDeadline;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+    private async Task Save()
+    {
+        _saving = true;
+        try
+        {
+            var result = await Api.CreatePurchaseOrderFromContractAsync(ContractId, new(_title, _orderDate, _deliveryDate, _deliveryLocation, _notes));
+            Snackbar.Add("سفارش خرید از قرارداد ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/purchase-orders/{result.PurchaseOrder.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add("ایجاد سفارش ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+    private static RenderFragment Info(string label, string value) => @<div class="summary-item"><span>@label</span><strong>@value</strong></div>;
+}

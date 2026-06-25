@@ -45,6 +45,13 @@ else if (_summary.Data is { } file)
                            Href="@($"/purchase/contracts/from-purchase-file/{file.Id}")">
                     ایجاد قرارداد از پرونده خرید
                 </MudButton>
+            </PermissionView>
+            <PermissionView Permission="@PurchaseOrderUiPolicy.Create">
+                <MudButton Class="mt-4 mx-2" Variant="Variant.Outlined" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.ShoppingCart"
+                           Href="@($"/purchase/purchase-orders/from-purchase-file/{file.Id}")">
+                    ایجاد سفارش خرید از پرونده خرید
+                </MudButton>
             </PermissionView></MudPaper>
         </MudTabPanel>
 
@@ -92,6 +99,10 @@ else if (_summary.Data is { } file)
             @TabBody(_contracts, LoadContracts, ContractsContent)
         </MudTabPanel>
 
+        <MudTabPanel Text="سفارش‌های خرید" Icon="@Icons.Material.Filled.ShoppingCart">
+            @TabBody(_purchaseOrders, LoadPurchaseOrders, PurchaseOrdersContent)
+        </MudTabPanel>
+
         <MudTabPanel Text="دستیار هوشمند" Icon="@Icons.Material.Filled.AutoAwesome">
             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3">نتایج هوش مصنوعی صرفاً پیشنهاد و تحلیل هستند و تصمیم نهایی بر عهده کاربران مجاز و کمیسیون‌ها است.</MudAlert>
             <div class="report-actions mb-4">
@@ -122,6 +133,7 @@ else if (_summary.Data is { } file)
     private readonly TabLoadState<List<PurchaseFileNoteDto>> _notes = new();
     private readonly TabLoadState<List<AiEvaluationResultDto>> _ai = new();
     private readonly TabLoadState<List<PurchaseContractSummaryDto>> _contracts = new();
+    private readonly TabLoadState<List<PurchaseOrderSummaryDto>> _purchaseOrders = new();
     private bool _showPreview, _savingReport, _aiBusy, _noteBusy, _internalNote, _reportLoading;
     private string? _noteText, _mescSearch, _documentDescription; private List<MescItemDto> _mescResults = [];
     private string? _purchaseFilePdfDataUrl;
@@ -134,7 +146,7 @@ else if (_summary.Data is { } file)
     protected override async Task OnParametersSetAsync()
     {
         await LoadSummary();
-        _ = LoadItems(); _ = LoadDocuments(); _ = LoadWorkflow(); _ = LoadNotes(); _ = LoadAi(); _ = LoadContracts();
+        _ = LoadItems(); _ = LoadDocuments(); _ = LoadWorkflow(); _ = LoadNotes(); _ = LoadAi(); _ = LoadContracts(); _ = LoadPurchaseOrders();
     }
     private async Task LoadSummary() => await Load(_summary, async () =>
         await Api.GetPurchaseFileAsync(Id) ?? throw new HttpRequestException("پرونده یافت نشد."), "خلاصه پرونده دریافت نشد.");
@@ -155,6 +167,7 @@ else if (_summary.Data is { } file)
     }
     private async Task LoadAi() => await Load(_ai, () => Api.GetAiEvaluationsAsync(Id), "نتایج هوش مصنوعی دریافت نشد.");
     private async Task LoadContracts() => await Load(_contracts, () => Api.GetPurchaseFileContractsAsync(Id), "قراردادهای پرونده دریافت نشد.");
+    private async Task LoadPurchaseOrders() => await Load(_purchaseOrders, () => Api.GetPurchaseFilePurchaseOrdersAsync(Id), "سفارش‌های خرید پرونده دریافت نشد.");
     private async Task Load<T>(TabLoadState<T> state, Func<Task<T>> loader, string message)
     {
         state.Loading = true; state.Error = null; StateHasChanged();
@@ -216,6 +229,34 @@ else if (_summary.Data is { } file)
                     <MudTd>@(context.FinalAmount?.ToString("N0") ?? "—") @context.Currency</MudTd>
                     <MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
                     <MudTd><MudButton Size="Size.Small" Href="@($"/purchase/contracts/{context.Id}")">مشاهده</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </div>;
+    private RenderFragment<List<PurchaseOrderSummaryDto>> PurchaseOrdersContent => orders => @<div>
+        <div class="d-flex justify-end mb-3">
+            <PermissionView Permission="@PurchaseOrderUiPolicy.Create">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add"
+                           Href="@($"/purchase/purchase-orders/from-purchase-file/{Id}")">ایجاد سفارش خرید</MudButton>
+            </PermissionView>
+        </div>
+        @if (orders.Count == 0)
+        {
+            <EmptyState Title="سفارش خریدی ثبت نشده" Description="برای این پرونده خرید هنوز سفارش خرید ایجاد نشده است." />
+        }
+        else
+        {
+            <MudTable Items="orders" Dense="true" Hover="true">
+                <HeaderContent><MudTh>شماره سفارش</MudTh><MudTh>قرارداد</MudTh><MudTh>تأمین‌کننده</MudTh><MudTh>نوع</MudTh><MudTh>وضعیت</MudTh><MudTh>مبلغ نهایی</MudTh><MudTh>موعد تحویل</MudTh><MudTh></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.PurchaseOrderNumber</MudTd>
+                    <MudTd>@(context.ContractNumber ?? "—")</MudTd>
+                    <MudTd>@context.SupplierName</MudTd>
+                    <MudTd>@PurchaseOrderUiPolicy.TypeText(context.PurchaseOrderType)</MudTd>
+                    <MudTd><StatusChip Text="@PurchaseOrderUiPolicy.StatusText(context.Status)" Color="@PurchaseOrderUiPolicy.StatusColor(context.Status)" /></MudTd>
+                    <MudTd>@(context.FinalAmount?.ToString("N0") ?? "—") @context.Currency</MudTd>
+                    <MudTd><DateDisplay Value="@context.ExpectedDeliveryDate" /></MudTd>
+                    <MudTd><MudButton Size="Size.Small" Href="@($"/purchase/purchase-orders/{context.Id}")">مشاهده</MudButton></MudTd>
                 </RowTemplate>
             </MudTable>
         }

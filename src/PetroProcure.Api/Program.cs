@@ -135,6 +135,7 @@ app.MapTenderEndpoints();
 app.MapCommissionEndpoints();
 app.MapTenderCommissionDocumentReportEndpoints();
 app.MapContractEndpoints();
+app.MapPurchaseOrderEndpoints();
 
 app.MapDefaultEndpoints();
 

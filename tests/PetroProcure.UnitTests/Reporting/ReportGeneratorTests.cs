@@ -207,6 +207,14 @@ public sealed class ReportGeneratorTests : IDisposable
                 [new("123456", "لوله و اتصالات",
                     [new("1234560001", "123456", "لوله و اتصالات", "لوله فولادی", "متر", 10)])],
                 [new(1, "موضوع قرارداد", "متن بند قرارداد", "عمومی", true)]));
+        public Task<PurchaseOrderReportData?> GetPurchaseOrderAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<PurchaseOrderReportData?>(new(Guid.NewGuid(), "PO-2026-000001", "PF-2026-000001",
+                "CNT-2026-000001", "شرکت الف", "SUP-001", "سفارش خرید", "پیش‌نویس",
+                "مبتنی بر قرارداد", "IRR", "1,000 IRR", "90 IRR", "0 IRR", "1,090 IRR",
+                "1405/01/01", "1405/06/01", "انبار مرکزی", "تحویل در انبار", "پرداخت مرحله‌ای",
+                "۱۲ ماه", "یادداشت تست",
+                [new("123456", "لوله و اتصالات",
+                    [new("1234560001", "123456", "لوله و اتصالات", "لوله فولادی", "متر", 10)])]));
     }
 
     private sealed class CapturingStorage : IFileStorageService

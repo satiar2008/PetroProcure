@@ -19,6 +19,7 @@ using PetroProcure.Application.Orders;
 using PetroProcure.Application.Tenders;
 using PetroProcure.Application.Commission;
 using PetroProcure.Application.Contracts;
+using PetroProcure.Application.PurchaseOrders;
 using PetroProcure.Reporting;
 using PetroProcure.AI;
 
@@ -77,6 +78,7 @@ public static class DependencyInjection
         services.AddScoped<ICommissionSessionNumberService, CommissionSessionNumberService>();
         services.AddScoped<ICommissionSessionEligibilityService, CommissionSessionEligibilityService>();
         services.AddScoped<IContractRepository, ContractRepository>();
+        services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
         services.AddScoped<IReportDataProvider, ReportDataProvider>();
         services.AddScoped<AiRepository>();
         services.AddScoped<IAiEvaluationRepository>(sp => sp.GetRequiredService<AiRepository>());

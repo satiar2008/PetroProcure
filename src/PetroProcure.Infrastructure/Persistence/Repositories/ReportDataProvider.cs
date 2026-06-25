@@ -203,6 +203,35 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
             clauses);
     }
 
+    public async Task<PurchaseOrderReportData?> GetPurchaseOrderAsync(Guid id, CancellationToken ct)
+    {
+        var po = await db.PurchaseOrders.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (po is null) return null;
+        var fileNumber = await db.PurchaseFiles.AsNoTracking()
+            .Where(x => x.Id == po.PurchaseFileId).Select(x => x.FileNumber).SingleOrDefaultAsync(ct) ?? "—";
+        var supplier = await db.Suppliers.AsNoTracking()
+            .Where(x => x.Id == po.SupplierId)
+            .Select(x => new { x.SupplierCode, x.Name })
+            .SingleOrDefaultAsync(ct);
+        var contractNumber = po.ContractId.HasValue
+            ? await db.PurchaseContracts.AsNoTracking().Where(x => x.Id == po.ContractId.Value).Select(x => x.ContractNumber).SingleOrDefaultAsync(ct) ?? "—"
+            : "—";
+        var items = await db.PurchaseOrderItems.AsNoTracking()
+            .Where(x => x.PurchaseOrderId == id)
+            .OrderBy(x => x.MescCode)
+            .ToListAsync(ct);
+
+        return new PurchaseOrderReportData(po.Id, po.PurchaseOrderNumber, fileNumber, contractNumber,
+            supplier?.Name ?? "—", supplier?.SupplierCode ?? "—", po.Title, Text(po.Status),
+            Text(po.PurchaseOrderType), po.Currency, Money(po.TotalAmount, po.Currency),
+            Money(po.TaxAmount, po.Currency), Money(po.DiscountAmount, po.Currency),
+            Money(po.FinalAmount, po.Currency), Date(po.OrderDate), Date(po.ExpectedDeliveryDate),
+            po.DeliveryLocation ?? "—", po.DeliveryTerms ?? "—", po.PaymentTerms ?? "—",
+            po.WarrantyTerms ?? "—", po.Notes ?? "—", Group(items.Select(x => new ReportItemData(
+                x.MescCode, x.MescGeneralGroupCode, x.GeneralDescription, x.SpecificDescription,
+                Unit(x.UnitOfMeasureId), x.OrderedQuantity))));
+    }
+
     private static IReadOnlyList<ReportItemGroupData> Group(IEnumerable<ReportItemData> items) =>
         items.GroupBy(x => new { x.GeneralGroupCode, x.GeneralDescription }).OrderBy(x => x.Key.GeneralGroupCode)
             .Select(x => new ReportItemGroupData(x.Key.GeneralGroupCode, x.Key.GeneralDescription, x.ToArray())).ToArray();
@@ -389,6 +418,29 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
         ContractClauseType.Legal => "حقوقی",
         ContractClauseType.AttachmentReference => "ارجاع پیوست",
         ContractClauseType.Other => "سایر",
+        _ => value.ToString()
+    };
+    private static string Text(PurchaseOrderStatus value) => value switch
+    {
+        PurchaseOrderStatus.Draft => "پیش‌نویس",
+        PurchaseOrderStatus.UnderReview => "در حال بررسی",
+        PurchaseOrderStatus.WaitingForApproval => "در انتظار تأیید",
+        PurchaseOrderStatus.Approved => "تأییدشده",
+        PurchaseOrderStatus.Issued => "صادرشده",
+        PurchaseOrderStatus.PartiallyReceived => "دریافت جزئی",
+        PurchaseOrderStatus.FullyReceived => "دریافت کامل",
+        PurchaseOrderStatus.Completed => "تکمیل‌شده",
+        PurchaseOrderStatus.Cancelled => "لغوشده",
+        PurchaseOrderStatus.Archived => "بایگانی‌شده",
+        _ => value.ToString()
+    };
+    private static string Text(PurchaseOrderType value) => value switch
+    {
+        PurchaseOrderType.ContractBased => "مبتنی بر قرارداد",
+        PurchaseOrderType.DirectPurchase => "خرید مستقیم",
+        PurchaseOrderType.TenderBased => "مبتنی بر مناقصه",
+        PurchaseOrderType.Service => "خدمات",
+        PurchaseOrderType.Other => "سایر",
         _ => value.ToString()
     };
 }

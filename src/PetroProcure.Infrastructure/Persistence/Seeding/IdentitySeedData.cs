@@ -59,12 +59,14 @@ public static class IdentitySeedData
     [
         new(StableGuid.Create("menu:purchase:files"), DepartmentType.PurchaseDepartment, "پرونده‌های خرید", "/purchase-files", ApplicationPermissions.PurchaseFileView, 1),
         new(StableGuid.Create("menu:purchase:suppliers"), DepartmentType.PurchaseDepartment, "تأمین‌کنندگان", "/purchase/suppliers", ApplicationPermissions.SupplierView, 2),
+        new(StableGuid.Create("menu:purchase:purchase-orders"), DepartmentType.PurchaseDepartment, "سفارش‌های خرید", "/purchase/purchase-orders", ApplicationPermissions.PurchaseOrderView, 3),
         new(StableGuid.Create("menu:orders:dashboard"), DepartmentType.OrdersAndInventoryControl, "داشبورد سفارشات", "/orders", ApplicationPermissions.OrdersViewDashboard, 1),
         new(StableGuid.Create("menu:orders:inventory"), DepartmentType.OrdersAndInventoryControl, "کنترل موجودی", "/orders/inventory-control", ApplicationPermissions.OrdersViewInventory, 2),
         new(StableGuid.Create("menu:orders:needs"), DepartmentType.OrdersAndInventoryControl, "نیازهای کالا", "/orders/material-needs", ApplicationPermissions.OrdersCreateMaterialNeed, 3),
         new(StableGuid.Create("menu:orders:shortages"), DepartmentType.OrdersAndInventoryControl, "هشدارهای کمبود", "/orders/shortage-alerts", ApplicationPermissions.OrdersManageShortageAlerts, 4),
         new(StableGuid.Create("menu:orders:indents"), DepartmentType.OrdersAndInventoryControl, "درخواست‌های خرید", "/orders/indents", ApplicationPermissions.IndentView, 5),
         new(StableGuid.Create("menu:warehouse:tasks"), DepartmentType.Warehouse, "عملیات انبار", "/warehouse", ApplicationPermissions.WarehouseView, 1),
+        new(StableGuid.Create("menu:warehouse:purchase-orders"), DepartmentType.Warehouse, "سفارش‌های در انتظار رسید", "/warehouse/purchase-orders", ApplicationPermissions.PurchaseOrderView, 2),
         new(StableGuid.Create("menu:applicant:requests"), DepartmentType.Applicant, "درخواست‌های من", "/applicant/requests", ApplicationPermissions.IndentCreate, 1),
         new(StableGuid.Create("menu:tender:commission"), DepartmentType.TenderCommission, "کمیسیون مناقصه", "/tenders", ApplicationPermissions.TenderView, 1)
     ];
@@ -163,6 +165,18 @@ public static class IdentitySeedData
                 ApplicationPermissions.ContractManageDocuments,
                 ApplicationPermissions.ContractReportView,
                 ApplicationPermissions.ContractReportExport,
+                ApplicationPermissions.PurchaseOrderView,
+                ApplicationPermissions.PurchaseOrderCreate,
+                ApplicationPermissions.PurchaseOrderEdit,
+                ApplicationPermissions.PurchaseOrderSubmit,
+                ApplicationPermissions.PurchaseOrderApprove,
+                ApplicationPermissions.PurchaseOrderReject,
+                ApplicationPermissions.PurchaseOrderIssue,
+                ApplicationPermissions.PurchaseOrderCancel,
+                ApplicationPermissions.PurchaseOrderManageItems,
+                ApplicationPermissions.PurchaseOrderManageDocuments,
+                ApplicationPermissions.PurchaseOrderReportView,
+                ApplicationPermissions.PurchaseOrderReportExport,
                 ApplicationPermissions.ReportView,
                 ApplicationPermissions.ReportPrint,
                 ApplicationPermissions.ReportExportPdf
@@ -205,7 +219,15 @@ public static class IdentitySeedData
                 ApplicationPermissions.ContractManageClauses,
                 ApplicationPermissions.ContractManageDocuments,
                 ApplicationPermissions.ContractReportView,
-                ApplicationPermissions.ContractReportExport
+                ApplicationPermissions.ContractReportExport,
+                ApplicationPermissions.PurchaseOrderView,
+                ApplicationPermissions.PurchaseOrderCreate,
+                ApplicationPermissions.PurchaseOrderEdit,
+                ApplicationPermissions.PurchaseOrderSubmit,
+                ApplicationPermissions.PurchaseOrderManageItems,
+                ApplicationPermissions.PurchaseOrderManageDocuments,
+                ApplicationPermissions.PurchaseOrderReportView,
+                ApplicationPermissions.PurchaseOrderReportExport
             ],
             [ApplicationRoles.OrdersManager] =
             [
@@ -242,12 +264,14 @@ public static class IdentitySeedData
                 ApplicationPermissions.WarehouseView,
                 ApplicationPermissions.WarehouseReceive,
                 ApplicationPermissions.WarehouseIssue,
+                ApplicationPermissions.PurchaseOrderView,
                 ApplicationPermissions.ItemView
             ],
             [ApplicationRoles.WarehouseUser] =
             [
                 ApplicationPermissions.WarehouseView,
                 ApplicationPermissions.WarehouseReceive,
+                ApplicationPermissions.PurchaseOrderView,
                 ApplicationPermissions.ItemView
             ],
             [ApplicationRoles.ApplicantUser] =
@@ -318,7 +342,9 @@ public static class IdentitySeedData
                 ApplicationPermissions.CommissionReportView,
                 ApplicationPermissions.CommissionReportExport,
                 ApplicationPermissions.ContractReportView,
-                ApplicationPermissions.ContractReportExport
+                ApplicationPermissions.ContractReportExport,
+                ApplicationPermissions.PurchaseOrderReportView,
+                ApplicationPermissions.PurchaseOrderReportExport
             ],
             [ApplicationRoles.AiAgentUser] =
             [

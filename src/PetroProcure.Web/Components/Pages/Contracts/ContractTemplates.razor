@@ -28,6 +28,23 @@
             @if (_editing is not null)
             {
                 <MudSwitch T="bool" @bind-Value="_isActive" Color="Color.Success" Label="فعال" Class="mt-2" />
+                <MudDivider Class="my-4" />
+                <MudText Typo="Typo.subtitle2">@(_editingClause is null ? "بند جدید قالب" : "ویرایش بند قالب")</MudText>
+                <MudNumericField T="int" @bind-Value="_clauseOrder" Label="ترتیب" Variant="Variant.Outlined" Class="mt-3" />
+                <MudTextField @bind-Value="_clauseTitle" Label="عنوان بند" Variant="Variant.Outlined" Class="mt-3" />
+                <MudTextField @bind-Value="_clauseBody" Label="متن بند" Variant="Variant.Outlined" Lines="4" Class="mt-3" />
+                <MudSelect T="ContractClauseType" @bind-Value="_clauseType" Label="نوع بند" Variant="Variant.Outlined" Class="mt-3">
+                    @foreach (var type in Enum.GetValues<ContractClauseType>())
+                    {
+                        <MudSelectItem Value="@type">@ContractUiPolicy.ClauseTypeText(type)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudCheckBox @bind-Value="_clauseRequired" Label="الزامی" />
+                <MudCheckBox @bind-Value="_clauseEditable" Label="قابل ویرایش" />
+                <div class="d-flex justify-end gap-2">
+                    @if (_editingClause is not null) { <MudButton Variant="Variant.Text" OnClick="ResetClauseForm">انصراف بند</MudButton> }
+                    <MudButton Color="Color.Secondary" Variant="Variant.Outlined" Disabled="_savingClause" OnClick="SaveClause">@(_editingClause is null ? "افزودن بند" : "ذخیره بند")</MudButton>
+                </div>
             }
             else
             {
@@ -76,13 +93,14 @@
                     @if (template.Clauses.Count > 0)
                     {
                         <MudTable Items="template.Clauses.OrderBy(x => x.OrderNo)" Dense="true" Elevation="0">
-                            <HeaderContent><MudTh>ترتیب</MudTh><MudTh>عنوان بند</MudTh><MudTh>نوع</MudTh><MudTh>الزامی</MudTh><MudTh>قابل ویرایش</MudTh></HeaderContent>
+                            <HeaderContent><MudTh>ترتیب</MudTh><MudTh>عنوان بند</MudTh><MudTh>نوع</MudTh><MudTh>الزامی</MudTh><MudTh>قابل ویرایش</MudTh><MudTh>عملیات</MudTh></HeaderContent>
                             <RowTemplate Context="clause">
                                 <MudTd>@clause.OrderNo</MudTd>
                                 <MudTd>@clause.Title</MudTd>
                                 <MudTd>@ContractUiPolicy.ClauseTypeText(clause.ClauseType)</MudTd>
                                 <MudTd>@(clause.IsRequired ? "بله" : "خیر")</MudTd>
                                 <MudTd>@(clause.IsEditable ? "بله" : "خیر")</MudTd>
+                                <MudTd><MudIconButton Icon="@Icons.Material.Filled.Edit" OnClick="@(() => EditClause(template, clause))" /></MudTd>
                             </RowTemplate>
                         </MudTable>
                     }
@@ -93,13 +111,15 @@
 </MudGrid>
 
 @code {
-    private bool _loading = true, _saving, _isActive = true, _clauseRequired = true;
+    private bool _loading = true, _saving, _savingClause, _isActive = true, _clauseRequired = true, _clauseEditable = true;
+    private int _clauseOrder = 1;
     private string? _error, _description, _clauseTitle, _clauseBody;
     private string _templateCode = "";
     private string _title = "";
     private ContractType _type = ContractType.DirectPurchase;
     private ContractClauseType _clauseType = ContractClauseType.General;
     private ContractTemplateDto? _editing;
+    private ContractTemplateClauseDto? _editingClause;
     private List<ContractTemplateDto> _templates = [];
 
     protected override async Task OnInitializedAsync()
@@ -129,6 +149,20 @@
         _description = template.Description;
         _type = template.ContractType;
         _isActive = template.IsActive;
+        ResetClauseForm();
+        _clauseOrder = template.Clauses.Count == 0 ? 1 : template.Clauses.Max(x => x.OrderNo) + 1;
+    }
+
+    private void EditClause(ContractTemplateDto template, ContractTemplateClauseDto clause)
+    {
+        Edit(template);
+        _editingClause = clause;
+        _clauseOrder = clause.OrderNo;
+        _clauseTitle = clause.Title;
+        _clauseBody = clause.Body;
+        _clauseType = clause.ClauseType;
+        _clauseRequired = clause.IsRequired;
+        _clauseEditable = clause.IsEditable;
     }
 
     private async Task ToggleActive(ContractTemplateDto template)
@@ -180,9 +214,43 @@
         finally { _saving = false; }
     }
 
+    private async Task SaveClause()
+    {
+        if (_editing is null) return;
+        if (string.IsNullOrWhiteSpace(_clauseTitle) || string.IsNullOrWhiteSpace(_clauseBody))
+        {
+            Snackbar.Add("عنوان و متن بند الزامی است.", Severity.Warning);
+            return;
+        }
+        _savingClause = true;
+        try
+        {
+            if (_editingClause is null)
+            {
+                await Api.AddContractTemplateClauseAsync(_editing.Id, new AddContractTemplateClauseRequest(
+                    _clauseOrder, _clauseTitle.Trim(), _clauseBody.Trim(), _clauseType, _clauseRequired, _clauseEditable));
+                Snackbar.Add("بند قالب اضافه شد.", Severity.Success);
+            }
+            else
+            {
+                await Api.UpdateContractTemplateClauseAsync(_editing.Id, _editingClause.Id, new UpdateContractTemplateClauseRequest(
+                    _clauseOrder, _clauseTitle.Trim(), _clauseBody.Trim(), _clauseType, _clauseRequired, _clauseEditable));
+                Snackbar.Add("بند قالب ویرایش شد.", Severity.Success);
+            }
+            var templateId = _editing.Id;
+            ResetClauseForm();
+            await Load();
+            _editing = _templates.SingleOrDefault(x => x.Id == templateId);
+            _clauseOrder = (_editing?.Clauses.Count ?? 0) + 1;
+        }
+        catch (Exception ex) { Snackbar.Add("ذخیره بند ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _savingClause = false; }
+    }
+
     private void ResetForm()
     {
         _editing = null;
+        _editingClause = null;
         _templateCode = "";
         _title = "";
         _description = null;
@@ -192,5 +260,18 @@
         _clauseBody = null;
         _clauseType = ContractClauseType.General;
         _clauseRequired = true;
+        _clauseEditable = true;
+        _clauseOrder = 1;
+    }
+
+    private void ResetClauseForm()
+    {
+        _editingClause = null;
+        _clauseTitle = null;
+        _clauseBody = null;
+        _clauseType = ContractClauseType.General;
+        _clauseRequired = true;
+        _clauseEditable = true;
+        _clauseOrder = _editing?.Clauses.Count + 1 ?? 1;
     }
 }

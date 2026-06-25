@@ -15,6 +15,7 @@ internal static class DatabaseSchemas
     public const string Tender = "tender";
     public const string Commission = "commission";
     public const string Contract = "contract";
+    public const string PurchaseOrder = "po";
     public const string Warehouse = "warehouse";
     public const string Report = "report";
     public const string Ai = "ai";

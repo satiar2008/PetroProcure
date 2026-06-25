@@ -75,6 +75,19 @@ public static class ApplicationPermissions
     public const string ContractReportView = "Contract.ReportView";
     public const string ContractReportExport = "Contract.ReportExport";
 
+    public const string PurchaseOrderView = "PurchaseOrder.View";
+    public const string PurchaseOrderCreate = "PurchaseOrder.Create";
+    public const string PurchaseOrderEdit = "PurchaseOrder.Edit";
+    public const string PurchaseOrderSubmit = "PurchaseOrder.Submit";
+    public const string PurchaseOrderApprove = "PurchaseOrder.Approve";
+    public const string PurchaseOrderReject = "PurchaseOrder.Reject";
+    public const string PurchaseOrderIssue = "PurchaseOrder.Issue";
+    public const string PurchaseOrderCancel = "PurchaseOrder.Cancel";
+    public const string PurchaseOrderManageItems = "PurchaseOrder.ManageItems";
+    public const string PurchaseOrderManageDocuments = "PurchaseOrder.ManageDocuments";
+    public const string PurchaseOrderReportView = "PurchaseOrder.ReportView";
+    public const string PurchaseOrderReportExport = "PurchaseOrder.ReportExport";
+
     public const string SupplierView = "Supplier.View";
     public const string SupplierCreate = "Supplier.Create";
     public const string SupplierEdit = "Supplier.Edit";
@@ -184,6 +197,18 @@ public static class ApplicationPermissions
         ContractManageDocuments,
         ContractReportView,
         ContractReportExport,
+        PurchaseOrderView,
+        PurchaseOrderCreate,
+        PurchaseOrderEdit,
+        PurchaseOrderSubmit,
+        PurchaseOrderApprove,
+        PurchaseOrderReject,
+        PurchaseOrderIssue,
+        PurchaseOrderCancel,
+        PurchaseOrderManageItems,
+        PurchaseOrderManageDocuments,
+        PurchaseOrderReportView,
+        PurchaseOrderReportExport,
         SupplierView,
         SupplierCreate,
         SupplierEdit,

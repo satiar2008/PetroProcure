@@ -1,0 +1,81 @@
+@page "/purchase/purchase-orders"
+@page "/warehouse/purchase-orders"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject ISnackbar Snackbar
+
+<PageTitle>سفارش‌های خرید</PageTitle>
+<PageHeader Title="سفارش‌های خرید" Subtitle="مدیریت سفارش‌های خرید رسمی متصل به پرونده خرید">
+    <Actions>
+        <PermissionView Permission="@PurchaseOrderUiPolicy.Create">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" Href="/purchase/purchase-orders/create">ایجاد سفارش خرید</MudButton>
+        </PermissionView>
+    </Actions>
+</PageHeader>
+
+<MudPaper Class="filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="3"><MudTextField @bind-Value="_search" Label="جستجو" Immediate="true" /></MudItem>
+        <MudItem xs="12" md="2"><MudSelect T="PurchaseOrderStatus?" @bind-Value="_status" Label="وضعیت" Clearable="true">@foreach(var s in Enum.GetValues<PurchaseOrderStatus>()){<MudSelectItem T="PurchaseOrderStatus?" Value="@s">@PurchaseOrderUiPolicy.StatusText(s)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="2"><MudSelect T="PurchaseOrderType?" @bind-Value="_type" Label="نوع" Clearable="true">@foreach(var t in Enum.GetValues<PurchaseOrderType>()){<MudSelectItem T="PurchaseOrderType?" Value="@t">@PurchaseOrderUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
+        <MudItem xs="12" md="2"><MudTextField @bind-Value="_fileNumber" Label="پرونده خرید" Immediate="true" /></MudItem>
+        <MudItem xs="12" md="2"><MudTextField @bind-Value="_contractNumber" Label="قرارداد" Immediate="true" /></MudItem>
+        <MudItem xs="12" md="1" Class="d-flex align-end"><MudButton OnClick="ReloadServerData">اعمال</MudButton></MudItem>
+    </MudGrid>
+</MudPaper>
+
+<MudTable T="PurchaseOrderSummaryDto" ServerData="LoadServerData" @ref="_table" Dense="true" Hover="true">
+    <HeaderContent>
+        <MudTh><MudTableSortLabel T="PurchaseOrderSummaryDto" SortLabel="PurchaseOrderNumber">شماره سفارش</MudTableSortLabel></MudTh>
+        <MudTh>پرونده خرید</MudTh>
+        <MudTh>قرارداد</MudTh>
+        <MudTh>تأمین‌کننده</MudTh>
+        <MudTh>نوع</MudTh>
+        <MudTh>وضعیت</MudTh>
+        <MudTh>مبلغ نهایی</MudTh>
+        <MudTh>تاریخ سفارش</MudTh>
+        <MudTh>موعد تحویل</MudTh>
+        <MudTh>عملیات</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd>@context.PurchaseOrderNumber</MudTd>
+        <MudTd>@context.PurchaseFileNumber</MudTd>
+        <MudTd>@(context.ContractNumber ?? "—")</MudTd>
+        <MudTd>@context.SupplierName</MudTd>
+        <MudTd>@PurchaseOrderUiPolicy.TypeText(context.PurchaseOrderType)</MudTd>
+        <MudTd><StatusChip Text="@PurchaseOrderUiPolicy.StatusText(context.Status)" Color="@PurchaseOrderUiPolicy.StatusColor(context.Status)" /></MudTd>
+        <MudTd>@(context.FinalAmount?.ToString("N0") ?? "—") @context.Currency</MudTd>
+        <MudTd><DateDisplay Value="@context.OrderDate" /></MudTd>
+        <MudTd><DateDisplay Value="@context.ExpectedDeliveryDate" /></MudTd>
+        <MudTd><MudButton Size="Size.Small" Href="@($"/purchase/purchase-orders/{context.Id}")">مشاهده</MudButton></MudTd>
+    </RowTemplate>
+    <NoRecordsContent><EmptyState Title="سفارشی یافت نشد" Description="با تغییر فیلترها یا ایجاد سفارش جدید شروع کنید." /></NoRecordsContent>
+    <PagerContent><MudTablePager RowsPerPageString="ردیف در صفحه" /></PagerContent>
+</MudTable>
+
+@code {
+    private MudTable<PurchaseOrderSummaryDto>? _table;
+    private string? _search, _fileNumber, _contractNumber;
+    private PurchaseOrderStatus? _status;
+    private PurchaseOrderType? _type;
+
+    private async Task<TableData<PurchaseOrderSummaryDto>> LoadServerData(TableState state, CancellationToken ct)
+    {
+        try
+        {
+            var request = new PurchaseOrderListRequest(_search, _status, _type, null, _contractNumber,
+                _fileNumber, null, null, state.SortLabel ?? "CreatedAt", state.SortDirection == SortDirection.Descending,
+                state.Page + 1, state.PageSize);
+            var result = await Api.GetPurchaseOrdersAsync(request, ct);
+            return new TableData<PurchaseOrderSummaryDto> { Items = result.Items, TotalItems = (int)result.TotalCount };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("دریافت سفارش‌ها ناموفق بود: " + ex.Message, Severity.Error);
+            return new TableData<PurchaseOrderSummaryDto> { Items = [], TotalItems = 0 };
+        }
+    }
+
+    private Task ReloadServerData() => _table?.ReloadServerData() ?? Task.CompletedTask;
+}
