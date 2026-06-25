@@ -14,6 +14,7 @@ public static class ReportNames
     public const string CommissionDecision = "CommissionDecisionReport";
     public const string Contract = "ContractReport";
     public const string PurchaseOrder = "PurchaseOrderReport";
+    public const string WarehouseReceipt = "WarehouseReceiptReport";
 }
 
 public sealed record ReportPreviewModel(string ReportName, string PreviewUrl, string Title);
@@ -37,6 +38,7 @@ public interface IReportDataProvider
     Task<CommissionDecisionReportData?> GetCommissionDecisionAsync(Guid sessionId, Guid decisionId, CancellationToken cancellationToken);
     Task<ContractReportData?> GetContractAsync(Guid id, CancellationToken cancellationToken);
     Task<PurchaseOrderReportData?> GetPurchaseOrderAsync(Guid id, CancellationToken cancellationToken);
+    Task<WarehouseReceiptReportData?> GetWarehouseReceiptAsync(Guid id, CancellationToken cancellationToken);
 }
 
 public sealed record ReportItemData(string MescCode, string GeneralGroupCode, string GeneralDescription,
@@ -97,3 +99,13 @@ public sealed record PurchaseOrderReportData(Guid Id, string PurchaseOrderNumber
     string FinalAmount, string OrderDate, string ExpectedDeliveryDate, string DeliveryLocation,
     string DeliveryTerms, string PaymentTerms, string WarrantyTerms, string Notes,
     IReadOnlyList<ReportItemGroupData> Groups);
+
+public sealed record WarehouseReceiptReportData(Guid Id, string ReceiptNumber, string PurchaseOrderNumber,
+    string PurchaseFileNumber, string SupplierName, string WarehouseName, string ReceiptDate,
+    string DeliveryNoteNumber, string CarrierName, string VehicleNumber, string Status,
+    IReadOnlyList<WarehouseReceiptItemReportData> Items);
+
+public sealed record WarehouseReceiptItemReportData(string MescCode, string GeneralGroupCode,
+    string GeneralDescription, string SpecificDescription, string Unit, decimal OrderedQuantity,
+    decimal PreviouslyReceivedQuantity, decimal ReceivedQuantity, decimal RemainingQuantityAfterReceipt,
+    string QualityStatus);

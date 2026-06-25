@@ -264,6 +264,18 @@ public static class IdentitySeedData
                 ApplicationPermissions.WarehouseView,
                 ApplicationPermissions.WarehouseReceive,
                 ApplicationPermissions.WarehouseIssue,
+                ApplicationPermissions.WarehouseManageWarehouses,
+                ApplicationPermissions.WarehouseReceiptView,
+                ApplicationPermissions.WarehouseReceiptCreate,
+                ApplicationPermissions.WarehouseReceiptEdit,
+                ApplicationPermissions.WarehouseReceiptSubmit,
+                ApplicationPermissions.WarehouseReceiptApprove,
+                ApplicationPermissions.WarehouseReceiptCancel,
+                ApplicationPermissions.WarehouseReceiptManageDocuments,
+                ApplicationPermissions.WarehouseReceiptReportView,
+                ApplicationPermissions.WarehouseReceiptReportExport,
+                ApplicationPermissions.InventoryViewTransactions,
+                ApplicationPermissions.InventoryViewStockBalance,
                 ApplicationPermissions.PurchaseOrderView,
                 ApplicationPermissions.ItemView
             ],
@@ -271,6 +283,13 @@ public static class IdentitySeedData
             [
                 ApplicationPermissions.WarehouseView,
                 ApplicationPermissions.WarehouseReceive,
+                ApplicationPermissions.WarehouseReceiptView,
+                ApplicationPermissions.WarehouseReceiptCreate,
+                ApplicationPermissions.WarehouseReceiptEdit,
+                ApplicationPermissions.WarehouseReceiptSubmit,
+                ApplicationPermissions.WarehouseReceiptManageDocuments,
+                ApplicationPermissions.InventoryViewTransactions,
+                ApplicationPermissions.InventoryViewStockBalance,
                 ApplicationPermissions.PurchaseOrderView,
                 ApplicationPermissions.ItemView
             ],
@@ -344,7 +363,9 @@ public static class IdentitySeedData
                 ApplicationPermissions.ContractReportView,
                 ApplicationPermissions.ContractReportExport,
                 ApplicationPermissions.PurchaseOrderReportView,
-                ApplicationPermissions.PurchaseOrderReportExport
+                ApplicationPermissions.PurchaseOrderReportExport,
+                ApplicationPermissions.WarehouseReceiptReportView,
+                ApplicationPermissions.WarehouseReceiptReportExport
             ],
             [ApplicationRoles.AiAgentUser] =
             [

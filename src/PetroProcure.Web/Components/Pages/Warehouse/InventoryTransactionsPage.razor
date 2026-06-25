@@ -1,0 +1,53 @@
+@page "/warehouse/inventory-transactions"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+
+<PageTitle>گردش موجودی</PageTitle>
+<PageHeader Title="گردش موجودی" Subtitle="تراکنش‌های قابل ممیزی موجودی کالا" />
+
+<MudPaper Class="filter-panel" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="5"><MudTextField @bind-Value="_search" Label="جستجو در شماره گردش یا کد کالا" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><MudSelect T="InventoryTransactionType?" @bind-Value="_type" Label="نوع گردش" Clearable="true" Variant="Variant.Outlined">
+            @foreach (var type in Enum.GetValues<InventoryTransactionType>())
+            { <MudSelectItem T="InventoryTransactionType?" Value="@type">@WarehouseUiPolicy.TransactionTypeText(type)</MudSelectItem> }
+        </MudSelect></MudItem>
+        <MudItem xs="12" md="2"><MudButton FullWidth Color="Color.Primary" Variant="Variant.Filled" OnClick="Load">اعمال</MudButton></MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_loading) { <LoadingOverlay Visible="true" Text="در حال دریافت گردش موجودی..." /> }
+else if (_error is not null) { <RetryPanel Message="@_error" OnRetry="Load" /> }
+else if (_items.Count == 0) { <EmptyState Title="گردش موجودی وجود ندارد" Description="با تأیید رسید انبار، گردش از نوع رسید ایجاد می‌شود." /> }
+else
+{
+    <MudTable Items="_items" Dense="true" Hover="true">
+        <HeaderContent><MudTh>شماره گردش</MudTh><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>انبار</MudTh><MudTh>نوع</MudTh><MudTh>مقدار</MudTh><MudTh>تاریخ</MudTh></HeaderContent>
+        <RowTemplate><MudTd>@context.TransactionNumber</MudTd><MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.WarehouseName</MudTd><MudTd>@WarehouseUiPolicy.TransactionTypeText(context.TransactionType)</MudTd><MudTd>@context.Quantity</MudTd><MudTd><DateDisplay Value="@context.TransactionDate" /></MudTd></RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<InventoryTransactionDto> _items = [];
+    private bool _loading = true;
+    private string? _error, _search;
+    private InventoryTransactionType? _type;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!Access.HasPermission(WarehouseUiPolicy.ViewTransactions)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load();
+        StateHasChanged();
+    }
+
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { _items = (await Api.GetInventoryTransactionsAsync(new(SearchTerm: _search, TransactionType: _type, PageSize: 100))).Items.ToList(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

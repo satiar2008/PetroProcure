@@ -1,0 +1,181 @@
+@page "/admin/procurement-rules"
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageHeader Title="قوانین مناقصه" Subtitle="Ruleهای نسخه‌دار، قابل ارجاع به ماده/بند قانونی و قابل استفاده توسط AI" />
+
+<MudGrid Class="mb-4">
+    <MudItem xs="12" md="4">
+        <MudTextField @bind-Value="_search" Label="جستجو در کد یا عنوان" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+    </MudItem>
+    <MudItem xs="12" md="3">
+        <MudSelect @bind-Value="_status" Label="وضعیت">
+            <MudSelectItem Value="@((RuleStatus?)null)">همه</MudSelectItem>
+            @foreach (var status in Enum.GetValues<RuleStatus>())
+            {
+                <MudSelectItem Value="@((RuleStatus?)status)">@RuleStatusText(status)</MudSelectItem>
+            }
+        </MudSelect>
+    </MudItem>
+    <MudItem xs="12" md="5" Class="d-flex align-center gap-2">
+        <MudButton Variant="Variant.Outlined" OnClick="LoadAsync">جستجو</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => _showCreate = !_showCreate)">Rule جدید</MudButton>
+        <MudButton Variant="Variant.Text" OnClick="@(() => Nav.NavigateTo("/admin/procurement-rules/test"))">آزمون Ruleها</MudButton>
+    </MudItem>
+</MudGrid>
+
+@if (_showCreate)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="0">
+        <MudText Typo="Typo.h6">ایجاد Rule پیش‌نویس</MudText>
+        <MudGrid>
+            <MudItem xs="12" md="3"><MudTextField @bind-Value="_code" Label="کد Rule" /></MudItem>
+            <MudItem xs="12" md="5"><MudTextField @bind-Value="_title" Label="عنوان" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_legalReference" Label="ارجاع قانونی" /></MudItem>
+            <MudItem xs="12" md="3"><MudSelect @bind-Value="_ruleType" Label="نوع"><MudSelectItem Value="_ruleType">@RuleTypeText(_ruleType)</MudSelectItem>@foreach (var value in Enum.GetValues<RuleType>()) { <MudSelectItem Value="@value">@RuleTypeText(value)</MudSelectItem> }</MudSelect></MudItem>
+            <MudItem xs="12" md="3"><MudSelect @bind-Value="_severity" Label="اهمیت">@foreach (var value in Enum.GetValues<RuleSeverity>()) { <MudSelectItem Value="@value">@SeverityText(value)</MudSelectItem> }</MudSelect></MudItem>
+            <MudItem xs="12" md="3"><MudSelect @bind-Value="_mode" Label="روش ارزیابی">@foreach (var value in Enum.GetValues<RuleEvaluationMode>()) { <MudSelectItem Value="@value">@ModeText(value)</MudSelectItem> }</MudSelect></MudItem>
+            <MudItem xs="12" md="3"><MudTextField @bind-Value="_legalClauseId" Label="شناسه بند قانونی" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_conditionType" Label="نوع شرط" HelperText="alwayspass, alwaysfail, requiredDocumentType, minimumItems, hasTender, purchaseFileStatus" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_conditionValue" Label="مقدار شرط" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_conditionDescription" Label="شرح شرط" /></MudItem>
+        </MudGrid>
+        <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateRuleAsync">ثبت Rule</MudButton>
+    </MudPaper>
+}
+
+@if (_loading)
+{
+    <LoadingOverlay IsVisible="true" Text="در حال دریافت Ruleها..." />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+}
+else if (_rules.Count == 0)
+{
+    <EmptyState Title="Rule ثبت نشده است" Description="Ruleها باید به ماده یا بند قانونی ارجاع داشته باشند و پس از تأیید فعال شوند." />
+}
+else
+{
+    <MudTable Items="_rules" Hover="true" Dense="true">
+        <HeaderContent>
+            <MudTh>کد</MudTh>
+            <MudTh>عنوان</MudTh>
+            <MudTh>نسخه فعال</MudTh>
+            <MudTh>نوع</MudTh>
+            <MudTh>اهمیت</MudTh>
+            <MudTh>وضعیت</MudTh>
+            <MudTh>عملیات</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.Code</MudTd>
+            <MudTd>@context.Title</MudTd>
+            <MudTd>@(context.ActiveVersion?.VersionNo.ToString() ?? "-")</MudTd>
+            <MudTd>@(context.ActiveVersion is null ? "-" : RuleTypeText(context.ActiveVersion.RuleType))</MudTd>
+            <MudTd>@(context.ActiveVersion is null ? "-" : SeverityText(context.ActiveVersion.Severity))</MudTd>
+            <MudTd><StatusChip Text="@(context.ActiveVersion is null ? "پیش‌نویس" : RuleStatusText(context.ActiveVersion.Status))" /></MudTd>
+            <MudTd><MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo($"/admin/procurement-rules/{context.Id}/edit"))">ویرایش نسخه‌ها</MudButton></MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private readonly List<ProcurementRuleDto> _rules = [];
+    private string? _search;
+    private RuleStatus? _status;
+    private bool _loading;
+    private bool _busy;
+    private bool _showCreate;
+    private string? _error;
+    private string _code = "";
+    private string _title = "";
+    private string _legalReference = "";
+    private string _legalClauseId = "";
+    private RuleType _ruleType = RuleType.Checklist;
+    private RuleSeverity _severity = RuleSeverity.Warning;
+    private RuleEvaluationMode _mode = RuleEvaluationMode.Automatic;
+    private string _conditionType = "alwayspass";
+    private string _conditionValue = "true";
+    private string? _conditionDescription;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            var result = await Api.GetProcurementRulesAsync(new ProcurementRuleListRequest(_search, _status, PageSize: 50));
+            _rules.Clear(); _rules.AddRange(result.Items);
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task CreateRuleAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_code) || string.IsNullOrWhiteSpace(_title) || string.IsNullOrWhiteSpace(_legalReference))
+        {
+            Snackbar.Add("کد، عنوان و ارجاع قانونی الزامی است.", Severity.Warning);
+            return;
+        }
+        Guid? clauseId = Guid.TryParse(_legalClauseId, out var parsedClause) ? parsedClause : null;
+        if (clauseId is null)
+        {
+            Snackbar.Add("برای ردیابی حقوقی، شناسه بند قانونی معتبر الزامی است.", Severity.Warning);
+            return;
+        }
+        _busy = true;
+        try
+        {
+            await Api.CreateProcurementRuleAsync(new CreateProcurementRuleRequest(_code, _title, null, _ruleType, _severity, _mode,
+                null, clauseId, _legalReference, _conditionType, _conditionValue, _conditionDescription));
+            Snackbar.Add("Rule به صورت پیش‌نویس ثبت شد.", Severity.Success);
+            _showCreate = false;
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    public static string RuleStatusText(RuleStatus status) => status switch
+    {
+        RuleStatus.Draft => "پیش‌نویس",
+        RuleStatus.PendingApproval => "در انتظار تأیید",
+        RuleStatus.Active => "فعال",
+        RuleStatus.Disabled => "غیرفعال",
+        RuleStatus.Deprecated => "منسوخ",
+        _ => status.ToString()
+    };
+
+    public static string SeverityText(RuleSeverity severity) => severity switch
+    {
+        RuleSeverity.Info => "اطلاع",
+        RuleSeverity.Warning => "هشدار",
+        RuleSeverity.Critical => "بحرانی",
+        RuleSeverity.Blocking => "بازدارنده",
+        _ => severity.ToString()
+    };
+
+    public static string RuleTypeText(RuleType type) => type switch
+    {
+        RuleType.Checklist => "چک‌لیست",
+        RuleType.Deadline => "مهلت",
+        RuleType.Threshold => "آستانه",
+        RuleType.Workflow => "گردش کار",
+        RuleType.Document => "مدرک",
+        RuleType.Evaluation => "ارزیابی",
+        RuleType.Exception => "استثنا",
+        _ => type.ToString()
+    };
+
+    public static string ModeText(RuleEvaluationMode mode) => mode switch
+    {
+        RuleEvaluationMode.Automatic => "خودکار",
+        RuleEvaluationMode.SemiAutomatic => "نیمه‌خودکار",
+        RuleEvaluationMode.ManualReview => "نیازمند بررسی انسانی",
+        _ => mode.ToString()
+    };
+}

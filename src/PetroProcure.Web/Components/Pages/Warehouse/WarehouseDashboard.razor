@@ -1,0 +1,69 @@
+@page "/warehouse"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+
+<PageTitle>داشبورد انبار</PageTitle>
+
+<PageHeader Title="داشبورد انبار" Subtitle="رسید کالا، موجودی و گردش انبار">
+    <Actions>
+        <PermissionView Permission="@WarehouseUiPolicy.Create">
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="/warehouse/purchase-orders-waiting">ثبت رسید جدید</MudButton>
+        </PermissionView>
+    </Actions>
+</PageHeader>
+
+@if (_loading)
+{
+    <LoadingOverlay Visible="true" Text="در حال دریافت اطلاعات انبار..." />
+}
+else if (_error is not null)
+{
+    <RetryPanel Message="@_error" OnRetry="Load" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="4"><MudPaper Class="stat-card" Elevation="0"><MudText Typo="Typo.subtitle2">سفارش‌های آماده دریافت</MudText><MudText Typo="Typo.h4">@_waitingCount</MudText></MudPaper></MudItem>
+        <MudItem xs="12" md="4"><MudPaper Class="stat-card" Elevation="0"><MudText Typo="Typo.subtitle2">رسیدهای اخیر</MudText><MudText Typo="Typo.h4">@_receiptCount</MudText></MudPaper></MudItem>
+        <MudItem xs="12" md="4"><MudPaper Class="stat-card" Elevation="0"><MudText Typo="Typo.subtitle2">اقلام دارای موجودی</MudText><MudText Typo="Typo.h4">@_stockCount</MudText></MudPaper></MudItem>
+    </MudGrid>
+
+    <MudGrid Class="mt-4">
+        <MudItem xs="12" md="3"><MudButton FullWidth Variant="Variant.Outlined" Href="/warehouse/receipts">رسیدهای انبار</MudButton></MudItem>
+        <MudItem xs="12" md="3"><MudButton FullWidth Variant="Variant.Outlined" Href="/warehouse/purchase-orders-waiting">سفارش‌های در انتظار رسید</MudButton></MudItem>
+        <MudItem xs="12" md="3"><MudButton FullWidth Variant="Variant.Outlined" Href="/warehouse/stock-balances">موجودی کالا</MudButton></MudItem>
+        <MudItem xs="12" md="3"><MudButton FullWidth Variant="Variant.Outlined" Href="/warehouse/inventory-transactions">گردش موجودی</MudButton></MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private int _waitingCount, _receiptCount, _stockCount;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!Access.HasPermission(WarehouseUiPolicy.View)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load();
+        StateHasChanged();
+    }
+
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            var waiting = Access.HasPermission(WarehouseUiPolicy.Create) ? await Api.GetPurchaseOrdersWaitingForReceiptAsync() : [];
+            var receipts = await Api.GetWarehouseReceiptsAsync(new(PageSize: 5));
+            var stock = Access.HasPermission(WarehouseUiPolicy.ViewStock) ? await Api.GetWarehouseStockBalancesAsync(new(PageSize: 1)) : new([], 1, 1, 0);
+            _waitingCount = waiting.Count;
+            _receiptCount = (int)receipts.TotalCount;
+            _stockCount = (int)stock.TotalCount;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

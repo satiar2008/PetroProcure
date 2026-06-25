@@ -31,6 +31,7 @@ public sealed class ReportGenerator(
             ReportNames.CommissionSessionMinutes => $"/api/commission/sessions/{value}/reports/minutes/pdf",
             ReportNames.Contract => $"/api/contracts/{value}/reports/contract/pdf",
             ReportNames.PurchaseOrder => $"/api/purchase-orders/{value}/reports/purchase-order/pdf",
+            ReportNames.WarehouseReceipt => $"/api/warehouse-receipts/{value}/reports/receipt/pdf",
             _ => $"/api/reports/purchase-file-summary/{value}/pdf"
         };
         return Task.FromResult(new ReportPreviewModel(reportName, url, PersianTitle(reportName)));
@@ -60,6 +61,7 @@ public sealed class ReportGenerator(
             ReportNames.CommissionDecision => new CommissionDecisionReport(await RequiredCommissionDecision(parameters, ct)),
             ReportNames.Contract => new ContractReport(await RequiredContract(parameters, ct)),
             ReportNames.PurchaseOrder => new PurchaseOrderReport(await RequiredPurchaseOrder(parameters, ct)),
+            ReportNames.WarehouseReceipt => new WarehouseReceiptReport(await RequiredWarehouseReceipt(parameters, ct)),
             _ => throw new ArgumentException($"Unknown report '{name}'.", nameof(name))
         };
     }
@@ -110,6 +112,11 @@ public sealed class ReportGenerator(
         var id = RequiredGuid(p, "PurchaseOrderId");
         return await dataProvider.GetPurchaseOrderAsync(id, ct) ?? throw new InvalidOperationException("Purchase order was not found.");
     }
+    private async Task<WarehouseReceiptReportData> RequiredWarehouseReceipt(IReadOnlyDictionary<string, object?> p, CancellationToken ct)
+    {
+        var id = RequiredGuid(p, "WarehouseReceiptId");
+        return await dataProvider.GetWarehouseReceiptAsync(id, ct) ?? throw new InvalidOperationException("Warehouse receipt was not found.");
+    }
     private static Guid RequiredGuid(IReadOnlyDictionary<string, object?> p, string key) =>
         p.TryGetValue(key, out var value) && value is Guid id ? id : throw new ArgumentException($"Parameter '{key}' is required.");
     private static string PersianTitle(string name) => name switch
@@ -124,6 +131,7 @@ public sealed class ReportGenerator(
         ReportNames.CommissionDecision => "تصمیم کمیسیون",
         ReportNames.Contract => "قرارداد خرید",
         ReportNames.PurchaseOrder => "سفارش خرید",
+        ReportNames.WarehouseReceipt => "رسید انبار",
         _ => name
     };
 
@@ -133,6 +141,7 @@ public sealed class ReportGenerator(
         ReportNames.CommissionSessionMinutes or ReportNames.CommissionDecision => DocumentType.TenderCommissionMinutes,
         ReportNames.Contract => DocumentType.Contract,
         ReportNames.PurchaseOrder => DocumentType.PurchaseOrder,
+        ReportNames.WarehouseReceipt => DocumentType.WarehouseReceipt,
         _ => DocumentType.FinalReport
     };
 
@@ -150,6 +159,7 @@ public sealed class ReportGenerator(
             ReportNames.CommissionDecision => $"CommissionDecision-{suffix}-{Short(parameters, "DecisionId")}.pdf",
             ReportNames.Contract => $"Contract-{(parameters.TryGetValue("ContractNumber", out var contractNumber) ? contractNumber : suffix)}.pdf",
             ReportNames.PurchaseOrder => $"PurchaseOrder-{(parameters.TryGetValue("PurchaseOrderNumber", out var poNumber) ? poNumber : suffix)}.pdf",
+            ReportNames.WarehouseReceipt => $"WarehouseReceipt-{(parameters.TryGetValue("ReceiptNumber", out var receiptNumber) ? receiptNumber : suffix)}.pdf",
             _ => $"{reportName}-{DateTime.UtcNow:yyyyMMddHHmmss}.pdf"
         };
         return Safe(raw);

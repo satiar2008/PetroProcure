@@ -96,10 +96,11 @@ internal sealed class PurchaseOrderRepository(PetroProcureDbContext db) : IPurch
     {
         var query = ApplyFilters(SummaryQuery(), request);
         var total = await query.LongCountAsync(ct);
-        var items = await ApplySort(query, request.SortBy, request.SortDescending)
+        var rows = await ApplySort(query, request.SortBy, request.SortDescending)
             .Skip((Math.Max(1, request.PageNumber) - 1) * Math.Max(1, request.PageSize))
             .Take(Math.Clamp(request.PageSize, 1, 200))
             .ToListAsync(ct);
+        var items = rows.Select(x => x.ToDto()).ToArray();
         return new PagedResult<PurchaseOrderSummaryDto>(items, request.PageNumber, request.PageSize, total);
     }
 
@@ -116,13 +117,16 @@ internal sealed class PurchaseOrderRepository(PetroProcureDbContext db) : IPurch
     }
 
     public async Task<IReadOnlyList<PurchaseOrderSummaryDto>> GetPurchaseOrdersByPurchaseFileAsync(Guid purchaseFileId, CancellationToken ct) =>
-        await SummaryQuery().Where(x => x.PurchaseFileId == purchaseFileId).OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        (await SummaryQuery().Where(x => x.PurchaseFileId == purchaseFileId).OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(ct)).Select(x => x.ToDto()).ToArray();
 
     public async Task<IReadOnlyList<PurchaseOrderSummaryDto>> GetPurchaseOrdersBySupplierAsync(Guid supplierId, CancellationToken ct) =>
-        await SummaryQuery().Where(x => x.SupplierId == supplierId).OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        (await SummaryQuery().Where(x => x.SupplierId == supplierId).OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(ct)).Select(x => x.ToDto()).ToArray();
 
     public async Task<IReadOnlyList<PurchaseOrderSummaryDto>> GetPurchaseOrdersByContractAsync(Guid contractId, CancellationToken ct) =>
-        await SummaryQuery().Where(x => x.ContractId == contractId).OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        (await SummaryQuery().Where(x => x.ContractId == contractId).OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(ct)).Select(x => x.ToDto()).ToArray();
 
     public async Task<IReadOnlyList<PurchaseOrderDocumentDto>> GetDocumentsAsync(Guid purchaseOrderId, CancellationToken ct) =>
         await db.PurchaseOrderDocuments.AsNoTracking().Where(x => x.PurchaseOrderId == purchaseOrderId)
@@ -152,16 +156,31 @@ internal sealed class PurchaseOrderRepository(PetroProcureDbContext db) : IPurch
         return new PurchaseOrderDetailDto(po, items, approvals, documents);
     }
 
-    private IQueryable<PurchaseOrderSummaryDto> SummaryQuery() =>
+    private IQueryable<PurchaseOrderSummaryRow> SummaryQuery() =>
         from po in db.PurchaseOrders.AsNoTracking()
         join file in db.PurchaseFiles.AsNoTracking() on po.PurchaseFileId equals file.Id
         join supplier in db.Suppliers.AsNoTracking() on po.SupplierId equals supplier.Id
         join contract in db.PurchaseContracts.AsNoTracking() on po.ContractId equals contract.Id into contracts
         from contract in contracts.DefaultIfEmpty()
-        select new PurchaseOrderSummaryDto(po.Id, po.PurchaseOrderNumber, po.PurchaseFileId,
-            file.FileNumber, po.SupplierId, supplier.Name, po.ContractId, contract == null ? null : contract.ContractNumber,
-            po.Title, po.PurchaseOrderType, po.Status, po.FinalAmount, po.Currency, po.OrderDate,
-            po.ExpectedDeliveryDate, po.CreatedAt);
+        select new PurchaseOrderSummaryRow
+        {
+            Id = po.Id,
+            PurchaseOrderNumber = po.PurchaseOrderNumber,
+            PurchaseFileId = po.PurchaseFileId,
+            PurchaseFileNumber = file.FileNumber,
+            SupplierId = po.SupplierId,
+            SupplierName = supplier.Name,
+            ContractId = po.ContractId,
+            ContractNumber = contract == null ? null : contract.ContractNumber,
+            Title = po.Title,
+            PurchaseOrderType = po.PurchaseOrderType,
+            Status = po.Status,
+            FinalAmount = po.FinalAmount,
+            Currency = po.Currency,
+            OrderDate = po.OrderDate,
+            ExpectedDeliveryDate = po.ExpectedDeliveryDate,
+            CreatedAt = po.CreatedAt
+        };
 
     private IQueryable<PurchaseOrderDto> DtoQuery(Guid? id = null, string? number = null)
     {
@@ -187,7 +206,7 @@ internal sealed class PurchaseOrderRepository(PetroProcureDbContext db) : IPurch
                    po.CancelledAt, po.CancelledByUserId, po.CancellationReason);
     }
 
-    private static IQueryable<PurchaseOrderSummaryDto> ApplyFilters(IQueryable<PurchaseOrderSummaryDto> query, PurchaseOrderListRequest r)
+    private static IQueryable<PurchaseOrderSummaryRow> ApplyFilters(IQueryable<PurchaseOrderSummaryRow> query, PurchaseOrderListRequest r)
     {
         if (!string.IsNullOrWhiteSpace(r.SearchTerm))
         {
@@ -206,7 +225,7 @@ internal sealed class PurchaseOrderRepository(PetroProcureDbContext db) : IPurch
         return query;
     }
 
-    private static IQueryable<PurchaseOrderSummaryDto> ApplySort(IQueryable<PurchaseOrderSummaryDto> query, string? sortBy, bool desc) =>
+    private static IQueryable<PurchaseOrderSummaryRow> ApplySort(IQueryable<PurchaseOrderSummaryRow> query, string? sortBy, bool desc) =>
         (sortBy ?? "CreatedAt").ToLowerInvariant() switch
         {
             "purchaseordernumber" => desc ? query.OrderByDescending(x => x.PurchaseOrderNumber) : query.OrderBy(x => x.PurchaseOrderNumber),
@@ -216,4 +235,28 @@ internal sealed class PurchaseOrderRepository(PetroProcureDbContext db) : IPurch
             "finalamount" => desc ? query.OrderByDescending(x => x.FinalAmount) : query.OrderBy(x => x.FinalAmount),
             _ => desc ? query.OrderByDescending(x => x.CreatedAt) : query.OrderBy(x => x.CreatedAt)
         };
+
+    private sealed class PurchaseOrderSummaryRow
+    {
+        public Guid Id { get; init; }
+        public string PurchaseOrderNumber { get; init; } = string.Empty;
+        public Guid PurchaseFileId { get; init; }
+        public string PurchaseFileNumber { get; init; } = string.Empty;
+        public Guid SupplierId { get; init; }
+        public string SupplierName { get; init; } = string.Empty;
+        public Guid? ContractId { get; init; }
+        public string? ContractNumber { get; init; }
+        public string Title { get; init; } = string.Empty;
+        public PurchaseOrderType PurchaseOrderType { get; init; }
+        public PurchaseOrderStatus Status { get; init; }
+        public decimal? FinalAmount { get; init; }
+        public string Currency { get; init; } = string.Empty;
+        public DateTime? OrderDate { get; init; }
+        public DateTime? ExpectedDeliveryDate { get; init; }
+        public DateTime CreatedAt { get; init; }
+
+        public PurchaseOrderSummaryDto ToDto() => new(Id, PurchaseOrderNumber, PurchaseFileId,
+            PurchaseFileNumber, SupplierId, SupplierName, ContractId, ContractNumber, Title,
+            PurchaseOrderType, Status, FinalAmount, Currency, OrderDate, ExpectedDeliveryDate, CreatedAt);
+    }
 }

@@ -425,6 +425,8 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
 public sealed class ApiAuthorizationFactory : WebApplicationFactory<Program>
 {
     public const string AdminPassword = "Integration-Admin-Password-2026!";
+    private readonly object _migrationLock = new();
+    private bool _migrated;
     private readonly string _connectionString =
         $"Server=localhost;Database=PetroProcureApiSecurity_{Guid.NewGuid():N};Trusted_Connection=True;TrustServerCertificate=True";
 
@@ -458,16 +460,25 @@ public sealed class ApiAuthorizationFactory : WebApplicationFactory<Program>
     protected override IHost CreateHost(IHostBuilder builder)
     {
         var host = base.CreateHost(builder);
-        using var scope = host.Services.CreateScope();
-        scope.ServiceProvider.GetRequiredService<PetroProcureDbContext>().Database.Migrate();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var admin = userManager.FindByIdAsync(IdentitySeedData.DefaultAdminUserId.ToString()).GetAwaiter().GetResult();
-        if (admin is not null)
+        lock (_migrationLock)
         {
-            admin.PasswordHash = new PasswordHasher<ApplicationUser>().HashPassword(admin, AdminPassword);
-            var result = userManager.UpdateAsync(admin).GetAwaiter().GetResult();
-            if (!result.Succeeded)
-                throw new InvalidOperationException(string.Join("; ", result.Errors.Select(x => x.Description)));
+            if (!_migrated)
+            {
+                using var scope = host.Services.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<PetroProcureDbContext>();
+                db.Database.EnsureDeleted();
+                db.Database.Migrate();
+                var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+                var admin = userManager.FindByIdAsync(IdentitySeedData.DefaultAdminUserId.ToString()).GetAwaiter().GetResult();
+                if (admin is not null)
+                {
+                    admin.PasswordHash = new PasswordHasher<ApplicationUser>().HashPassword(admin, AdminPassword);
+                    var result = userManager.UpdateAsync(admin).GetAwaiter().GetResult();
+                    if (!result.Succeeded)
+                        throw new InvalidOperationException(string.Join("; ", result.Errors.Select(x => x.Description)));
+                }
+                _migrated = true;
+            }
         }
         return host;
     }

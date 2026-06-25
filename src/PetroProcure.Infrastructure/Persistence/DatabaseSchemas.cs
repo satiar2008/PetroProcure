@@ -17,6 +17,8 @@ internal static class DatabaseSchemas
     public const string Contract = "contract";
     public const string PurchaseOrder = "po";
     public const string Warehouse = "warehouse";
+    public const string Legal = "legal";
+    public const string Rule = "rule";
     public const string Report = "report";
     public const string Ai = "ai";
     public const string Audit = "audit";

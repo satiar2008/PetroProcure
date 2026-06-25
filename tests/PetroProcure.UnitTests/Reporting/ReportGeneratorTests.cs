@@ -143,6 +143,19 @@ public sealed class ReportGeneratorTests : IDisposable
         Assert.DoesNotContain(':', storage.LastOriginalFileName);
     }
 
+    [Fact]
+    public async Task WarehouseReceiptReportCreatesPdfBytes()
+    {
+        var generator = new ReportGenerator(new FakeDataProvider(), new CapturingStorage(),
+            new TestCurrentUser(Guid.NewGuid()));
+
+        var bytes = await generator.GeneratePdfAsync(ReportNames.WarehouseReceipt,
+            new Dictionary<string, object?> { ["WarehouseReceiptId"] = FakeDataProvider.WarehouseReceiptId });
+
+        Assert.True(bytes.Length > 100);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root)) Directory.Delete(_root, true);
@@ -155,6 +168,7 @@ public sealed class ReportGeneratorTests : IDisposable
         public static readonly Guid CommissionSessionId = Guid.NewGuid();
         public static readonly Guid DecisionId = Guid.NewGuid();
         public static readonly Guid ContractId = Guid.NewGuid();
+        public static readonly Guid WarehouseReceiptId = Guid.NewGuid();
         public Task<PurchaseFileReportData?> GetPurchaseFileAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<PurchaseFileReportData?>(new(
                 PurchaseFileId, "PF-2026-000001", "خرید لوله", "در واحد خرید", "واحد خرید",
@@ -215,6 +229,12 @@ public sealed class ReportGeneratorTests : IDisposable
                 "۱۲ ماه", "یادداشت تست",
                 [new("123456", "لوله و اتصالات",
                     [new("1234560001", "123456", "لوله و اتصالات", "لوله فولادی", "متر", 10)])]));
+        public Task<WarehouseReceiptReportData?> GetWarehouseReceiptAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<WarehouseReceiptReportData?>(new(WarehouseReceiptId, "WR-2026-000001",
+                "PO-2026-000001", "PF-2026-000001", "شرکت الف", "انبار مرکزی",
+                "1405/01/10", "DL-001", "باربری الف", "12الف345", "تأییدشده",
+                [new("1234560001", "123456", "لوله و اتصالات", "لوله فولادی", "متر",
+                    10, 0, 5, 5, "پذیرفته‌شده")]));
     }
 
     private sealed class CapturingStorage : IFileStorageService

@@ -12,6 +12,8 @@ using PetroProcure.Application.Tenders;
 using PetroProcure.Application.Commission;
 using PetroProcure.Application.Contracts;
 using PetroProcure.Application.PurchaseOrders;
+using PetroProcure.Application.Warehouse;
+using PetroProcure.Application.Legal;
 
 namespace PetroProcure.Application;
 
@@ -53,6 +55,18 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseOrderReportDataSourceBuilder, PurchaseOrderReportDataSourceBuilder>();
         services.AddScoped<PurchaseOrderCommandHandler>();
         services.AddScoped<PurchaseOrderQueryHandler>();
+        services.AddScoped<IWarehouseReceiptNumberService, WarehouseReceiptNumberService>();
+        services.AddScoped<IInventoryTransactionNumberService, InventoryTransactionNumberService>();
+        services.AddScoped<IWarehouseReceiptEligibilityService, WarehouseReceiptEligibilityService>();
+        services.AddScoped<IInventoryBalanceService, InventoryBalanceService>();
+        services.AddScoped<WarehouseCommandHandler>();
+        services.AddScoped<WarehouseQueryHandler>();
+        services.AddScoped<LegalRuleCommandHandler>();
+        services.AddScoped<LegalRuleQueryHandler>();
+        services.AddScoped<LegalRuleEvaluationHandler>();
+        services.AddScoped<ILegalClauseSearchService, LegalClauseSearchService>();
+        services.AddScoped<PetroProcure.Application.Legal.IProcurementRuleEvaluator, DeterministicProcurementRuleEvaluator>();
+        services.AddScoped<IAiRuleExplanationService, MockAiRuleExplanationService>();
         return services;
     }
 }

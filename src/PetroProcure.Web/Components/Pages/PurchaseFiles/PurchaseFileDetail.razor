@@ -109,6 +109,7 @@ else if (_summary.Data is { } file)
                 <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_aiBusy" OnClick="@(()=>RunAi("summarize"))">خلاصه پرونده</MudButton>
                 <MudButton Variant="Variant.Outlined" Disabled="_aiBusy" OnClick="@(()=>RunAi("check-missing-documents"))">بررسی نقص مدارک</MudButton>
                 <MudButton Variant="Variant.Outlined" Disabled="_aiBusy" OnClick="@(()=>RunAi("evaluate-rules"))">بررسی قوانین خرید</MudButton>
+                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Disabled="_aiBusy" OnClick="EvaluateTenderLegalRules">بررسی قوانین مناقصه</MudButton>
             </div>
             @if (_ai.Loading || _aiBusy) { <MudProgressLinear Indeterminate="true" /> }
             else if (_ai.Error is not null) { @ErrorState(_ai.Error, LoadAi) }
@@ -299,6 +300,7 @@ else if (_summary.Data is { } file)
     private async Task OpenPurchaseFilePdf(){await EnsurePurchaseFilePdfLoaded();if(_purchaseFilePdfDataUrl is not null)await JS.InvokeVoidAsync("open",_purchaseFilePdfDataUrl,"_blank");}
     private async Task EnsurePurchaseFilePdfLoaded(){if(_purchaseFilePdfDataUrl is not null)return;_reportLoading=true;try{var bytes=await Api.GetPurchaseFileSummaryPdfAsync(Id);_purchaseFilePdfDataUrl=$"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";}catch(Exception ex){Snackbar.Add("دریافت گزارش ناموفق بود: "+ex.Message,Severity.Error);}finally{_reportLoading=false;}}
     private async Task RunAi(string action){_aiBusy=true;try{await Api.RunAiAsync(Id,action);await LoadAi();Snackbar.Add("تحلیل تکمیل شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_aiBusy=false;}}
+    private async Task EvaluateTenderLegalRules(){_aiBusy=true;try{var result=await Api.EvaluatePurchaseFileLegalRulesAsync(Id);var fail=result.Findings.Count(x=>x.Result==RuleResult.Fail);var warning=result.Findings.Count(x=>x.Result==RuleResult.Warning||x.Result==RuleResult.NeedHumanReview);Snackbar.Add($"بررسی قوانین مناقصه انجام شد. خطا: {fail}، هشدار/نیازمند بررسی: {warning}",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_aiBusy=false;}}
     private string DepartmentName(Guid id)=>Access.Departments.FirstOrDefault(x=>x.Id==id)?.Title??FakeDirectory.DepartmentName(id);
     private static string FormatSize(long size)=>size<1024?$"{size} B":size<1048576?$"{size/1024d:0.#} KB":$"{size/1048576d:0.#} MB";
     private static string DocumentTypeText(DocumentType type)=>type switch{DocumentType.Indent=>"درخواست خرید",DocumentType.TechnicalSpecification=>"مشخصات فنی",DocumentType.CommercialOffer=>"پیشنهاد تجاری",DocumentType.Correspondence=>"مکاتبات",DocumentType.TenderDocument=>"اسناد مناقصه",DocumentType.TenderCommissionMinutes=>"صورتجلسه کمیسیون",DocumentType.Contract=>"قرارداد",DocumentType.PurchaseOrder=>"سفارش خرید",DocumentType.WarehouseReceipt=>"رسید انبار",DocumentType.FinalReport=>"گزارش نهایی",_=>type.ToString()};

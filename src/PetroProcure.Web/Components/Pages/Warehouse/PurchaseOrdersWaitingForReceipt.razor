@@ -1,0 +1,55 @@
+@page "/warehouse/purchase-orders-waiting"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+
+<PageTitle>سفارش‌های در انتظار رسید</PageTitle>
+
+<PageHeader Title="سفارش‌های در انتظار رسید" Subtitle="سفارش‌های صادرشده یا نیمه‌دریافت‌شده که هنوز مانده قابل دریافت دارند" />
+
+@if (_loading) { <LoadingOverlay Visible="true" Text="در حال دریافت سفارش‌ها..." /> }
+else if (_error is not null) { <RetryPanel Message="@_error" OnRetry="Load" /> }
+else if (_items.Count == 0) { <EmptyState Title="سفارشی برای دریافت وجود ندارد" Description="پس از صدور سفارش خرید، امکان ثبت رسید انبار فعال می‌شود." /> }
+else
+{
+    <MudTable Items="_items" Dense="true" Hover="true">
+        <HeaderContent>
+            <MudTh>شماره سفارش</MudTh><MudTh>پرونده</MudTh><MudTh>تأمین‌کننده</MudTh><MudTh>عنوان</MudTh><MudTh>وضعیت</MudTh><MudTh>موعد تحویل</MudTh><MudTh>عملیات</MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.PurchaseOrderNumber</MudTd>
+            <MudTd>@context.PurchaseFileNumber</MudTd>
+            <MudTd>@context.SupplierName</MudTd>
+            <MudTd>@context.Title</MudTd>
+            <MudTd><StatusChip Text="@PurchaseOrderUiPolicy.StatusText(context.Status)" Color="@PurchaseOrderUiPolicy.StatusColor(context.Status)" /></MudTd>
+            <MudTd><DateDisplay Value="@context.ExpectedDeliveryDate" /></MudTd>
+            <MudTd>
+                <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => Navigation.NavigateTo($"/warehouse/receipts/from-purchase-order/{context.Id}"))">ثبت رسید</MudButton>
+                <MudIconButton Icon="@Icons.Material.Filled.Visibility" OnClick="@(() => Navigation.NavigateTo($"/purchase/purchase-orders/{context.Id}"))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private List<PurchaseOrderSummaryDto> _items = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        if (!Access.HasPermission(WarehouseUiPolicy.Create)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load();
+        StateHasChanged();
+    }
+
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try { _items = await Api.GetPurchaseOrdersWaitingForReceiptAsync(); }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

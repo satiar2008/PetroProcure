@@ -1,0 +1,100 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="afc63b6a-8f72-4596-bbbc-a40aa1b7812a" name="Mohammad Shamsololam@DESKTOP-U1R5ISO 2026-06-25 19:06:28" runUser="DESKTOP-U1R5ISO\Mohammad Shamsololam" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-06-25T19:06:28.9931177+03:30" queuing="2026-06-25T19:06:28.9931181+03:30" start="2026-06-25T19:06:27.8605009+03:30" finish="2026-06-25T19:06:29.0705417+03:30" />
+  <TestSettings name="default" id="74b827cb-b304-4305-b074-063252efb385">
+    <Deployment runDeploymentRoot="Mohammad_Shamsololam_DESKTOP-U1R5ISO_2026-06-25_19_06_28" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="d0e800c5-ecf3-4ddf-9d09-93e259deb22e" testId="3de16b0e-1b64-d138-4d8c-19d0b9898b1b" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ApiCanReferenceInfrastructure" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0039338" startTime="2026-06-25T19:06:28.9428795+03:30" endTime="2026-06-25T19:06:28.9428796+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d0e800c5-ecf3-4ddf-9d09-93e259deb22e" />
+    <UnitTestResult executionId="5554e89e-5239-43c5-b678-dbed9d8cd2ba" testId="ec8d8ac9-3fc0-4bd8-14eb-88bfdc14f11e" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.DomainMustNotReferenceEfCore" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0005995" startTime="2026-06-25T19:06:28.8862202+03:30" endTime="2026-06-25T19:06:28.8862202+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5554e89e-5239-43c5-b678-dbed9d8cd2ba" />
+    <UnitTestResult executionId="03f4791f-1845-44e6-8125-cce56e6be1f9" testId="1fda57f8-0620-cb99-53fe-0abe41a2a0ef" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ReportingMustNotDependOnWeb" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0009579" startTime="2026-06-25T19:06:28.8797855+03:30" endTime="2026-06-25T19:06:28.8797860+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="03f4791f-1845-44e6-8125-cce56e6be1f9" />
+    <UnitTestResult executionId="6f449eba-884d-458c-a7f2-5375dcf4b476" testId="3031f9d4-3e54-aa35-6ee4-b9ceedbd5e18" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ApplicationMustNotReferenceWeb" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0036345" startTime="2026-06-25T19:06:28.8331601+03:30" endTime="2026-06-25T19:06:28.8331606+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6f449eba-884d-458c-a7f2-5375dcf4b476" />
+    <UnitTestResult executionId="b4c625ce-c859-4ffa-aac0-480ae5d9e839" testId="a4d95ed3-7d36-eca2-bceb-52bc1a3a266d" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebTypedClientUsesSharedContracts" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0192480" startTime="2026-06-25T19:06:28.8279518+03:30" endTime="2026-06-25T19:06:28.8279885+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b4c625ce-c859-4ffa-aac0-480ae5d9e839" />
+    <UnitTestResult executionId="3b63a902-526c-47b5-bdcc-15848e0ebecb" testId="01f3e380-d42d-70e8-d397-b615c50266c2" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebMustNotDeclareDuplicateApiDtos" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0475902" startTime="2026-06-25T19:06:28.8786181+03:30" endTime="2026-06-25T19:06:28.8786185+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3b63a902-526c-47b5-bdcc-15848e0ebecb" />
+    <UnitTestResult executionId="c1b47848-39c4-48bf-8af5-2cd950748eff" testId="c1954cde-905f-4103-04f2-22fff962ad3d" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ApplicationMustNotReferenceInfrastructure" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0001423" startTime="2026-06-25T19:06:28.8864199+03:30" endTime="2026-06-25T19:06:28.8864201+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c1b47848-39c4-48bf-8af5-2cd950748eff" />
+    <UnitTestResult executionId="41c7b4a5-cb7c-467a-b5c5-c29be5edc207" testId="8df75ca3-9220-fc0e-0fe5-23faeb097dc7" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.NavigationPolicyHidesUnauthorizedItems" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0040479" startTime="2026-06-25T19:06:28.8860814+03:30" endTime="2026-06-25T19:06:28.8860820+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="41c7b4a5-cb7c-467a-b5c5-c29be5edc207" />
+    <UnitTestResult executionId="b8ec6bf0-9d8d-4328-86c1-48494264c913" testId="81aea2f4-30e3-bc47-809d-482a8293133b" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.DomainMustNotReferenceInfrastructure" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0001146" startTime="2026-06-25T19:06:28.8866049+03:30" endTime="2026-06-25T19:06:28.8866050+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="b8ec6bf0-9d8d-4328-86c1-48494264c913" />
+    <UnitTestResult executionId="d4ff96ee-ca00-47f8-add3-26c23d477448" testId="ac9b5b11-e067-467d-1f20-e49ceef05904" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebMustNotDirectlyReferenceInfrastructure" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0007970" startTime="2026-06-25T19:06:28.9431512+03:30" endTime="2026-06-25T19:06:28.9431513+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d4ff96ee-ca00-47f8-add3-26c23d477448" />
+    <UnitTestResult executionId="15304972-68d2-435f-ab65-55a162087e10" testId="44c4c64b-a53c-7350-7a76-63639962b8b7" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebUsesRealAuthenticationServices" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0013618" startTime="2026-06-25T19:06:28.8812961+03:30" endTime="2026-06-25T19:06:28.8812964+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="15304972-68d2-435f-ab65-55a162087e10" />
+    <UnitTestResult executionId="bce78a1a-4fdd-4e99-986f-ef051ee2c8f6" testId="13b16ed7-fd96-84a5-75b4-4b0e408e9c49" testName="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.AiModuleIsReplaceableViaInterfaces" computerName="DESKTOP-U1R5ISO" duration="00:00:00.0008542" startTime="2026-06-25T19:06:28.9432231+03:30" endTime="2026-06-25T19:06:28.9432232+03:30" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="bce78a1a-4fdd-4e99-986f-ef051ee2c8f6" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ReportingMustNotDependOnWeb" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="1fda57f8-0620-cb99-53fe-0abe41a2a0ef">
+      <Execution id="03f4791f-1845-44e6-8125-cce56e6be1f9" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="ReportingMustNotDependOnWeb" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ApplicationMustNotReferenceWeb" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="3031f9d4-3e54-aa35-6ee4-b9ceedbd5e18">
+      <Execution id="6f449eba-884d-458c-a7f2-5375dcf4b476" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="ApplicationMustNotReferenceWeb" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.AiModuleIsReplaceableViaInterfaces" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="13b16ed7-fd96-84a5-75b4-4b0e408e9c49">
+      <Execution id="bce78a1a-4fdd-4e99-986f-ef051ee2c8f6" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="AiModuleIsReplaceableViaInterfaces" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.DomainMustNotReferenceInfrastructure" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="81aea2f4-30e3-bc47-809d-482a8293133b">
+      <Execution id="b8ec6bf0-9d8d-4328-86c1-48494264c913" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="DomainMustNotReferenceInfrastructure" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ApplicationMustNotReferenceInfrastructure" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="c1954cde-905f-4103-04f2-22fff962ad3d">
+      <Execution id="c1b47848-39c4-48bf-8af5-2cd950748eff" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="ApplicationMustNotReferenceInfrastructure" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebMustNotDeclareDuplicateApiDtos" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="01f3e380-d42d-70e8-d397-b615c50266c2">
+      <Execution id="3b63a902-526c-47b5-bdcc-15848e0ebecb" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="WebMustNotDeclareDuplicateApiDtos" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.NavigationPolicyHidesUnauthorizedItems" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="8df75ca3-9220-fc0e-0fe5-23faeb097dc7">
+      <Execution id="41c7b4a5-cb7c-467a-b5c5-c29be5edc207" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="NavigationPolicyHidesUnauthorizedItems" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebTypedClientUsesSharedContracts" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="a4d95ed3-7d36-eca2-bceb-52bc1a3a266d">
+      <Execution id="b4c625ce-c859-4ffa-aac0-480ae5d9e839" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="WebTypedClientUsesSharedContracts" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.DomainMustNotReferenceEfCore" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="ec8d8ac9-3fc0-4bd8-14eb-88bfdc14f11e">
+      <Execution id="5554e89e-5239-43c5-b678-dbed9d8cd2ba" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="DomainMustNotReferenceEfCore" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.ApiCanReferenceInfrastructure" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="3de16b0e-1b64-d138-4d8c-19d0b9898b1b">
+      <Execution id="d0e800c5-ecf3-4ddf-9d09-93e259deb22e" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="ApiCanReferenceInfrastructure" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebMustNotDirectlyReferenceInfrastructure" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="ac9b5b11-e067-467d-1f20-e49ceef05904">
+      <Execution id="d4ff96ee-ca00-47f8-add3-26c23d477448" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="WebMustNotDirectlyReferenceInfrastructure" />
+    </UnitTest>
+    <UnitTest name="PetroProcure.ArchitectureTests.ArchitectureDependencyTests.WebUsesRealAuthenticationServices" storage="e:\petroprocure\tests\petroprocure.architecturetests\bin\debug\net9.0\petroprocure.architecturetests.dll" id="44c4c64b-a53c-7350-7a76-63639962b8b7">
+      <Execution id="15304972-68d2-435f-ab65-55a162087e10" />
+      <TestMethod codeBase="E:\PetroProcure\tests\PetroProcure.ArchitectureTests\bin\Debug\net9.0\PetroProcure.ArchitectureTests.dll" adapterTypeName="executor://xunit/VsTestRunner2/netcoreapp" className="PetroProcure.ArchitectureTests.ArchitectureDependencyTests" name="WebUsesRealAuthenticationServices" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="3de16b0e-1b64-d138-4d8c-19d0b9898b1b" executionId="d0e800c5-ecf3-4ddf-9d09-93e259deb22e" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ec8d8ac9-3fc0-4bd8-14eb-88bfdc14f11e" executionId="5554e89e-5239-43c5-b678-dbed9d8cd2ba" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1fda57f8-0620-cb99-53fe-0abe41a2a0ef" executionId="03f4791f-1845-44e6-8125-cce56e6be1f9" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3031f9d4-3e54-aa35-6ee4-b9ceedbd5e18" executionId="6f449eba-884d-458c-a7f2-5375dcf4b476" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a4d95ed3-7d36-eca2-bceb-52bc1a3a266d" executionId="b4c625ce-c859-4ffa-aac0-480ae5d9e839" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="01f3e380-d42d-70e8-d397-b615c50266c2" executionId="3b63a902-526c-47b5-bdcc-15848e0ebecb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c1954cde-905f-4103-04f2-22fff962ad3d" executionId="c1b47848-39c4-48bf-8af5-2cd950748eff" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="8df75ca3-9220-fc0e-0fe5-23faeb097dc7" executionId="41c7b4a5-cb7c-467a-b5c5-c29be5edc207" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="81aea2f4-30e3-bc47-809d-482a8293133b" executionId="b8ec6bf0-9d8d-4328-86c1-48494264c913" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="ac9b5b11-e067-467d-1f20-e49ceef05904" executionId="d4ff96ee-ca00-47f8-add3-26c23d477448" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="44c4c64b-a53c-7350-7a76-63639962b8b7" executionId="15304972-68d2-435f-ab65-55a162087e10" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="13b16ed7-fd96-84a5-75b4-4b0e408e9c49" executionId="bce78a1a-4fdd-4e99-986f-ef051ee2c8f6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="12" executed="12" passed="12" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.8.2+699d445a1a (64-bit .NET 9.0.17)&#xD;
+[xUnit.net 00:00:00.13]   Discovering: PetroProcure.ArchitectureTests&#xD;
+[xUnit.net 00:00:00.18]   Discovered:  PetroProcure.ArchitectureTests&#xD;
+[xUnit.net 00:00:00.18]   Starting:    PetroProcure.ArchitectureTests&#xD;
+[xUnit.net 00:00:00.39]   Finished:    PetroProcure.ArchitectureTests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

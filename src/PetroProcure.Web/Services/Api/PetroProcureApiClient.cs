@@ -17,7 +17,11 @@ using PetroProcure.Contracts.V1.Commission;
 using PetroProcure.Contracts.V1.Reports;
 using PetroProcure.Contracts.V1.Contracts;
 using PetroProcure.Contracts.V1.PurchaseOrders;
+using PetroProcure.Contracts.V1.Warehouse;
+using PetroProcure.Contracts.V1.Legal;
 using PetroProcure.Web.Services.Auth;
+using WarehouseStockBalanceListRequest = PetroProcure.Contracts.V1.Warehouse.StockBalanceListRequest;
+using WarehouseStockBalanceDto = PetroProcure.Contracts.V1.Warehouse.StockBalanceDto;
 
 namespace PetroProcure.Web.Services.Api;
 
@@ -43,6 +47,21 @@ public interface IPetroProcureApiClient
     Task SavePurchaseFileSummaryAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<AiEvaluationResultDto> RunAiAsync(Guid purchaseFileId, string action, CancellationToken ct = default);
     Task<List<AiEvaluationResultDto>> GetAiEvaluationsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<ProcurementRuleEvaluationDto> EvaluatePurchaseFileLegalRulesAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<List<ProcurementRuleEvaluationDto>> GetPurchaseFileLegalRuleEvaluationsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest request, CancellationToken ct = default);
+    Task<LegalDocumentDto?> GetLegalDocumentAsync(Guid id, CancellationToken ct = default);
+    Task<List<LegalArticleDto>> GetLegalDocumentArticlesAsync(Guid id, CancellationToken ct = default);
+    Task<LegalDocumentDto> UploadLegalDocumentAsync(Stream stream, string fileName, string contentType, string title, string? description, CancellationToken ct = default);
+    Task<LegalArticleDto> CreateLegalArticleAsync(CreateLegalArticleRequest request, CancellationToken ct = default);
+    Task<LegalClauseDto> CreateLegalClauseAsync(CreateLegalClauseRequest request, CancellationToken ct = default);
+    Task<PagedResult<ProcurementRuleDto>> GetProcurementRulesAsync(ProcurementRuleListRequest request, CancellationToken ct = default);
+    Task<List<ProcurementRuleVersionDto>> GetProcurementRuleVersionsAsync(Guid ruleId, CancellationToken ct = default);
+    Task<ProcurementRuleDto> CreateProcurementRuleAsync(CreateProcurementRuleRequest request, CancellationToken ct = default);
+    Task<ProcurementRuleVersionDto> CloneProcurementRuleAsDraftAsync(Guid ruleId, CancellationToken ct = default);
+    Task<ProcurementRuleVersionDto> UpdateRuleDraftAsync(Guid ruleId, UpdateRuleDraftRequest request, CancellationToken ct = default);
+    Task SubmitProcurementRuleAsync(Guid ruleId, string? comment = null, CancellationToken ct = default);
+    Task ApproveProcurementRuleAsync(Guid ruleId, string? comment = null, CancellationToken ct = default);
     Task<PurchaseFileNoteDto> AddNoteAsync(Guid purchaseFileId, AddPurchaseFileNoteRequest request, CancellationToken ct = default);
     Task RemovePurchaseFileItemAsync(Guid purchaseFileId, Guid itemId, CancellationToken ct = default);
     Task<PurchaseFileWorkflowStateDto> GetWorkflowStateAsync(Guid purchaseFileId, CancellationToken ct = default);
@@ -143,6 +162,28 @@ public interface IPetroProcureApiClient
     Task<(byte[] Content, string ContentType, string FileName)> DownloadPurchaseOrderDocumentAsync(Guid id, Guid documentId, CancellationToken ct = default);
     Task<byte[]> GetPurchaseOrderPdfAsync(Guid id, CancellationToken ct = default);
     Task SavePurchaseOrderPdfAsync(Guid id, CancellationToken ct = default);
+    Task<PagedResult<WarehouseDto>> GetWarehousesAsync(WarehouseListRequest request, CancellationToken ct = default);
+    Task<WarehouseDto> CreateWarehouseAsync(CreateWarehouseRequest request, CancellationToken ct = default);
+    Task<WarehouseDto> UpdateWarehouseAsync(Guid id, UpdateWarehouseRequest request, CancellationToken ct = default);
+    Task<PagedResult<WarehouseReceiptSummaryDto>> GetWarehouseReceiptsAsync(WarehouseReceiptListRequest request, CancellationToken ct = default);
+    Task<WarehouseReceiptDetailDto?> GetWarehouseReceiptAsync(Guid id, CancellationToken ct = default);
+    Task<List<WarehouseReceiptSummaryDto>> GetPurchaseOrderWarehouseReceiptsAsync(Guid purchaseOrderId, CancellationToken ct = default);
+    Task<List<WarehouseReceiptSummaryDto>> GetPurchaseFileWarehouseReceiptsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<WarehouseReceiptDetailDto> CreateWarehouseReceiptFromPurchaseOrderAsync(Guid purchaseOrderId, CreateWarehouseReceiptFromPurchaseOrderRequest request, CancellationToken ct = default);
+    Task<WarehouseReceiptDetailDto> UpdateWarehouseReceiptAsync(Guid id, UpdateWarehouseReceiptRequest request, CancellationToken ct = default);
+    Task<WarehouseReceiptItemDto> AddWarehouseReceiptItemAsync(Guid id, AddWarehouseReceiptItemRequest request, CancellationToken ct = default);
+    Task RemoveWarehouseReceiptItemAsync(Guid id, Guid itemId, CancellationToken ct = default);
+    Task ChangeWarehouseReceiptStatusAsync(Guid id, string action, object body, CancellationToken ct = default);
+    Task<List<WarehouseReceiptDocumentDto>> GetWarehouseReceiptDocumentsAsync(Guid id, CancellationToken ct = default);
+    Task<WarehouseReceiptDocumentDto> UploadWarehouseReceiptDocumentAsync(Guid id, Stream stream, string fileName,
+        string contentType, string documentType, string? description, CancellationToken ct = default);
+    Task DeleteWarehouseReceiptDocumentAsync(Guid id, Guid documentId, CancellationToken ct = default);
+    Task<(byte[] Content, string ContentType, string FileName)> DownloadWarehouseReceiptDocumentAsync(Guid id, Guid documentId, CancellationToken ct = default);
+    Task<byte[]> GetWarehouseReceiptPdfAsync(Guid id, CancellationToken ct = default);
+    Task SaveWarehouseReceiptPdfAsync(Guid id, CancellationToken ct = default);
+    Task<PagedResult<WarehouseStockBalanceDto>> GetWarehouseStockBalancesAsync(WarehouseStockBalanceListRequest request, CancellationToken ct = default);
+    Task<PagedResult<InventoryTransactionDto>> GetInventoryTransactionsAsync(InventoryTransactionListRequest request, CancellationToken ct = default);
+    Task<List<PurchaseOrderSummaryDto>> GetPurchaseOrdersWaitingForReceiptAsync(CancellationToken ct = default);
     Task<PagedResult<SupplierSummaryDto>> GetSuppliersAsync(SupplierListRequest request, CancellationToken ct = default);
     Task<SupplierDetailDto?> GetSupplierAsync(Guid id, CancellationToken ct = default);
     Task<SupplierDetailDto> CreateSupplierAsync(CreateSupplierRequest request, CancellationToken ct = default);
@@ -338,6 +379,95 @@ public sealed class PetroProcureApiClient(
 
     public async Task<List<AiEvaluationResultDto>> GetAiEvaluationsAsync(Guid id, CancellationToken ct = default) =>
         await GetJsonAsync<List<AiEvaluationResultDto>>($"/api/ai/purchase-files/{id}/evaluations", ct) ?? [];
+
+    public async Task<ProcurementRuleEvaluationDto> EvaluatePurchaseFileLegalRulesAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsync($"/api/procurement-rules/evaluate/purchase-file/{id}", null, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ProcurementRuleEvaluationDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<List<ProcurementRuleEvaluationDto>> GetPurchaseFileLegalRuleEvaluationsAsync(Guid id, CancellationToken ct = default) =>
+        await GetJsonAsync<List<ProcurementRuleEvaluationDto>>($"/api/procurement-rules/evaluations/purchase-file/{id}", ct) ?? [];
+
+    public async Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest request, CancellationToken ct = default) =>
+        await GetJsonAsync<PagedResult<LegalDocumentDto>>($"/api/legal/documents?{ToQuery(request)}", ct)
+        ?? new PagedResult<LegalDocumentDto>([], request.PageNumber, request.PageSize, 0);
+
+    public async Task<LegalDocumentDto?> GetLegalDocumentAsync(Guid id, CancellationToken ct = default) =>
+        await GetJsonAsync<LegalDocumentDto>($"/api/legal/documents/{id}", ct);
+
+    public async Task<List<LegalArticleDto>> GetLegalDocumentArticlesAsync(Guid id, CancellationToken ct = default) =>
+        await GetJsonAsync<List<LegalArticleDto>>($"/api/legal/documents/{id}/articles", ct) ?? [];
+
+    public async Task<LegalDocumentDto> UploadLegalDocumentAsync(Stream stream, string fileName, string contentType,
+        string title, string? description, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        var content = new StreamContent(stream);
+        content.Headers.ContentType = new(contentType);
+        form.Add(content, "file", fileName);
+        form.Add(new StringContent(title), "title");
+        if (!string.IsNullOrWhiteSpace(description)) form.Add(new StringContent(description), "description");
+        var response = await Client().PostAsync("/api/legal/documents/upload", form, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<LegalDocumentDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<LegalArticleDto> CreateLegalArticleAsync(CreateLegalArticleRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/legal/articles", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<LegalArticleDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<LegalClauseDto> CreateLegalClauseAsync(CreateLegalClauseRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/legal/clauses", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<LegalClauseDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PagedResult<ProcurementRuleDto>> GetProcurementRulesAsync(ProcurementRuleListRequest request, CancellationToken ct = default) =>
+        await GetJsonAsync<PagedResult<ProcurementRuleDto>>($"/api/procurement-rules?{ToQuery(request)}", ct)
+        ?? new PagedResult<ProcurementRuleDto>([], request.PageNumber, request.PageSize, 0);
+
+    public async Task<List<ProcurementRuleVersionDto>> GetProcurementRuleVersionsAsync(Guid ruleId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<ProcurementRuleVersionDto>>($"/api/procurement-rules/{ruleId}/versions", ct) ?? [];
+
+    public async Task<ProcurementRuleDto> CreateProcurementRuleAsync(CreateProcurementRuleRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/procurement-rules", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ProcurementRuleDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<ProcurementRuleVersionDto> CloneProcurementRuleAsDraftAsync(Guid ruleId, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsync($"/api/procurement-rules/{ruleId}/clone-draft", null, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ProcurementRuleVersionDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<ProcurementRuleVersionDto> UpdateRuleDraftAsync(Guid ruleId, UpdateRuleDraftRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/procurement-rules/{ruleId}/draft", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<ProcurementRuleVersionDto>(cancellationToken: ct))!;
+    }
+
+    public async Task SubmitProcurementRuleAsync(Guid ruleId, string? comment = null, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/procurement-rules/{ruleId}/submit", new SubmitRuleForApprovalRequest(comment), ct);
+        await Ensure(response, ct);
+    }
+
+    public async Task ApproveProcurementRuleAsync(Guid ruleId, string? comment = null, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/procurement-rules/{ruleId}/approve", new ApproveRuleVersionRequest(comment), ct);
+        await Ensure(response, ct);
+    }
+
     public async Task<PurchaseFileNoteDto> AddNoteAsync(Guid id, AddPurchaseFileNoteRequest request, CancellationToken ct = default)
     {
         var response = await Client().PostAsJsonAsync($"/api/purchase-files/{id}/notes", request, ct); await Ensure(response, ct);
@@ -775,6 +905,166 @@ public sealed class PetroProcureApiClient(
         var response = await Client().PostAsync($"/api/purchase-orders/{id}/reports/purchase-order/save-to-file", null, ct);
         await Ensure(response, ct);
     }
+
+    public async Task<PagedResult<WarehouseDto>> GetWarehousesAsync(WarehouseListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["searchTerm"] = r.SearchTerm,
+            ["includeInactive"] = r.IncludeInactive.ToString().ToLowerInvariant(),
+            ["pageNumber"] = r.PageNumber.ToString(),
+            ["pageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/warehouses?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<WarehouseDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public async Task<WarehouseDto> CreateWarehouseAsync(CreateWarehouseRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/warehouses", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<WarehouseDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<WarehouseDto> UpdateWarehouseAsync(Guid id, UpdateWarehouseRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/warehouses/{id}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<WarehouseDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PagedResult<WarehouseReceiptSummaryDto>> GetWarehouseReceiptsAsync(WarehouseReceiptListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["searchTerm"] = r.SearchTerm,
+            ["status"] = r.Status?.ToString(),
+            ["receiptNumber"] = r.ReceiptNumber,
+            ["purchaseOrderNumber"] = r.PurchaseOrderNumber,
+            ["purchaseFileNumber"] = r.PurchaseFileNumber,
+            ["supplierId"] = r.SupplierId?.ToString(),
+            ["warehouseId"] = r.WarehouseId?.ToString(),
+            ["receiptDateFrom"] = r.ReceiptDateFrom?.ToString("O"),
+            ["receiptDateTo"] = r.ReceiptDateTo?.ToString("O"),
+            ["sortBy"] = r.SortBy,
+            ["sortDescending"] = r.SortDescending.ToString().ToLowerInvariant(),
+            ["pageNumber"] = r.PageNumber.ToString(),
+            ["pageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/warehouse-receipts?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<WarehouseReceiptSummaryDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public Task<WarehouseReceiptDetailDto?> GetWarehouseReceiptAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<WarehouseReceiptDetailDto>($"/api/warehouse-receipts/{id}", ct);
+
+    public async Task<List<WarehouseReceiptSummaryDto>> GetPurchaseOrderWarehouseReceiptsAsync(Guid purchaseOrderId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<WarehouseReceiptSummaryDto>>($"/api/purchase-orders/{purchaseOrderId}/warehouse-receipts", ct) ?? [];
+
+    public async Task<List<WarehouseReceiptSummaryDto>> GetPurchaseFileWarehouseReceiptsAsync(Guid purchaseFileId, CancellationToken ct = default) =>
+        await GetJsonAsync<List<WarehouseReceiptSummaryDto>>($"/api/purchase-files/{purchaseFileId}/warehouse-receipts", ct) ?? [];
+
+    public async Task<WarehouseReceiptDetailDto> CreateWarehouseReceiptFromPurchaseOrderAsync(Guid purchaseOrderId, CreateWarehouseReceiptFromPurchaseOrderRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/warehouse-receipts/from-purchase-order/{purchaseOrderId}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<WarehouseReceiptDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<WarehouseReceiptDetailDto> UpdateWarehouseReceiptAsync(Guid id, UpdateWarehouseReceiptRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync($"/api/warehouse-receipts/{id}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<WarehouseReceiptDetailDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<WarehouseReceiptItemDto> AddWarehouseReceiptItemAsync(Guid id, AddWarehouseReceiptItemRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/warehouse-receipts/{id}/items", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<WarehouseReceiptItemDto>(cancellationToken: ct))!;
+    }
+
+    public async Task RemoveWarehouseReceiptItemAsync(Guid id, Guid itemId, CancellationToken ct = default)
+    {
+        var response = await Client().DeleteAsync($"/api/warehouse-receipts/{id}/items/{itemId}", ct); await Ensure(response, ct);
+    }
+
+    public async Task ChangeWarehouseReceiptStatusAsync(Guid id, string action, object body, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/warehouse-receipts/{id}/{action}", body, ct); await Ensure(response, ct);
+    }
+
+    public async Task<List<WarehouseReceiptDocumentDto>> GetWarehouseReceiptDocumentsAsync(Guid id, CancellationToken ct = default) =>
+        await GetJsonAsync<List<WarehouseReceiptDocumentDto>>($"/api/warehouse-receipts/{id}/documents", ct) ?? [];
+
+    public async Task<WarehouseReceiptDocumentDto> UploadWarehouseReceiptDocumentAsync(Guid id, Stream stream, string fileName,
+        string contentType, string documentType, string? description, CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        var content = new StreamContent(stream);
+        content.Headers.ContentType = new(contentType);
+        form.Add(content, "file", fileName);
+        form.Add(new StringContent(documentType), "documentType");
+        if (!string.IsNullOrWhiteSpace(description)) form.Add(new StringContent(description), "description");
+        var response = await Client().PostAsync($"/api/warehouse-receipts/{id}/documents/upload", form, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<WarehouseReceiptDocumentDto>(cancellationToken: ct))!;
+    }
+
+    public async Task DeleteWarehouseReceiptDocumentAsync(Guid id, Guid documentId, CancellationToken ct = default)
+    {
+        var response = await Client().DeleteAsync($"/api/warehouse-receipts/{id}/documents/{documentId}", ct); await Ensure(response, ct);
+    }
+
+    public async Task<(byte[] Content, string ContentType, string FileName)> DownloadWarehouseReceiptDocumentAsync(Guid id, Guid documentId, CancellationToken ct = default)
+    {
+        using var response = await SendGetAsync($"/api/warehouse-receipts/{id}/documents/{documentId}/download", ct);
+        await Ensure(response, ct);
+        return await ReadFileResponseAsync(response, "warehouse-receipt-document", ct);
+    }
+
+    public Task<byte[]> GetWarehouseReceiptPdfAsync(Guid id, CancellationToken ct = default) =>
+        GetBytesAsync($"/api/warehouse-receipts/{id}/reports/receipt/pdf", ct);
+
+    public async Task SaveWarehouseReceiptPdfAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsync($"/api/warehouse-receipts/{id}/reports/receipt/save-to-file", null, ct);
+        await Ensure(response, ct);
+    }
+
+    public async Task<PagedResult<WarehouseStockBalanceDto>> GetWarehouseStockBalancesAsync(WarehouseStockBalanceListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["searchTerm"] = r.SearchTerm,
+            ["warehouseId"] = r.WarehouseId?.ToString(),
+            ["lowStockOnly"] = r.LowStockOnly.ToString().ToLowerInvariant(),
+            ["mescGeneralGroupCode"] = r.MescGeneralGroupCode,
+            ["pageNumber"] = r.PageNumber.ToString(),
+            ["pageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/inventory/stock-balances?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<WarehouseStockBalanceDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public async Task<PagedResult<InventoryTransactionDto>> GetInventoryTransactionsAsync(InventoryTransactionListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["searchTerm"] = r.SearchTerm,
+            ["warehouseId"] = r.WarehouseId?.ToString(),
+            ["transactionType"] = r.TransactionType?.ToString(),
+            ["dateFrom"] = r.DateFrom?.ToString("O"),
+            ["dateTo"] = r.DateTo?.ToString("O"),
+            ["pageNumber"] = r.PageNumber.ToString(),
+            ["pageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/inventory/transactions?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value))
+            .Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<PagedResult<InventoryTransactionDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public async Task<List<PurchaseOrderSummaryDto>> GetPurchaseOrdersWaitingForReceiptAsync(CancellationToken ct = default) =>
+        await GetJsonAsync<List<PurchaseOrderSummaryDto>>("/api/purchase-orders/waiting-for-receipt", ct) ?? [];
 
     public async Task<PagedResult<SupplierSummaryDto>> GetSuppliersAsync(SupplierListRequest r, CancellationToken ct = default)
     {
@@ -1303,6 +1593,29 @@ public sealed class PetroProcureApiClient(
         var detail = await response.Content.ReadAsStringAsync(ct);
         throw new ApiClientException(ApiClientErrors.FromStatusCode(response.StatusCode, detail));
     }
+
+    private static string ToQuery(LegalDocumentListRequest request) =>
+        string.Join('&', new[]
+        {
+            Pair("SearchTerm", request.SearchTerm),
+            Pair("Status", request.Status?.ToString()),
+            Pair("PageNumber", request.PageNumber.ToString()),
+            Pair("PageSize", request.PageSize.ToString())
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    private static string ToQuery(ProcurementRuleListRequest request) =>
+        string.Join('&', new[]
+        {
+            Pair("SearchTerm", request.SearchTerm),
+            Pair("Status", request.Status?.ToString()),
+            Pair("RuleType", request.RuleType?.ToString()),
+            Pair("Severity", request.Severity?.ToString()),
+            Pair("PageNumber", request.PageNumber.ToString()),
+            Pair("PageSize", request.PageSize.ToString())
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    private static string? Pair(string name, string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : $"{Uri.EscapeDataString(name)}={Uri.EscapeDataString(value)}";
 
     private static async Task<(byte[] Content, string ContentType, string FileName)> ReadFileResponseAsync(
         HttpResponseMessage response, string fallbackFileName, CancellationToken ct)

@@ -1,0 +1,64 @@
+@page "/admin/procurement-rules/test"
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+
+<PageHeader Title="آزمون قوانین مناقصه" Subtitle="اجرای آزمایشی Rule Engine قطعی روی پرونده خرید؛ نتیجه فقط پیشنهاد و هشدار است." />
+
+<MudAlert Severity="Severity.Warning" Class="mb-4">
+    AI و Rule Engine تصمیم نهایی تجاری یا حقوقی نمی‌گیرند؛ نتیجه فقط برای کمک به کارشناس، کمیسیون و مدیران است.
+</MudAlert>
+
+<MudPaper Class="pa-4 mb-4" Elevation="0">
+    <MudTextField @bind-Value="_purchaseFileId" Label="شناسه پرونده خرید" HelperText="Guid پرونده خرید را وارد کنید." />
+    <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="EvaluateAsync">اجرای ارزیابی</MudButton>
+</MudPaper>
+
+@if (_evaluation is not null)
+{
+    <MudPaper Class="pa-4" Elevation="0">
+        <MudText Typo="Typo.h6">@_evaluation.Summary</MudText>
+        <MudText Typo="Typo.caption">زمان ارزیابی: <DateDisplay Value="@_evaluation.EvaluatedAt" /></MudText>
+        @foreach (var finding in _evaluation.Findings)
+        {
+            <MudAlert Severity="@FindingSeverity(finding)" Variant="Variant.Outlined" Class="my-2">
+                <strong>@finding.Title</strong>
+                <br />
+                @finding.Description
+                <br />
+                <MudText Typo="Typo.caption">ارجاع قانونی: @finding.LegalReference</MudText>
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    private string _purchaseFileId = "";
+    private bool _busy;
+    private ProcurementRuleEvaluationDto? _evaluation;
+
+    private async Task EvaluateAsync()
+    {
+        if (!Guid.TryParse(_purchaseFileId, out var id))
+        {
+            Snackbar.Add("شناسه پرونده خرید معتبر نیست.", Severity.Warning);
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            _evaluation = await Api.EvaluatePurchaseFileLegalRulesAsync(id);
+            Snackbar.Add("ارزیابی قوانین مناقصه انجام شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private static Severity FindingSeverity(ProcurementRuleFindingDto finding) => finding.Result switch
+    {
+        RuleResult.Fail => Severity.Error,
+        RuleResult.Warning => Severity.Warning,
+        RuleResult.NeedHumanReview => Severity.Info,
+        _ => finding.Severity >= RuleSeverity.Critical ? Severity.Error : Severity.Info
+    };
+}

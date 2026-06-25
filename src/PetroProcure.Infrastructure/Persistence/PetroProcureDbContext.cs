@@ -15,9 +15,19 @@ using PetroProcure.Domain.Modules.PurchaseOrders;
 using PetroProcure.Domain.Modules.Suppliers;
 using PetroProcure.Domain.Modules.Tenders;
 using PetroProcure.Domain.Modules.TenderCommission;
+using PetroProcure.Domain.Modules.Warehouse;
 using PetroProcure.Domain.Modules.Workflow;
 using PetroProcure.AI;
 using PetroProcure.Domain.Common;
+using LegalDocument = PetroProcure.Domain.Modules.Legal.LegalDocument;
+using LegalArticle = PetroProcure.Domain.Modules.Legal.LegalArticle;
+using LegalClause = PetroProcure.Domain.Modules.Legal.LegalClause;
+using LegalRuleAuditLog = PetroProcure.Domain.Modules.Legal.LegalRuleAuditLog;
+using LegalProcurementRule = PetroProcure.Domain.Modules.Legal.ProcurementRule;
+using LegalProcurementRuleEvaluation = PetroProcure.Domain.Modules.Legal.ProcurementRuleEvaluation;
+using LegalProcurementRuleFinding = PetroProcure.Domain.Modules.Legal.ProcurementRuleFinding;
+using LegalProcurementRuleSet = PetroProcure.Domain.Modules.Legal.ProcurementRuleSet;
+using LegalProcurementRuleVersion = PetroProcure.Domain.Modules.Legal.ProcurementRuleVersion;
 
 namespace PetroProcure.Infrastructure.Persistence;
 
@@ -121,6 +131,13 @@ public sealed class PetroProcureDbContext : IdentityDbContext<ApplicationUser, I
     public DbSet<PurchaseOrderApproval> PurchaseOrderApprovals => Set<PurchaseOrderApproval>();
     public DbSet<PurchaseOrderDocument> PurchaseOrderDocuments => Set<PurchaseOrderDocument>();
     public DbSet<PurchaseOrderSequence> PurchaseOrderSequences => Set<PurchaseOrderSequence>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<WarehouseReceipt> WarehouseReceipts => Set<WarehouseReceipt>();
+    public DbSet<WarehouseReceiptItem> WarehouseReceiptItems => Set<WarehouseReceiptItem>();
+    public DbSet<WarehouseReceiptDocument> WarehouseReceiptDocuments => Set<WarehouseReceiptDocument>();
+    public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+    public DbSet<WarehouseReceiptSequence> WarehouseReceiptSequences => Set<WarehouseReceiptSequence>();
+    public DbSet<InventoryTransactionSequence> InventoryTransactionSequences => Set<InventoryTransactionSequence>();
     public DbSet<AiProvider> AiProviders => Set<AiProvider>();
     public DbSet<AiModel> AiModels => Set<AiModel>();
     public DbSet<AiAgentDefinition> AiAgentDefinitions => Set<AiAgentDefinition>();
@@ -133,6 +150,15 @@ public sealed class PetroProcureDbContext : IdentityDbContext<ApplicationUser, I
     public DbSet<AiRecommendation> AiRecommendations => Set<AiRecommendation>();
     public DbSet<AiConversation> AiConversations => Set<AiConversation>();
     public DbSet<AiMessage> AiMessages => Set<AiMessage>();
+    public DbSet<LegalDocument> LegalDocuments => Set<LegalDocument>();
+    public DbSet<LegalArticle> LegalArticles => Set<LegalArticle>();
+    public DbSet<LegalClause> LegalClauses => Set<LegalClause>();
+    public DbSet<LegalProcurementRuleSet> LegalProcurementRuleSets => Set<LegalProcurementRuleSet>();
+    public DbSet<LegalProcurementRule> LegalProcurementRules => Set<LegalProcurementRule>();
+    public DbSet<LegalProcurementRuleVersion> LegalProcurementRuleVersions => Set<LegalProcurementRuleVersion>();
+    public DbSet<LegalProcurementRuleEvaluation> LegalProcurementRuleEvaluations => Set<LegalProcurementRuleEvaluation>();
+    public DbSet<LegalProcurementRuleFinding> LegalProcurementRuleFindings => Set<LegalProcurementRuleFinding>();
+    public DbSet<LegalRuleAuditLog> LegalRuleAuditLogs => Set<LegalRuleAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

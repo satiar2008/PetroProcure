@@ -232,6 +232,42 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
                 Unit(x.UnitOfMeasureId), x.OrderedQuantity))));
     }
 
+    public async Task<WarehouseReceiptReportData?> GetWarehouseReceiptAsync(Guid id, CancellationToken ct)
+    {
+        var receipt = await db.WarehouseReceipts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
+        if (receipt is null) return null;
+
+        var poNumber = await db.PurchaseOrders.AsNoTracking()
+            .Where(x => x.Id == receipt.PurchaseOrderId)
+            .Select(x => x.PurchaseOrderNumber)
+            .SingleOrDefaultAsync(ct) ?? "—";
+        var fileNumber = await db.PurchaseFiles.AsNoTracking()
+            .Where(x => x.Id == receipt.PurchaseFileId)
+            .Select(x => x.FileNumber)
+            .SingleOrDefaultAsync(ct) ?? "—";
+        var supplierName = await db.Suppliers.AsNoTracking()
+            .Where(x => x.Id == receipt.SupplierId)
+            .Select(x => x.Name)
+            .SingleOrDefaultAsync(ct) ?? "—";
+        var warehouseName = await db.Warehouses.AsNoTracking()
+            .Where(x => x.Id == receipt.WarehouseId)
+            .Select(x => x.Name)
+            .SingleOrDefaultAsync(ct) ?? "—";
+
+        var items = await db.WarehouseReceiptItems.AsNoTracking()
+            .Where(x => x.WarehouseReceiptId == id)
+            .OrderBy(x => x.MescCode)
+            .Select(x => new WarehouseReceiptItemReportData(x.MescCode, x.MescGeneralGroupCode,
+                x.GeneralDescription, x.SpecificDescription, Unit(x.UnitOfMeasureId), x.OrderedQuantity,
+                x.PreviouslyReceivedQuantity, x.ReceivedQuantity, x.RemainingQuantityAfterReceipt,
+                Text(x.QualityStatus)))
+            .ToListAsync(ct);
+
+        return new WarehouseReceiptReportData(receipt.Id, receipt.ReceiptNumber, poNumber, fileNumber,
+            supplierName, warehouseName, Date(receipt.ReceiptDate), receipt.DeliveryNoteNumber ?? "—",
+            receipt.CarrierName ?? "—", receipt.VehicleNumber ?? "—", Text(receipt.Status), items);
+    }
+
     private static IReadOnlyList<ReportItemGroupData> Group(IEnumerable<ReportItemData> items) =>
         items.GroupBy(x => new { x.GeneralGroupCode, x.GeneralDescription }).OrderBy(x => x.Key.GeneralGroupCode)
             .Select(x => new ReportItemGroupData(x.Key.GeneralGroupCode, x.Key.GeneralDescription, x.ToArray())).ToArray();
@@ -441,6 +477,23 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
         PurchaseOrderType.TenderBased => "مبتنی بر مناقصه",
         PurchaseOrderType.Service => "خدمات",
         PurchaseOrderType.Other => "سایر",
+        _ => value.ToString()
+    };
+    private static string Text(WarehouseReceiptStatus value) => value switch
+    {
+        WarehouseReceiptStatus.Draft => "پیش‌نویس",
+        WarehouseReceiptStatus.Submitted => "ارسال‌شده",
+        WarehouseReceiptStatus.Approved => "تأییدشده",
+        WarehouseReceiptStatus.Cancelled => "لغوشده",
+        _ => value.ToString()
+    };
+    private static string Text(WarehouseReceiptQualityStatus value) => value switch
+    {
+        WarehouseReceiptQualityStatus.NotInspected => "بازرسی نشده",
+        WarehouseReceiptQualityStatus.Accepted => "پذیرفته‌شده",
+        WarehouseReceiptQualityStatus.PartiallyAccepted => "پذیرش جزئی",
+        WarehouseReceiptQualityStatus.Rejected => "ردشده",
+        WarehouseReceiptQualityStatus.NeedsInspection => "نیازمند بازرسی",
         _ => value.ToString()
     };
 }

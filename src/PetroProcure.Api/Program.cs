@@ -90,6 +90,10 @@ app.UseExceptionHandler(exceptionHandlerApp => exceptionHandlerApp.Run(async con
         PetroProcure.Application.Contracts.ContractValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
         PetroProcure.Application.Contracts.ContractNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
         PetroProcure.Application.Contracts.ContractConflictException => (StatusCodes.Status409Conflict, "Conflict"),
+        PetroProcure.Application.Warehouse.WarehouseReceiptValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
+        PetroProcure.Application.Warehouse.WarehouseReceiptNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
+        PetroProcure.Application.Legal.LegalRuleValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
+        PetroProcure.Application.Legal.LegalRuleNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
         PetroProcure.Application.Security.CurrentUserNotAuthenticatedException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
         PetroProcure.Application.Security.CurrentUserForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden"),
         _ => (StatusCodes.Status500InternalServerError, "Unexpected error")
@@ -136,6 +140,8 @@ app.MapCommissionEndpoints();
 app.MapTenderCommissionDocumentReportEndpoints();
 app.MapContractEndpoints();
 app.MapPurchaseOrderEndpoints();
+app.MapWarehouseEndpoints();
+app.MapLegalRuleEndpoints();
 
 app.MapDefaultEndpoints();
 

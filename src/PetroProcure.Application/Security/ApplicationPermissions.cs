@@ -24,6 +24,19 @@ public static class ApplicationPermissions
     public const string WarehouseView = "Warehouse.View";
     public const string WarehouseReceive = "Warehouse.Receive";
     public const string WarehouseIssue = "Warehouse.Issue";
+    public const string WarehouseManageWarehouses = "Warehouse.ManageWarehouses";
+    public const string WarehouseReceiptView = "WarehouseReceipt.View";
+    public const string WarehouseReceiptCreate = "WarehouseReceipt.Create";
+    public const string WarehouseReceiptEdit = "WarehouseReceipt.Edit";
+    public const string WarehouseReceiptSubmit = "WarehouseReceipt.Submit";
+    public const string WarehouseReceiptApprove = "WarehouseReceipt.Approve";
+    public const string WarehouseReceiptCancel = "WarehouseReceipt.Cancel";
+    public const string WarehouseReceiptManageDocuments = "WarehouseReceipt.ManageDocuments";
+    public const string WarehouseReceiptReportView = "WarehouseReceipt.ReportView";
+    public const string WarehouseReceiptReportExport = "WarehouseReceipt.ReportExport";
+    public const string InventoryViewTransactions = "Inventory.ViewTransactions";
+    public const string InventoryViewStockBalance = "Inventory.ViewStockBalance";
+    public const string InventoryAdjustStock = "Inventory.AdjustStock";
 
     public const string TenderCreate = "Tender.Create";
     public const string TenderView = "Tender.View";
@@ -126,6 +139,13 @@ public static class ApplicationPermissions
     public const string AiAgentUse = "AiAgent.Use";
     public const string AiAgentEvaluatePurchaseRules = "AiAgent.EvaluatePurchaseRules";
 
+    public const string LegalDocumentView = "LegalDocument.View";
+    public const string LegalDocumentManage = "LegalDocument.Manage";
+    public const string ProcurementRuleView = "ProcurementRule.View";
+    public const string ProcurementRuleManage = "ProcurementRule.Manage";
+    public const string ProcurementRuleApprove = "ProcurementRule.Approve";
+    public const string ProcurementRuleEvaluate = "ProcurementRule.Evaluate";
+
     public const string AdminManageUsers = "Admin.ManageUsers";
     public const string AdminManageRoles = "Admin.ManageRoles";
     public const string AdminManageDepartments = "Admin.ManageDepartments";
@@ -150,6 +170,19 @@ public static class ApplicationPermissions
         WarehouseView,
         WarehouseReceive,
         WarehouseIssue,
+        WarehouseManageWarehouses,
+        WarehouseReceiptView,
+        WarehouseReceiptCreate,
+        WarehouseReceiptEdit,
+        WarehouseReceiptSubmit,
+        WarehouseReceiptApprove,
+        WarehouseReceiptCancel,
+        WarehouseReceiptManageDocuments,
+        WarehouseReceiptReportView,
+        WarehouseReceiptReportExport,
+        InventoryViewTransactions,
+        InventoryViewStockBalance,
+        InventoryAdjustStock,
         TenderCreate,
         TenderView,
         TenderEdit,
@@ -242,6 +275,12 @@ public static class ApplicationPermissions
         ReportExportPdf,
         AiAgentUse,
         AiAgentEvaluatePurchaseRules,
+        LegalDocumentView,
+        LegalDocumentManage,
+        ProcurementRuleView,
+        ProcurementRuleManage,
+        ProcurementRuleApprove,
+        ProcurementRuleEvaluate,
         AdminManageUsers,
         AdminManageRoles,
         AdminManageDepartments,

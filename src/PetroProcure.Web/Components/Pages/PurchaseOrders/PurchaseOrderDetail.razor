@@ -26,15 +26,14 @@ else if (_detail is not null)
         <MudTabPanel Text="اسناد" Icon="@Icons.Material.Filled.AttachFile">@DocumentsTab()</MudTabPanel>
         <MudTabPanel Text="گزارش" Icon="@Icons.Material.Filled.PictureAsPdf">@ReportsTab()</MudTabPanel>
         <MudTabPanel Text="ارتباطات" Icon="@Icons.Material.Filled.Link">@LinksTab()</MudTabPanel>
-        <MudTabPanel Text="رسیدهای انبار آینده" Icon="@Icons.Material.Filled.Warehouse">
-            <EmptyState Title="دریافت انبار در فاز بعدی" Description="رسید انبار بعداً در برابر اقلام همین سفارش خرید ثبت خواهد شد." />
-        </MudTabPanel>
+        <MudTabPanel Text="رسیدهای انبار" Icon="@Icons.Material.Filled.Warehouse">@WarehouseReceiptsTab()</MudTabPanel>
     </MudTabs>
 }
 
 @code {
     [Parameter] public Guid Id { get; set; }
     private PurchaseOrderDetailDto? _detail;
+    private List<WarehouseReceiptSummaryDto> _warehouseReceipts = [];
     private bool _loading = true, _busy, _uploading, _pdfLoading, _showPreview;
     private string? _error, _comment, _documentDescription, _pdfDataUrl;
     private string _documentType = "PurchaseOrderAttachment";
@@ -53,6 +52,7 @@ else if (_detail is not null)
         {
             _detail = await Api.GetPurchaseOrderAsync(Id);
             if (_detail is null) throw new InvalidOperationException("سفارش خرید یافت نشد.");
+            _warehouseReceipts = await Api.GetPurchaseOrderWarehouseReceiptsAsync(Id);
             try
             {
                 var limits = await Api.GetUploadLimitsAsync();
@@ -153,6 +153,30 @@ else if (_detail is not null)
         @if (_pdfLoading) { <MudProgressLinear Indeterminate="true" Class="mt-4" /> }
         @if (_showPreview && _pdfDataUrl is not null) { <div class="report-preview"><iframe src="@_pdfDataUrl" title="پیش‌نمایش سفارش خرید"></iframe></div> }
     </MudPaper>;
+
+    private RenderFragment WarehouseReceiptsTab() => @<div>
+        @if (_detail!.PurchaseOrder.Status is PurchaseOrderStatus.Issued or PurchaseOrderStatus.PartiallyReceived && Access.HasPermission(WarehouseUiPolicy.Create))
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Href="@($"/warehouse/receipts/from-purchase-order/{Id}")" Class="mb-3">ثبت رسید انبار</MudButton>
+        }
+        @if (_warehouseReceipts.Count == 0)
+        {
+            <EmptyState Title="رسید انباری برای این سفارش ثبت نشده" Description="پس از دریافت کالا، رسیدهای مرتبط با همین سفارش در اینجا نمایش داده می‌شوند." />
+        }
+        else
+        {
+            <MudTable Items="_warehouseReceipts" Dense="true">
+                <HeaderContent><MudTh>شماره رسید</MudTh><MudTh>انبار</MudTh><MudTh>وضعیت</MudTh><MudTh>تاریخ رسید</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.ReceiptNumber</MudTd>
+                    <MudTd>@context.WarehouseName</MudTd>
+                    <MudTd><StatusChip Text="@WarehouseUiPolicy.ReceiptStatusText(context.Status)" Color="@WarehouseUiPolicy.ReceiptStatusColor(context.Status)" /></MudTd>
+                    <MudTd><DateDisplay Value="@context.ReceiptDate" /></MudTd>
+                    <MudTd><MudButton Size="Size.Small" Variant="Variant.Outlined" Href="@($"/warehouse/receipts/{context.Id}")">مشاهده</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </div>;
 
     private RenderFragment LinksTab() => @<MudPaper Class="form-panel" Elevation="0">
         <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">پرونده خرید: <MudLink Href="@($"/purchase/files/{_detail!.PurchaseOrder.PurchaseFileId}")">@(_detail.PurchaseOrder.PurchaseFileNumber ?? "مشاهده")</MudLink></MudAlert>

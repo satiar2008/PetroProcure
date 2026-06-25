@@ -2238,6 +2238,410 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalArticle", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ArticleNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("LegalDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("OrderNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalDocumentId", "ArticleNumber")
+                        .IsUnique();
+
+                    b.ToTable("LegalArticles", "legal");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalClause", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ClauseNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("LegalArticleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int>("OrderNo")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalArticleId", "ClauseNumber")
+                        .IsUnique();
+
+                    b.ToTable("LegalClauses", "legal");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("FileHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("OriginalFileName")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<string>("RelativePath")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileHash");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("LegalDocuments", "legal");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalRuleAuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.ToTable("LegalRuleAuditLogs", "audit");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ActiveVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("RuleSetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("ProcurementRules", "rule");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRuleEvaluation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("EvaluatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("EvaluatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("PurchaseFileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid?>("TenderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseFileId");
+
+                    b.HasIndex("TenderId");
+
+                    b.ToTable("ProcurementRuleEvaluations", "rule");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRuleFinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid?>("LegalArticleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("LegalClauseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LegalReference")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("ProcurementRuleEvaluationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ProcurementRuleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("RuleVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProcurementRuleEvaluationId");
+
+                    b.HasIndex("RuleVersionId");
+
+                    b.ToTable("ProcurementRuleFindings", "rule");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRuleSet", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ProcurementRuleSets", "rule");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRuleVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ConditionDescription")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ConditionType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ConditionValue")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EvaluationMode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("LegalArticleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("LegalClauseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LegalReference")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("ProcurementRuleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("RuleType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("VersionNo")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("ProcurementRuleId", "VersionNo")
+                        .IsUnique();
+
+                    b.ToTable("ProcurementRuleVersions", "rule");
+                });
+
             modelBuilder.Entity("PetroProcure.Domain.Modules.Orders.InventoryControlItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3775,6 +4179,110 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Id = new Guid("f5028680-3796-1e8b-daee-91a6ba67f567"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Warehouse.ManageWarehouses",
+                            IsActive = true,
+                            Name = "Warehouse.ManageWarehouses"
+                        },
+                        new
+                        {
+                            Id = new Guid("6c9ae34d-d023-26d2-0931-a68c4b1b617d"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.View",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.View"
+                        },
+                        new
+                        {
+                            Id = new Guid("0af103a3-842d-c621-c1b8-5679d8532ab6"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.Create",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.Create"
+                        },
+                        new
+                        {
+                            Id = new Guid("2f7d2116-df4b-9236-e1a1-a89e7916c7e3"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.Edit",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.Edit"
+                        },
+                        new
+                        {
+                            Id = new Guid("64392951-b89f-a94d-b83f-edc655a67b53"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.Submit",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.Submit"
+                        },
+                        new
+                        {
+                            Id = new Guid("02269edb-c2e9-4bb3-2a61-e0e61ca60eed"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.Approve",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.Approve"
+                        },
+                        new
+                        {
+                            Id = new Guid("a358b88f-a122-dedf-5038-99a845fd4882"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.Cancel",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.Cancel"
+                        },
+                        new
+                        {
+                            Id = new Guid("d6e7c773-bee7-d7ce-bdb2-2d52e68c6a88"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.ManageDocuments",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.ManageDocuments"
+                        },
+                        new
+                        {
+                            Id = new Guid("ec1f39ea-473f-faf5-2a3c-27524b56a268"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.ReportView",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.ReportView"
+                        },
+                        new
+                        {
+                            Id = new Guid("4dc55e7b-527c-a0d5-0d6e-bd03abffe055"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "WarehouseReceipt.ReportExport",
+                            IsActive = true,
+                            Name = "WarehouseReceipt.ReportExport"
+                        },
+                        new
+                        {
+                            Id = new Guid("fe0e020e-750f-9a22-ee97-beb1185b0ef6"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Inventory.ViewTransactions",
+                            IsActive = true,
+                            Name = "Inventory.ViewTransactions"
+                        },
+                        new
+                        {
+                            Id = new Guid("874fd4b0-5eca-276f-037f-8a7db9d18e94"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Inventory.ViewStockBalance",
+                            IsActive = true,
+                            Name = "Inventory.ViewStockBalance"
+                        },
+                        new
+                        {
+                            Id = new Guid("743b5801-dcd2-513f-ea82-76c97c399f69"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "Inventory.AdjustStock",
+                            IsActive = true,
+                            Name = "Inventory.AdjustStock"
+                        },
+                        new
+                        {
                             Id = new Guid("9c752dc9-c777-9dd1-8b40-5b0f0698690b"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Tender.Create",
@@ -4511,6 +5019,54 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Id = new Guid("c247e927-997a-aff8-e1fe-ce1655470418"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "LegalDocument.View",
+                            IsActive = true,
+                            Name = "LegalDocument.View"
+                        },
+                        new
+                        {
+                            Id = new Guid("dfc85a01-96aa-1df0-8d37-fd52d876788c"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "LegalDocument.Manage",
+                            IsActive = true,
+                            Name = "LegalDocument.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("ac143c6f-89ad-c038-82fa-77b3fba76014"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "ProcurementRule.View",
+                            IsActive = true,
+                            Name = "ProcurementRule.View"
+                        },
+                        new
+                        {
+                            Id = new Guid("72b4023f-c5f5-18aa-1042-58a23aecabca"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "ProcurementRule.Manage",
+                            IsActive = true,
+                            Name = "ProcurementRule.Manage"
+                        },
+                        new
+                        {
+                            Id = new Guid("6de6c76a-2d4d-042a-5500-d66b78d17feb"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "ProcurementRule.Approve",
+                            IsActive = true,
+                            Name = "ProcurementRule.Approve"
+                        },
+                        new
+                        {
+                            Id = new Guid("d68c140f-3ce3-317b-ee21-72e345b730a4"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "ProcurementRule.Evaluate",
+                            IsActive = true,
+                            Name = "ProcurementRule.Evaluate"
+                        },
+                        new
+                        {
                             Id = new Guid("cce440c9-4fd8-147a-57f3-3c35c901317c"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Admin.ManageUsers",
@@ -4695,6 +5251,97 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("5bf2d89e-d4d9-3ed4-bfeb-1b2931b81d20"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             PermissionId = new Guid("02eecd9e-94ae-ef20-8cbf-bf5922f4ccfd"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("5aef0e19-0f9f-4f27-1ee3-8b8602490d8d"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("f5028680-3796-1e8b-daee-91a6ba67f567"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("b5c9d6d2-c419-db5c-580a-42811b2b2453"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("6c9ae34d-d023-26d2-0931-a68c4b1b617d"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("c23c1099-ca60-b6d4-ccdb-eded56c1cdcb"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("0af103a3-842d-c621-c1b8-5679d8532ab6"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("4dd8694b-575b-83aa-165c-06708d28c5e5"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("2f7d2116-df4b-9236-e1a1-a89e7916c7e3"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("a047e0f2-08aa-ff58-6a1e-4e95f54e3e5f"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("64392951-b89f-a94d-b83f-edc655a67b53"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("a1591f8c-1db9-48dc-5607-63ce9d437a4a"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("02269edb-c2e9-4bb3-2a61-e0e61ca60eed"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("0babe2cb-e96b-1d19-7115-fa71cbfb9889"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("a358b88f-a122-dedf-5038-99a845fd4882"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("6c8c2cb3-1420-d5aa-6265-c9b22e6aaeca"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("d6e7c773-bee7-d7ce-bdb2-2d52e68c6a88"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("e4b04751-48c9-7ce0-7155-5cb5a504cdd0"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("ec1f39ea-473f-faf5-2a3c-27524b56a268"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("061a08a2-a29d-ce5a-8c34-5f275b236943"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("4dc55e7b-527c-a0d5-0d6e-bd03abffe055"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("f5a16e95-0e08-7428-20d6-45ff965014f8"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("fe0e020e-750f-9a22-ee97-beb1185b0ef6"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("bb19c265-5113-2d60-febd-23488c60c40b"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("874fd4b0-5eca-276f-037f-8a7db9d18e94"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("8bfe2acb-19b8-742a-7106-3d40253a57a2"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("743b5801-dcd2-513f-ea82-76c97c399f69"),
                             RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
                         },
                         new
@@ -5339,6 +5986,48 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("ccdb4e52-960f-c90e-d3cf-7b381ee1f5a4"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             PermissionId = new Guid("12ad9300-f80e-f386-070c-c93f0117b66f"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("c04edffc-ed30-3f5e-ed6b-f3f4e40b67ce"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("c247e927-997a-aff8-e1fe-ce1655470418"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("2c83c748-ffe4-c08a-1706-a469f94e56e4"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("dfc85a01-96aa-1df0-8d37-fd52d876788c"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("199a2351-2e32-b1bf-d536-9eea43a32bf6"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("ac143c6f-89ad-c038-82fa-77b3fba76014"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("42e4d8af-0bad-8990-6294-a41e72a11305"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("72b4023f-c5f5-18aa-1042-58a23aecabca"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("1a4a765b-97ad-4d06-3557-a971efcea6e8"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("6de6c76a-2d4d-042a-5500-d66b78d17feb"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("80ea3b40-d3f0-e2a5-e538-e811873c1e28"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("d68c140f-3ce3-317b-ee21-72e345b730a4"),
                             RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
                         },
                         new
@@ -6393,6 +7082,90 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Id = new Guid("d38a92d8-07f3-6d35-d0ad-9b008f59e9e9"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("f5028680-3796-1e8b-daee-91a6ba67f567"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("848af1f9-5046-f68b-9c4c-84f387ac8dd1"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("6c9ae34d-d023-26d2-0931-a68c4b1b617d"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("b61a8a36-5e72-c2ed-4f5f-3c118157d0a6"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("0af103a3-842d-c621-c1b8-5679d8532ab6"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("b71de7ab-dfbd-21f5-a672-24a73423603b"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("2f7d2116-df4b-9236-e1a1-a89e7916c7e3"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("55e1b6c0-047e-dfbb-e171-386bf22f0918"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("64392951-b89f-a94d-b83f-edc655a67b53"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("81a80a83-369a-cbf3-7d28-5ca3f1453305"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("02269edb-c2e9-4bb3-2a61-e0e61ca60eed"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("0810915d-dc21-b41e-c1e4-1dc6d05c7cd7"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("a358b88f-a122-dedf-5038-99a845fd4882"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("f355c58c-cbf0-f8d9-d3f3-8110de17a313"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("d6e7c773-bee7-d7ce-bdb2-2d52e68c6a88"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("a04b09df-1dc9-2fb5-7b72-e631b4e93798"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("ec1f39ea-473f-faf5-2a3c-27524b56a268"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("66569459-c766-c0d0-56c0-a98780906853"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("4dc55e7b-527c-a0d5-0d6e-bd03abffe055"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("ed8ca05f-e24c-cf36-e133-00793d9f7c41"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("fe0e020e-750f-9a22-ee97-beb1185b0ef6"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
+                            Id = new Guid("c65ecb93-077b-76ec-7a64-dc3cd79cb9ee"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("874fd4b0-5eca-276f-037f-8a7db9d18e94"),
+                            RoleId = new Guid("82cfcfc0-5a42-fba0-38b8-a4aa21c9213c")
+                        },
+                        new
+                        {
                             Id = new Guid("e8e8a216-56cc-6d54-922d-1b5fe8bcfbbf"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             PermissionId = new Guid("96813069-cf12-e82d-f2c1-4b6f874bb94a"),
@@ -6417,6 +7190,55 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("7c0f93b8-3398-f384-4878-031ec26da04a"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             PermissionId = new Guid("1ab75a4b-ef24-8a2a-bc82-9ae054003d86"),
+                            RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
+                        },
+                        new
+                        {
+                            Id = new Guid("15767b51-f2ff-e555-4f1c-84d2ef808194"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("6c9ae34d-d023-26d2-0931-a68c4b1b617d"),
+                            RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
+                        },
+                        new
+                        {
+                            Id = new Guid("968b84d9-b83c-01db-73cb-20b6056d4fe5"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("0af103a3-842d-c621-c1b8-5679d8532ab6"),
+                            RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
+                        },
+                        new
+                        {
+                            Id = new Guid("96476200-ccec-4d54-aab7-a060d78c8415"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("2f7d2116-df4b-9236-e1a1-a89e7916c7e3"),
+                            RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
+                        },
+                        new
+                        {
+                            Id = new Guid("edd60152-57a9-03d2-4b55-d05cf32f67b2"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("64392951-b89f-a94d-b83f-edc655a67b53"),
+                            RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
+                        },
+                        new
+                        {
+                            Id = new Guid("b71fb4d5-99fa-3edd-0150-bb0faf31c15c"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("d6e7c773-bee7-d7ce-bdb2-2d52e68c6a88"),
+                            RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
+                        },
+                        new
+                        {
+                            Id = new Guid("291b6743-8856-1704-9cf6-d318077e3837"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("fe0e020e-750f-9a22-ee97-beb1185b0ef6"),
+                            RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
+                        },
+                        new
+                        {
+                            Id = new Guid("1c78032a-4b19-eeb0-7499-a4254771b953"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("874fd4b0-5eca-276f-037f-8a7db9d18e94"),
                             RoleId = new Guid("08e0b8c8-0ce3-698c-c760-498a3746bb1f")
                         },
                         new
@@ -6851,6 +7673,20 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("3c00b3c9-0c6c-1db3-72be-f22c278e69d4"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             PermissionId = new Guid("145be573-0dc4-e326-2b79-40427d85c426"),
+                            RoleId = new Guid("84dfd3fc-e85b-d990-896c-f99f7933d3e4")
+                        },
+                        new
+                        {
+                            Id = new Guid("762ecce6-5e37-9095-14ac-bebede8631dd"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("ec1f39ea-473f-faf5-2a3c-27524b56a268"),
+                            RoleId = new Guid("84dfd3fc-e85b-d990-896c-f99f7933d3e4")
+                        },
+                        new
+                        {
+                            Id = new Guid("87205596-3806-0f00-d75f-e3710ed84942"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("4dc55e7b-527c-a0d5-0d6e-bd03abffe055"),
                             RoleId = new Guid("84dfd3fc-e85b-d990-896c-f99f7933d3e4")
                         },
                         new
@@ -8452,6 +9288,374 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.ToTable("TenderStages", "tender");
                 });
 
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.InventoryTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("MescItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid>("ReferenceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReferenceType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("TransactionDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("TransactionNumber")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("UnitOfMeasureId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MescItemId");
+
+                    b.HasIndex("TransactionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("WarehouseId");
+
+                    b.HasIndex("ReferenceType", "ReferenceId");
+
+                    b.ToTable("InventoryTransactions", "warehouse");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.InventoryTransactionSequence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("LastNumber")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Year")
+                        .IsUnique();
+
+                    b.ToTable("InventoryTransactionSequences", "warehouse");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.Warehouse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("Warehouses", "warehouse");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("eeee0000-0000-0000-0000-000000000001"),
+                            Code = "MAIN",
+                            Description = "انبار پیش‌فرض سیستم",
+                            IsActive = true,
+                            Location = "انبار مرکزی",
+                            Name = "انبار مرکزی"
+                        });
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ApprovedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CarrierName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DeliveryNoteNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("PurchaseFileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ReceiptDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("ReceivedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("VehicleNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PurchaseFileId");
+
+                    b.HasIndex("PurchaseOrderId");
+
+                    b.HasIndex("ReceiptDate");
+
+                    b.HasIndex("ReceiptNumber")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("SupplierId");
+
+                    b.HasIndex("WarehouseId");
+
+                    b.ToTable("WarehouseReceipts", "warehouse");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceiptDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("FileDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OriginalFileName")
+                        .HasMaxLength(260)
+                        .HasColumnType("nvarchar(260)");
+
+                    b.Property<DateTime>("UploadedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UploadedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WarehouseReceiptId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FileDocumentId");
+
+                    b.HasIndex("WarehouseReceiptId");
+
+                    b.ToTable("WarehouseReceiptDocuments", "warehouse");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceiptItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("AcceptedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("BatchNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("ExpiryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("GeneralDescription")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("MescCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("MescGeneralGroupCode")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("nvarchar(6)");
+
+                    b.Property<Guid>("MescItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<decimal>("OrderedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("PreviouslyReceivedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<Guid>("PurchaseOrderItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("QualityStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("ReceivedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal?>("RejectedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("RemainingQuantityAfterReceipt")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SpecificDescription")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid>("UnitOfMeasureId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("WarehouseReceiptId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MescItemId");
+
+                    b.HasIndex("PurchaseOrderItemId");
+
+                    b.HasIndex("WarehouseReceiptId");
+
+                    b.ToTable("WarehouseReceiptItems", "warehouse");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceiptSequence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("LastNumber")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Year")
+                        .IsUnique();
+
+                    b.ToTable("WarehouseReceiptSequences", "warehouse");
+                });
+
             modelBuilder.Entity("PetroProcure.Domain.Modules.Workflow.InboxTask", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9333,6 +10537,42 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.Navigation("GeneralGroup");
                 });
 
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalArticle", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Legal.LegalDocument", null)
+                        .WithMany("Articles")
+                        .HasForeignKey("LegalDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalClause", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Legal.LegalArticle", null)
+                        .WithMany("Clauses")
+                        .HasForeignKey("LegalArticleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRuleFinding", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Legal.ProcurementRuleEvaluation", null)
+                        .WithMany("Findings")
+                        .HasForeignKey("ProcurementRuleEvaluationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRuleVersion", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Legal.ProcurementRule", null)
+                        .WithMany("Versions")
+                        .HasForeignKey("ProcurementRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PetroProcure.Domain.Modules.Organization.UserDepartment", b =>
                 {
                     b.HasOne("PetroProcure.Domain.Modules.Organization.Department", null)
@@ -9764,6 +11004,77 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.InventoryTransaction", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Items.MescItem", null)
+                        .WithMany()
+                        .HasForeignKey("MescItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PetroProcure.Domain.Modules.Warehouse.Warehouse", null)
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceipt", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.PurchaseFiles.PurchaseFile", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseFileId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PetroProcure.Domain.Modules.PurchaseOrders.PurchaseOrder", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PetroProcure.Domain.Modules.Suppliers.Supplier", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PetroProcure.Domain.Modules.Warehouse.Warehouse", null)
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceiptDocument", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Documents.FileDocument", null)
+                        .WithMany()
+                        .HasForeignKey("FileDocumentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PetroProcure.Domain.Modules.Warehouse.WarehouseReceipt", null)
+                        .WithMany("Documents")
+                        .HasForeignKey("WarehouseReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceiptItem", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.PurchaseOrders.PurchaseOrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseOrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PetroProcure.Domain.Modules.Warehouse.WarehouseReceipt", null)
+                        .WithMany("Items")
+                        .HasForeignKey("WarehouseReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("PetroProcure.Domain.Modules.Workflow.InboxTask", b =>
                 {
                     b.HasOne("PetroProcure.Domain.Modules.Organization.Department", null)
@@ -9920,6 +11231,26 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.Navigation("Items");
                 });
 
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalArticle", b =>
+                {
+                    b.Navigation("Clauses");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.LegalDocument", b =>
+                {
+                    b.Navigation("Articles");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRule", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Legal.ProcurementRuleEvaluation", b =>
+                {
+                    b.Navigation("Findings");
+                });
+
             modelBuilder.Entity("PetroProcure.Domain.Modules.PurchaseFiles.PurchaseFile", b =>
                 {
                     b.Navigation("Items");
@@ -9981,6 +11312,13 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("PetroProcure.Domain.Modules.Tenders.TenderBid", b =>
                 {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Warehouse.WarehouseReceipt", b =>
+                {
+                    b.Navigation("Documents");
+
                     b.Navigation("Items");
                 });
 

@@ -20,6 +20,8 @@ using PetroProcure.Application.Tenders;
 using PetroProcure.Application.Commission;
 using PetroProcure.Application.Contracts;
 using PetroProcure.Application.PurchaseOrders;
+using PetroProcure.Application.Warehouse;
+using PetroProcure.Application.Legal;
 using PetroProcure.Reporting;
 using PetroProcure.AI;
 
@@ -79,6 +81,10 @@ public static class DependencyInjection
         services.AddScoped<ICommissionSessionEligibilityService, CommissionSessionEligibilityService>();
         services.AddScoped<IContractRepository, ContractRepository>();
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+        services.AddScoped<IWarehouseRepository, WarehouseRepository>();
+        services.AddScoped<LegalRuleRepository>();
+        services.AddScoped<ILegalRuleRepository>(sp => sp.GetRequiredService<LegalRuleRepository>());
+        services.AddScoped<IPurchaseFileRuleContextBuilder>(sp => sp.GetRequiredService<LegalRuleRepository>());
         services.AddScoped<IReportDataProvider, ReportDataProvider>();
         services.AddScoped<AiRepository>();
         services.AddScoped<IAiEvaluationRepository>(sp => sp.GetRequiredService<AiRepository>());

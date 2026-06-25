@@ -1,0 +1,115 @@
+@page "/warehouse/receipts/from-purchase-order/{PurchaseOrderId:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>ثبت رسید انبار</PageTitle>
+
+<PageHeader Title="ثبت رسید انبار از سفارش خرید" Subtitle="@(_po?.PurchaseOrder.PurchaseOrderNumber ?? "در حال بارگذاری")">
+    <Actions><MudButton Variant="Variant.Outlined" Href="/warehouse/purchase-orders-waiting">بازگشت</MudButton></Actions>
+</PageHeader>
+
+@if (_loading) { <LoadingOverlay Visible="true" Text="در حال دریافت سفارش خرید..." /> }
+else if (_error is not null) { <RetryPanel Message="@_error" OnRetry="Load" /> }
+else if (_po is not null)
+{
+    <MudPaper Class="form-panel mb-4" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid" @bind-Value="_warehouseId" Label="انبار دریافت‌کننده" Variant="Variant.Outlined" Required="true">
+                    @foreach (var warehouse in _warehouses)
+                    { <MudSelectItem Value="@warehouse.Id">@warehouse.Name (@warehouse.Code)</MudSelectItem> }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_receiptDate" Label="تاریخ رسید" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_deliveryNoteNumber" Label="شماره حواله/بارنامه" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_carrierName" Label="حمل‌کننده" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_vehicleNumber" Label="شماره خودرو" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_description" Label="توضیحات" Variant="Variant.Outlined" /></MudItem>
+        </MudGrid>
+    </MudPaper>
+
+    <MudPaper Class="data-panel" Elevation="0">
+        <MudText Typo="Typo.h6" Class="mb-3">اقلام قابل دریافت</MudText>
+        @foreach (var group in _rows.GroupBy(x => new { x.Item.MescGeneralGroupCode, x.Item.GeneralDescription }))
+        {
+            <MudExpansionPanels Class="mb-3"><MudExpansionPanel Expanded="true" Text="@($"{group.Key.MescGeneralGroupCode} — {group.Key.GeneralDescription}")">
+                <MudTable Items="group" Dense="true">
+                    <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>سفارش</MudTh><MudTh>دریافت‌شده</MudTh><MudTh>مانده</MudTh><MudTh>رسید این مرحله</MudTh><MudTh>کیفیت</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Item.MescCode</MudTd>
+                        <MudTd>@context.Item.SpecificDescription</MudTd>
+                        <MudTd>@context.Item.OrderedQuantity</MudTd>
+                        <MudTd>@context.Item.ReceivedQuantity</MudTd>
+                        <MudTd>@context.Item.RemainingQuantity</MudTd>
+                        <MudTd><MudNumericField T="decimal" @bind-Value="context.ReceivedQuantity" Min="0" Max="@context.Item.RemainingQuantity" Variant="Variant.Outlined" /></MudTd>
+                        <MudTd><MudSelect T="WarehouseReceiptQualityStatus" @bind-Value="context.QualityStatus" Dense="true" Variant="Variant.Outlined">
+                            @foreach (var status in Enum.GetValues<WarehouseReceiptQualityStatus>())
+                            { <MudSelectItem Value="@status">@WarehouseUiPolicy.QualityText(status)</MudSelectItem> }
+                        </MudSelect></MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudExpansionPanel></MudExpansionPanels>
+        }
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(_saving || !_rows.Any(x => x.ReceivedQuantity > 0))" OnClick="Save">ثبت رسید</MudButton>
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid PurchaseOrderId { get; set; }
+    private PurchaseOrderDetailDto? _po;
+    private List<WarehouseDto> _warehouses = [];
+    private List<Row> _rows = [];
+    private bool _loading = true, _saving;
+    private string? _error, _deliveryNoteNumber, _carrierName, _vehicleNumber, _description;
+    private Guid _warehouseId;
+    private DateTime? _receiptDate = DateTime.Today;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Access.HasPermission(WarehouseUiPolicy.Create)) { Navigation.NavigateTo("/access-denied"); return; }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            _po = await Api.GetPurchaseOrderAsync(PurchaseOrderId) ?? throw new InvalidOperationException("سفارش خرید یافت نشد.");
+            _warehouses = (await Api.GetWarehousesAsync(new(PageSize: 100))).Items.ToList();
+            _warehouseId = _warehouses.FirstOrDefault()?.Id ?? Guid.Empty;
+            _rows = _po.Items.Where(x => x.RemainingQuantity > 0).Select(x => new Row(x, x.RemainingQuantity, WarehouseReceiptQualityStatus.NotInspected)).ToList();
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task Save()
+    {
+        if (_warehouseId == Guid.Empty) { Snackbar.Add("انتخاب انبار الزامی است.", Severity.Warning); return; }
+        var items = _rows.Where(x => x.ReceivedQuantity > 0)
+            .Select(x => new AddWarehouseReceiptItemRequest(x.Item.Id, x.ReceivedQuantity, x.ReceivedQuantity, 0, x.QualityStatus))
+            .ToArray();
+        if (items.Length == 0) { Snackbar.Add("حداقل یک قلم با مقدار رسید وارد کنید.", Severity.Warning); return; }
+        _saving = true;
+        try
+        {
+            var receipt = await Api.CreateWarehouseReceiptFromPurchaseOrderAsync(PurchaseOrderId,
+                new(_warehouseId, _receiptDate ?? DateTime.Today, _deliveryNoteNumber, _carrierName, _vehicleNumber, _description, items));
+            Snackbar.Add("رسید انبار ثبت شد.", Severity.Success);
+            Navigation.NavigateTo($"/warehouse/receipts/{receipt.Receipt.Id}");
+        }
+        catch (Exception ex) { Snackbar.Add("ثبت رسید ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _saving = false; }
+    }
+
+    private sealed class Row(PurchaseOrderItemDto item, decimal receivedQuantity, WarehouseReceiptQualityStatus qualityStatus)
+    {
+        public PurchaseOrderItemDto Item { get; } = item;
+        public decimal ReceivedQuantity { get; set; } = receivedQuantity;
+        public WarehouseReceiptQualityStatus QualityStatus { get; set; } = qualityStatus;
+    }
+}

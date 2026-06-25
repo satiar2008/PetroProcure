@@ -184,6 +184,17 @@ public sealed class PurchaseOrder : Entity<Guid>
         CompletedByUserId = userId;
     }
 
+    public void ApplyReceipt(Guid itemId, decimal receivedQuantity)
+    {
+        if (Status is not PurchaseOrderStatus.Issued and not PurchaseOrderStatus.PartiallyReceived)
+            throw new InvalidOperationException("Only issued or partially received purchase orders can receive goods.");
+        var item = _items.SingleOrDefault(x => x.Id == itemId) ?? throw new InvalidOperationException("Purchase order item was not found.");
+        item.Receive(receivedQuantity);
+        Status = _items.All(x => x.RemainingQuantity == 0)
+            ? PurchaseOrderStatus.FullyReceived
+            : PurchaseOrderStatus.PartiallyReceived;
+    }
+
     public void Cancel(string reason, Guid userId)
     {
         if (Status is PurchaseOrderStatus.Completed or PurchaseOrderStatus.Archived)
@@ -285,6 +296,14 @@ public sealed class PurchaseOrderItem : Entity<Guid>
         if (receivedQuantity < 0 || receivedQuantity > OrderedQuantity) throw new ArgumentOutOfRangeException(nameof(receivedQuantity));
         ReceivedQuantity = receivedQuantity;
         RemainingQuantity = OrderedQuantity - receivedQuantity;
+    }
+
+    public void Receive(decimal quantity)
+    {
+        if (quantity <= 0) throw new ArgumentOutOfRangeException(nameof(quantity));
+        if (quantity > RemainingQuantity) throw new InvalidOperationException("Received quantity cannot exceed remaining quantity.");
+        ReceivedQuantity += quantity;
+        RemainingQuantity -= quantity;
     }
 
     private static string Required(string value, string name) => string.IsNullOrWhiteSpace(value) ? throw new ArgumentException("Value is required.", name) : value.Trim();

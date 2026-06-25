@@ -1,0 +1,145 @@
+@page "/admin/legal-documents/{Id:guid}"
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+
+<PageHeader Title="@(_document?.Title ?? "جزئیات سند قانونی")" Subtitle="مواد، بندها و یادداشت‌های قابل استفاده برای استخراج Rule" />
+
+@if (_loading)
+{
+    <LoadingOverlay IsVisible="true" Text="در حال دریافت سند..." />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    <MudButton Class="mt-2" OnClick="LoadAsync">تلاش مجدد</MudButton>
+}
+else if (_document is not null)
+{
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4" Elevation="0">
+                <MudText Typo="Typo.h6">افزودن ماده قانونی</MudText>
+                <MudTextField @bind-Value="_articleNumber" Label="شماره ماده" />
+                <MudTextField @bind-Value="_articleTitle" Label="عنوان ماده" />
+                <MudNumericField @bind-Value="_articleOrder" Label="ترتیب" />
+                <MudTextField @bind-Value="_articleBody" Label="متن ماده" Lines="5" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateArticleAsync">ثبت ماده</MudButton>
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mt-4" Elevation="0">
+                <MudText Typo="Typo.h6">افزودن بند / تبصره</MudText>
+                <MudSelect @bind-Value="_selectedArticleId" Label="ماده مرتبط">
+                    @foreach (var article in _articles)
+                    {
+                        <MudSelectItem Value="@article.Id">@article.ArticleNumber - @article.Title</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudTextField @bind-Value="_clauseNumber" Label="شماره بند / تبصره" />
+                <MudNumericField @bind-Value="_clauseOrder" Label="ترتیب" />
+                <MudTextField @bind-Value="_clauseBody" Label="متن بند" Lines="4" />
+                <MudTextField @bind-Value="_clauseNote" Label="یادداشت" Lines="2" />
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="CreateClauseAsync">ثبت بند</MudButton>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="8">
+            @if (_articles.Count == 0)
+            {
+                <EmptyState Title="ماده‌ای ثبت نشده است" Description="برای AI و Rule Engine، متن PDF باید به ماده و بند قابل ارجاع تبدیل شود." />
+            }
+            else
+            {
+                <MudExpansionPanels MultiExpansion="true">
+                    @foreach (var article in _articles.OrderBy(x => x.OrderNo))
+                    {
+                        <MudExpansionPanel Text="@($"{article.ArticleNumber} - {article.Title}")">
+                            <MudText Class="mb-3">@article.Body</MudText>
+                            @foreach (var clause in article.Clauses.OrderBy(x => x.OrderNo))
+                            {
+                                <MudPaper Class="pa-3 mb-2 legal-clause" Elevation="0">
+                                    <MudText Typo="Typo.subtitle2">@clause.ClauseNumber</MudText>
+                                    <MudText>@clause.Body</MudText>
+                                    @if (!string.IsNullOrWhiteSpace(clause.Note))
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Secondary">یادداشت: @clause.Note</MudText>
+                                    }
+                                </MudPaper>
+                            }
+                        </MudExpansionPanel>
+                    }
+                </MudExpansionPanels>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private LegalDocumentDto? _document;
+    private readonly List<LegalArticleDto> _articles = [];
+    private bool _loading;
+    private bool _busy;
+    private string? _error;
+    private string _articleNumber = "";
+    private string _articleTitle = "";
+    private string _articleBody = "";
+    private int _articleOrder = 1;
+    private Guid _selectedArticleId;
+    private string _clauseNumber = "";
+    private string _clauseBody = "";
+    private string? _clauseNote;
+    private int _clauseOrder = 1;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            _document = await Api.GetLegalDocumentAsync(Id);
+            var articles = await Api.GetLegalDocumentArticlesAsync(Id);
+            _articles.Clear(); _articles.AddRange(articles);
+            _selectedArticleId = _articles.FirstOrDefault()?.Id ?? Guid.Empty;
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private async Task CreateArticleAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_articleNumber) || string.IsNullOrWhiteSpace(_articleBody))
+        {
+            Snackbar.Add("شماره و متن ماده الزامی است.", Severity.Warning);
+            return;
+        }
+        _busy = true;
+        try
+        {
+            await Api.CreateLegalArticleAsync(new CreateLegalArticleRequest(Id, _articleNumber, _articleTitle, _articleBody, _articleOrder));
+            Snackbar.Add("ماده قانونی ثبت شد.", Severity.Success);
+            _articleNumber = _articleTitle = _articleBody = "";
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task CreateClauseAsync()
+    {
+        if (_selectedArticleId == Guid.Empty || string.IsNullOrWhiteSpace(_clauseNumber) || string.IsNullOrWhiteSpace(_clauseBody))
+        {
+            Snackbar.Add("ماده، شماره و متن بند الزامی است.", Severity.Warning);
+            return;
+        }
+        _busy = true;
+        try
+        {
+            await Api.CreateLegalClauseAsync(new CreateLegalClauseRequest(_selectedArticleId, _clauseNumber, _clauseBody, _clauseOrder, _clauseNote));
+            Snackbar.Add("بند قانونی ثبت شد.", Severity.Success);
+            _clauseNumber = _clauseBody = ""; _clauseNote = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+}

@@ -1,0 +1,184 @@
+@page "/admin/procurement-rules/{Id:guid}/edit"
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<PageHeader Title="@(_rule?.Title ?? "ویرایش Rule")" Subtitle="ویرایش Rule فعال مستقیماً انجام نمی‌شود؛ ابتدا نسخه پیش‌نویس ساخته می‌شود." />
+
+@if (_loading)
+{
+    <LoadingOverlay IsVisible="true" Text="در حال دریافت نسخه‌ها..." />
+}
+else if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error">@_error</MudAlert>
+    <MudButton Class="mt-2" OnClick="LoadAsync">تلاش مجدد</MudButton>
+}
+else if (_rule is not null)
+{
+    <MudPaper Class="pa-4 mb-4" Elevation="0">
+        <MudText Typo="Typo.h6">@_rule.Code</MudText>
+        <MudText Color="Color.Secondary">نسخه فعال: @(_rule.ActiveVersion?.VersionNo.ToString() ?? "ندارد")</MudText>
+        <MudButton Class="mt-3" Variant="Variant.Outlined" OnClick="CloneDraftAsync" Disabled="_busy">ساخت نسخه پیش‌نویس از نسخه فعال</MudButton>
+        <MudButton Class="mt-3 mx-2" Variant="Variant.Text" OnClick="@(() => Nav.NavigateTo("/admin/procurement-rules"))">بازگشت</MudButton>
+    </MudPaper>
+
+    <MudGrid>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4" Elevation="0">
+                <MudText Typo="Typo.h6">نسخه‌ها</MudText>
+                <MudTable Items="_versions" Hover="true" Dense="true">
+                    <HeaderContent><MudTh>نسخه</MudTh><MudTh>وضعیت</MudTh><MudTh>اهمیت</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.VersionNo</MudTd>
+                        <MudTd><StatusChip Text="@ProcurementRulesPage.RuleStatusText(context.Status)" /></MudTd>
+                        <MudTd>@ProcurementRulesPage.SeverityText(context.Severity)</MudTd>
+                        <MudTd><MudButton Size="Size.Small" OnClick="@(() => SelectVersion(context))">انتخاب</MudButton></MudTd>
+                    </RowTemplate>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="7">
+            @if (_selected is null)
+            {
+                <EmptyState Title="نسخه‌ای انتخاب نشده است" Description="برای ویرایش، نسخه Draft را انتخاب کنید یا از نسخه فعال Draft بسازید." />
+            }
+            else
+            {
+                <MudPaper Class="pa-4" Elevation="0">
+                    <MudText Typo="Typo.h6">نسخه @_selected.VersionNo</MudText>
+                    <MudTextField @bind-Value="_draftTitle" Label="عنوان" Disabled="@(!_isDraft)" />
+                    <MudSelect @bind-Value="_draftType" Label="نوع Rule" Disabled="@(!_isDraft)">
+                        @foreach (var value in Enum.GetValues<RuleType>()) { <MudSelectItem Value="@value">@ProcurementRulesPage.RuleTypeText(value)</MudSelectItem> }
+                    </MudSelect>
+                    <MudSelect @bind-Value="_draftSeverity" Label="اهمیت" Disabled="@(!_isDraft)">
+                        @foreach (var value in Enum.GetValues<RuleSeverity>()) { <MudSelectItem Value="@value">@ProcurementRulesPage.SeverityText(value)</MudSelectItem> }
+                    </MudSelect>
+                    <MudSelect @bind-Value="_draftMode" Label="روش ارزیابی" Disabled="@(!_isDraft)">
+                        @foreach (var value in Enum.GetValues<RuleEvaluationMode>()) { <MudSelectItem Value="@value">@ProcurementRulesPage.ModeText(value)</MudSelectItem> }
+                    </MudSelect>
+                    <MudTextField @bind-Value="_draftLegalReference" Label="ارجاع قانونی" Disabled="@(!_isDraft)" />
+                    <MudTextField @bind-Value="_draftLegalArticleId" Label="شناسه ماده قانونی" Disabled="@(!_isDraft)" />
+                    <MudTextField @bind-Value="_draftLegalClauseId" Label="شناسه بند قانونی" Disabled="@(!_isDraft)" />
+                    <MudTextField @bind-Value="_draftConditionType" Label="نوع شرط" Disabled="@(!_isDraft)" />
+                    <MudTextField @bind-Value="_draftConditionValue" Label="مقدار شرط" Disabled="@(!_isDraft)" />
+                    <MudTextField @bind-Value="_draftConditionDescription" Label="شرح شرط" Lines="2" Disabled="@(!_isDraft)" />
+                    @if (!_isDraft)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-3">نسخه فعال یا تأییدشده قابل ویرایش مستقیم نیست. برای تغییر، نسخه Draft بسازید.</MudAlert>
+                    }
+                    <MudStack Row="true" Class="mt-3">
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!_isDraft || _busy)" OnClick="UpdateDraftAsync">ذخیره Draft</MudButton>
+                        <MudButton Variant="Variant.Outlined" Disabled="@(!_isDraft || _busy)" OnClick="SubmitAsync">ارسال برای تأیید</MudButton>
+                        <MudButton Color="Color.Success" Variant="Variant.Outlined" Disabled="@(_selected.Status != RuleStatus.PendingApproval || _busy)" OnClick="ApproveAsync">تأیید و فعال‌سازی</MudButton>
+                    </MudStack>
+                </MudPaper>
+            }
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private ProcurementRuleDto? _rule;
+    private readonly List<ProcurementRuleVersionDto> _versions = [];
+    private ProcurementRuleVersionDto? _selected;
+    private bool _loading;
+    private bool _busy;
+    private string? _error;
+    private bool _isDraft => _selected?.Status == RuleStatus.Draft;
+    private string _draftTitle = "";
+    private RuleType _draftType = RuleType.Checklist;
+    private RuleSeverity _draftSeverity = RuleSeverity.Warning;
+    private RuleEvaluationMode _draftMode = RuleEvaluationMode.Automatic;
+    private string _draftLegalReference = "";
+    private string _draftLegalArticleId = "";
+    private string _draftLegalClauseId = "";
+    private string _draftConditionType = "";
+    private string _draftConditionValue = "";
+    private string? _draftConditionDescription;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            var rules = await Api.GetProcurementRulesAsync(new ProcurementRuleListRequest(PageSize: 200));
+            _rule = rules.Items.SingleOrDefault(x => x.Id == Id);
+            _versions.Clear();
+            _versions.AddRange(await Api.GetProcurementRuleVersionsAsync(Id));
+            SelectVersion(_versions.OrderByDescending(x => x.VersionNo).FirstOrDefault());
+        }
+        catch (Exception ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+
+    private void SelectVersion(ProcurementRuleVersionDto? version)
+    {
+        _selected = version;
+        if (version is null) return;
+        _draftTitle = version.Title;
+        _draftType = version.RuleType;
+        _draftSeverity = version.Severity;
+        _draftMode = version.EvaluationMode;
+        _draftLegalReference = version.LegalReference;
+        _draftLegalArticleId = version.LegalArticleId?.ToString() ?? "";
+        _draftLegalClauseId = version.LegalClauseId?.ToString() ?? "";
+        _draftConditionType = version.ConditionType;
+        _draftConditionValue = version.ConditionValue;
+        _draftConditionDescription = version.ConditionDescription;
+    }
+
+    private async Task CloneDraftAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.CloneProcurementRuleAsDraftAsync(Id);
+            Snackbar.Add("نسخه پیش‌نویس ساخته شد.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task UpdateDraftAsync()
+    {
+        Guid? articleId = Guid.TryParse(_draftLegalArticleId, out var a) ? a : null;
+        Guid? clauseId = Guid.TryParse(_draftLegalClauseId, out var c) ? c : null;
+        if (articleId is null && clauseId is null)
+        {
+            Snackbar.Add("Rule باید به ماده یا بند قانونی ارجاع داشته باشد.", Severity.Warning);
+            return;
+        }
+        _busy = true;
+        try
+        {
+            await Api.UpdateRuleDraftAsync(Id, new UpdateRuleDraftRequest(_draftTitle, _draftType, _draftSeverity,
+                _draftMode, articleId, clauseId, _draftLegalReference, _draftConditionType, _draftConditionValue,
+                _draftConditionDescription));
+            Snackbar.Add("Draft ذخیره شد.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task SubmitAsync()
+    {
+        _busy = true;
+        try { await Api.SubmitProcurementRuleAsync(Id, "ارسال از رابط مدیریتی"); Snackbar.Add("برای تأیید ارسال شد.", Severity.Success); await LoadAsync(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task ApproveAsync()
+    {
+        _busy = true;
+        try { await Api.ApproveProcurementRuleAsync(Id, "تأیید از رابط مدیریتی"); Snackbar.Add("نسخه فعال شد.", Severity.Success); await LoadAsync(); }
+        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+}
