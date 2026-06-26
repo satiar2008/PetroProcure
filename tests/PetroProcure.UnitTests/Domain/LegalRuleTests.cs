@@ -46,6 +46,20 @@ public sealed class LegalRuleTests
     }
 
     [Fact]
+    public void LegalClauseStoresAiSearchMetadata()
+    {
+        var clause = new LegalClause(Guid.NewGuid(), Guid.NewGuid(), "بند الف",
+            "متن بند قانونی", 1, "تبصره", "PurchaseFile", RuleSeverity.Critical,
+            "مناقصه,اسناد,ارزیابی");
+
+        Assert.Equal("PurchaseFile", clause.AppliesTo);
+        Assert.Equal(RuleSeverity.Critical, clause.Severity);
+        Assert.Equal("مناقصه,اسناد,ارزیابی", clause.Tags);
+        Assert.Contains("PurchaseFile", clause.SearchText);
+        Assert.Contains("اسناد", clause.SearchText);
+    }
+
+    [Fact]
     public async Task EvaluationStoresResultLinkedToRuleVersion()
     {
         var repo = new FakeLegalRuleRepository();
@@ -180,8 +194,10 @@ public sealed class LegalRuleTests
         public Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest request, CancellationToken ct) => throw new NotSupportedException();
         public Task<LegalDocumentDto?> GetLegalDocumentAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<LegalArticleDto>> GetArticlesByDocumentAsync(Guid documentId, CancellationToken ct) => throw new NotSupportedException();
+        public Task<PagedResult<LegalArticleDto>> SearchArticlesAsync(LegalArticleSearchRequest request, CancellationToken ct) => throw new NotSupportedException();
+        public Task<PagedResult<LegalClauseContextDto>> SearchClauseContextsAsync(LegalClauseSearchRequest request, CancellationToken ct) => throw new NotSupportedException();
+        public Task<LegalClauseContextDto?> GetClauseContextAsync(Guid clauseId, CancellationToken ct) => throw new NotSupportedException();
         public Task<PagedResult<ProcurementRuleDto>> GetRulesAsync(ProcurementRuleListRequest request, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<ProcurementRuleVersionDto>> GetRuleVersionsAsync(Guid ruleId, CancellationToken ct) => throw new NotSupportedException();
-        public Task<IReadOnlyList<LegalClauseDto>> SearchClausesAsync(string term, CancellationToken ct) => throw new NotSupportedException();
     }
 }

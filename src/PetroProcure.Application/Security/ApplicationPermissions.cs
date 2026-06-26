@@ -138,6 +138,15 @@ public static class ApplicationPermissions
 
     public const string AiAgentUse = "AiAgent.Use";
     public const string AiAgentEvaluatePurchaseRules = "AiAgent.EvaluatePurchaseRules";
+    public const string AiAdmin = "Ai.Admin";
+    public const string AiProviderManage = "Ai.ProviderManage";
+    public const string AiProviderTest = "Ai.ProviderTest";
+    public const string AiAnalyzePurchaseFile = "Ai.AnalyzePurchaseFile";
+    public const string AiAnalyzeTender = "Ai.AnalyzeTender";
+    public const string AiAnalyzeContract = "Ai.AnalyzeContract";
+    public const string AiAnalyzePurchaseOrder = "Ai.AnalyzePurchaseOrder";
+    public const string AiAnalyzeWarehouseReceipt = "Ai.AnalyzeWarehouseReceipt";
+    public const string AiViewEvaluations = "Ai.ViewEvaluations";
 
     public const string LegalDocumentView = "LegalDocument.View";
     public const string LegalDocumentManage = "LegalDocument.Manage";
@@ -275,6 +284,15 @@ public static class ApplicationPermissions
         ReportExportPdf,
         AiAgentUse,
         AiAgentEvaluatePurchaseRules,
+        AiAdmin,
+        AiProviderManage,
+        AiProviderTest,
+        AiAnalyzePurchaseFile,
+        AiAnalyzeTender,
+        AiAnalyzeContract,
+        AiAnalyzePurchaseOrder,
+        AiAnalyzeWarehouseReceipt,
+        AiViewEvaluations,
         LegalDocumentView,
         LegalDocumentManage,
         ProcurementRuleView,

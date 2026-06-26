@@ -120,7 +120,8 @@
 
         try
         {
-            var tasks = await Api.GetMyInboxTasksAsync(_disposeCts.Token);
+            var tasks = await Api.GetMyInboxTasksAsync();
+            if (_disposed) return;
             _pendingCount = tasks.Count(task => task.Status is WorkflowStatus.Pending or WorkflowStatus.InProgress);
             _tasks = tasks
                 .Where(task => task.Status is WorkflowStatus.Pending or WorkflowStatus.InProgress)
@@ -160,8 +161,8 @@
     {
         _disposed = true;
         Access.Changed -= OnAccessChanged;
-        _disposeCts.Cancel();
         _timer?.Dispose();
+        _disposeCts.Cancel();
         _disposeCts.Dispose();
         return ValueTask.CompletedTask;
     }

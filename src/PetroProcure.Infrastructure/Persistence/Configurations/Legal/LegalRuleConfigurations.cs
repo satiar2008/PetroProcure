@@ -13,15 +13,21 @@ internal sealed class LegalDocumentConfiguration : IEntityTypeConfiguration<Lega
         b.ConfigureEntity();
         b.Property(x => x.Title).HasMaxLength(500);
         b.Property(x => x.OriginalFileName).HasMaxLength(260);
+        b.Property(x => x.StoredFileName).HasMaxLength(260);
         b.Property(x => x.FileHash).HasMaxLength(128);
         b.Property(x => x.RelativePath).HasMaxLength(1000);
+        b.Property(x => x.Extension).HasMaxLength(20);
+        b.Property(x => x.MimeType).HasMaxLength(200);
         b.Property(x => x.Description).HasMaxLength(2000);
+        b.Property(x => x.SourceDocumentTitle).HasMaxLength(500);
+        b.Property(x => x.SourceDocumentNumber).HasMaxLength(100);
         b.Property(x => x.SearchText).HasMaxLength(4000);
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(50);
         b.HasMany(x => x.Articles).WithOne().HasForeignKey(x => x.LegalDocumentId).OnDelete(DeleteBehavior.Cascade);
         b.Navigation(x => x.Articles).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasIndex(x => x.FileHash);
         b.HasIndex(x => x.Status);
+        b.HasIndex(x => x.IsDeleted);
     }
 }
 
@@ -50,8 +56,13 @@ internal sealed class LegalClauseConfiguration : IEntityTypeConfiguration<LegalC
         b.Property(x => x.ClauseNumber).HasMaxLength(50);
         b.Property(x => x.Body).HasMaxLength(8000);
         b.Property(x => x.Note).HasMaxLength(4000);
+        b.Property(x => x.AppliesTo).HasMaxLength(100);
+        b.Property(x => x.Severity).HasConversion<string>().HasMaxLength(50);
+        b.Property(x => x.Tags).HasMaxLength(1000);
         b.Property(x => x.SearchText).HasMaxLength(8000);
         b.HasIndex(x => new { x.LegalArticleId, x.ClauseNumber }).IsUnique();
+        b.HasIndex(x => x.AppliesTo);
+        b.HasIndex(x => x.Severity);
     }
 }
 

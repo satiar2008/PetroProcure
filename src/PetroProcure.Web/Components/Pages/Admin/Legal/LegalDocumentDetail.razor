@@ -1,6 +1,7 @@
 @page "/admin/legal-documents/{Id:guid}"
 @inject IPetroProcureApiClient Api
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 
 <PageHeader Title="@(_document?.Title ?? "جزئیات سند قانونی")" Subtitle="مواد، بندها و یادداشت‌های قابل استفاده برای استخراج Rule" />
 
@@ -15,6 +16,17 @@ else if (_error is not null)
 }
 else if (_document is not null)
 {
+    <MudPaper Class="pa-4 mb-4" Elevation="0">
+        <MudGrid>
+            <MudItem xs="12" md="3"><MudText>فایل</MudText><strong>@_document.OriginalFileName</strong></MudItem>
+            <MudItem xs="12" md="3"><MudText>عنوان منبع</MudText><strong>@(_document.SourceDocumentTitle ?? "-")</strong></MudItem>
+            <MudItem xs="12" md="2"><MudText>شماره منبع</MudText><strong>@(_document.SourceDocumentNumber ?? "-")</strong></MudItem>
+            <MudItem xs="12" md="2"><MudText>حجم</MudText><strong>@FormatSize(_document.Size)</strong></MudItem>
+            <MudItem xs="12" md="2"><MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="DownloadAsync">دانلود سند</MudButton></MudItem>
+        </MudGrid>
+        <MudText Typo="Typo.caption">مسیر نسبی: @_document.RelativePath</MudText>
+    </MudPaper>
+
     <MudGrid>
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4" Elevation="0">
@@ -142,4 +154,19 @@ else if (_document is not null)
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
         finally { _busy = false; }
     }
+
+    private async Task DownloadAsync()
+    {
+        if (_document is null) return;
+        try
+        {
+            var file = await Api.DownloadLegalDocumentAsync(_document.Id);
+            await JS.InvokeVoidAsync("petroProcureDownloadFile", file.Content, file.ContentType, file.FileName);
+        }
+        catch (Exception ex) { Snackbar.Add("دانلود سند ناموفق بود: " + ex.Message, Severity.Error); }
+    }
+
+    private static string FormatSize(long size) => size <= 0 ? "-" :
+        size < 1024 ? $"{size} B" :
+        size < 1024 * 1024 ? $"{size / 1024d:0.#} KB" : $"{size / 1024d / 1024d:0.#} MB";
 }

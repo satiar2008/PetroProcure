@@ -58,8 +58,15 @@ else if (_rule is not null)
                         @foreach (var value in Enum.GetValues<RuleEvaluationMode>()) { <MudSelectItem Value="@value">@ProcurementRulesPage.ModeText(value)</MudSelectItem> }
                     </MudSelect>
                     <MudTextField @bind-Value="_draftLegalReference" Label="ارجاع قانونی" Disabled="@(!_isDraft)" />
-                    <MudTextField @bind-Value="_draftLegalArticleId" Label="شناسه ماده قانونی" Disabled="@(!_isDraft)" />
-                    <MudTextField @bind-Value="_draftLegalClauseId" Label="شناسه بند قانونی" Disabled="@(!_isDraft)" />
+                    <LegalClauseSelector Disabled="@(!_isDraft)" @bind-SelectedClause="_selectedClause" />
+                    @if (_selectedClause is not null)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-3">
+                            <strong>@_selectedClause.ArticleNumber / @_selectedClause.ClauseNumber</strong> — @_selectedClause.DocumentTitle
+                            <br />
+                            @_selectedClause.ClauseText
+                        </MudAlert>
+                    }
                     <MudTextField @bind-Value="_draftConditionType" Label="نوع شرط" Disabled="@(!_isDraft)" />
                     <MudTextField @bind-Value="_draftConditionValue" Label="مقدار شرط" Disabled="@(!_isDraft)" />
                     <MudTextField @bind-Value="_draftConditionDescription" Label="شرح شرط" Lines="2" Disabled="@(!_isDraft)" />
@@ -92,8 +99,7 @@ else if (_rule is not null)
     private RuleSeverity _draftSeverity = RuleSeverity.Warning;
     private RuleEvaluationMode _draftMode = RuleEvaluationMode.Automatic;
     private string _draftLegalReference = "";
-    private string _draftLegalArticleId = "";
-    private string _draftLegalClauseId = "";
+    private LegalClauseContextDto? _selectedClause;
     private string _draftConditionType = "";
     private string _draftConditionValue = "";
     private string? _draftConditionDescription;
@@ -124,8 +130,8 @@ else if (_rule is not null)
         _draftSeverity = version.Severity;
         _draftMode = version.EvaluationMode;
         _draftLegalReference = version.LegalReference;
-        _draftLegalArticleId = version.LegalArticleId?.ToString() ?? "";
-        _draftLegalClauseId = version.LegalClauseId?.ToString() ?? "";
+        _selectedClause = null;
+        _ = LoadClauseContextAsync(version.LegalClauseId);
         _draftConditionType = version.ConditionType;
         _draftConditionValue = version.ConditionValue;
         _draftConditionDescription = version.ConditionDescription;
@@ -146,8 +152,8 @@ else if (_rule is not null)
 
     private async Task UpdateDraftAsync()
     {
-        Guid? articleId = Guid.TryParse(_draftLegalArticleId, out var a) ? a : null;
-        Guid? clauseId = Guid.TryParse(_draftLegalClauseId, out var c) ? c : null;
+        Guid? articleId = _selectedClause?.ArticleId ?? _selected?.LegalArticleId;
+        Guid? clauseId = _selectedClause?.ClauseId ?? _selected?.LegalClauseId;
         if (articleId is null && clauseId is null)
         {
             Snackbar.Add("Rule باید به ماده یا بند قانونی ارجاع داشته باشد.", Severity.Warning);
@@ -164,6 +170,17 @@ else if (_rule is not null)
         }
         catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
         finally { _busy = false; }
+    }
+
+    private async Task LoadClauseContextAsync(Guid? clauseId)
+    {
+        if (!clauseId.HasValue) return;
+        try
+        {
+            _selectedClause = await Api.GetLegalClauseContextAsync(clauseId.Value);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch { }
     }
 
     private async Task SubmitAsync()

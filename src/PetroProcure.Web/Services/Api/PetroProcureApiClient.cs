@@ -47,14 +47,32 @@ public interface IPetroProcureApiClient
     Task SavePurchaseFileSummaryAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<AiEvaluationResultDto> RunAiAsync(Guid purchaseFileId, string action, CancellationToken ct = default);
     Task<List<AiEvaluationResultDto>> GetAiEvaluationsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<List<AiProviderDto>> GetAiProvidersAsync(CancellationToken ct = default);
+    Task<AiCoreProviderSettingsDto> GetAiCoreSettingsAsync(CancellationToken ct = default);
+    Task UpdateAiCoreSettingsAsync(ConfigureAiCoreProviderRequest request, CancellationToken ct = default);
+    Task<AiProviderHealthDto> TestAiCoreAsync(CancellationToken ct = default);
+    Task<AiAnalysisResultDto> AnalyzePurchaseFileAsync(Guid purchaseFileId, AnalyzePurchaseFileRequest request, CancellationToken ct = default);
+    Task<AiAnalysisResultDto> AnalyzeTenderAsync(Guid tenderId, AnalyzeTenderRequest request, CancellationToken ct = default);
+    Task<AiAnalysisResultDto> AnalyzeContractAsync(Guid contractId, AnalyzeContractRequest request, CancellationToken ct = default);
+    Task<AiAnalysisResultDto> AnalyzePurchaseOrderAsync(Guid purchaseOrderId, AnalyzePurchaseOrderRequest request, CancellationToken ct = default);
+    Task<AiAnalysisResultDto> AnalyzeWarehouseReceiptAsync(Guid receiptId, AnalyzeWarehouseReceiptRequest request, CancellationToken ct = default);
+    Task<AiAnalysisResultDto> AnalyzeLegalComplianceAsync(AnalyzeLegalComplianceRequest request, CancellationToken ct = default);
+    Task<List<AiAnalysisResultDto>> GetAiAnalysisEvaluationsAsync(string? entityType = null, Guid? entityId = null, CancellationToken ct = default);
     Task<ProcurementRuleEvaluationDto> EvaluatePurchaseFileLegalRulesAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<List<ProcurementRuleEvaluationDto>> GetPurchaseFileLegalRuleEvaluationsAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest request, CancellationToken ct = default);
     Task<LegalDocumentDto?> GetLegalDocumentAsync(Guid id, CancellationToken ct = default);
     Task<List<LegalArticleDto>> GetLegalDocumentArticlesAsync(Guid id, CancellationToken ct = default);
-    Task<LegalDocumentDto> UploadLegalDocumentAsync(Stream stream, string fileName, string contentType, string title, string? description, CancellationToken ct = default);
+    Task<LegalDocumentDto> UploadLegalDocumentAsync(Stream stream, string fileName, string contentType, string title,
+        string? description, string? sourceDocumentTitle = null, string? sourceDocumentNumber = null,
+        DateTime? sourceDocumentDate = null, CancellationToken ct = default);
+    Task DeleteLegalDocumentAsync(Guid id, CancellationToken ct = default);
+    Task<(byte[] Content, string ContentType, string FileName)> DownloadLegalDocumentAsync(Guid id, CancellationToken ct = default);
     Task<LegalArticleDto> CreateLegalArticleAsync(CreateLegalArticleRequest request, CancellationToken ct = default);
     Task<LegalClauseDto> CreateLegalClauseAsync(CreateLegalClauseRequest request, CancellationToken ct = default);
+    Task<PagedResult<LegalArticleDto>> SearchLegalArticlesAsync(LegalArticleSearchRequest request, CancellationToken ct = default);
+    Task<PagedResult<LegalClauseContextDto>> SearchLegalClausesAsync(LegalClauseSearchRequest request, CancellationToken ct = default);
+    Task<LegalClauseContextDto?> GetLegalClauseContextAsync(Guid id, CancellationToken ct = default);
     Task<PagedResult<ProcurementRuleDto>> GetProcurementRulesAsync(ProcurementRuleListRequest request, CancellationToken ct = default);
     Task<List<ProcurementRuleVersionDto>> GetProcurementRuleVersionsAsync(Guid ruleId, CancellationToken ct = default);
     Task<ProcurementRuleDto> CreateProcurementRuleAsync(CreateProcurementRuleRequest request, CancellationToken ct = default);
@@ -380,6 +398,79 @@ public sealed class PetroProcureApiClient(
     public async Task<List<AiEvaluationResultDto>> GetAiEvaluationsAsync(Guid id, CancellationToken ct = default) =>
         await GetJsonAsync<List<AiEvaluationResultDto>>($"/api/ai/purchase-files/{id}/evaluations", ct) ?? [];
 
+    public async Task<List<AiProviderDto>> GetAiProvidersAsync(CancellationToken ct = default) =>
+        await GetJsonAsync<List<AiProviderDto>>("/api/ai/providers", ct) ?? [];
+
+    public async Task<AiCoreProviderSettingsDto> GetAiCoreSettingsAsync(CancellationToken ct = default) =>
+        await GetJsonAsync<AiCoreProviderSettingsDto>("/api/ai/providers/aicore/settings", ct)
+        ?? new AiCoreProviderSettingsDto(null, null, 60, null, null, false, false, null, null, null, false,
+            "/api/ai/text", "/health/ready");
+
+    public async Task UpdateAiCoreSettingsAsync(ConfigureAiCoreProviderRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PutAsJsonAsync("/api/ai/providers/aicore/settings", request, ct);
+        await Ensure(response, ct);
+    }
+
+    public async Task<AiProviderHealthDto> TestAiCoreAsync(CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/ai/providers/aicore/test", new TestAiProviderConnectionRequest(), ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AiProviderHealthDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<AiAnalysisResultDto> AnalyzePurchaseFileAsync(Guid id, AnalyzePurchaseFileRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/ai/purchase-files/{id}/analyze", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AiAnalysisResultDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<AiAnalysisResultDto> AnalyzeTenderAsync(Guid id, AnalyzeTenderRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/ai/tenders/{id}/analyze", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AiAnalysisResultDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<AiAnalysisResultDto> AnalyzeContractAsync(Guid id, AnalyzeContractRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/ai/contracts/{id}/analyze", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AiAnalysisResultDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<AiAnalysisResultDto> AnalyzePurchaseOrderAsync(Guid id, AnalyzePurchaseOrderRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/ai/purchase-orders/{id}/analyze", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AiAnalysisResultDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<AiAnalysisResultDto> AnalyzeWarehouseReceiptAsync(Guid id, AnalyzeWarehouseReceiptRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/ai/warehouse-receipts/{id}/analyze", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AiAnalysisResultDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<AiAnalysisResultDto> AnalyzeLegalComplianceAsync(AnalyzeLegalComplianceRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/ai/legal-compliance/analyze", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<AiAnalysisResultDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<List<AiAnalysisResultDto>> GetAiAnalysisEvaluationsAsync(string? entityType = null, Guid? entityId = null, CancellationToken ct = default)
+    {
+        var query = string.Join('&', new[]
+        {
+            Pair("entityType", entityType),
+            Pair("entityId", entityId?.ToString())
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+        return await GetJsonAsync<List<AiAnalysisResultDto>>($"/api/ai/evaluations{(string.IsNullOrWhiteSpace(query) ? "" : "?" + query)}", ct) ?? [];
+    }
+
     public async Task<ProcurementRuleEvaluationDto> EvaluatePurchaseFileLegalRulesAsync(Guid id, CancellationToken ct = default)
     {
         var response = await Client().PostAsync($"/api/procurement-rules/evaluate/purchase-file/{id}", null, ct);
@@ -401,7 +492,8 @@ public sealed class PetroProcureApiClient(
         await GetJsonAsync<List<LegalArticleDto>>($"/api/legal/documents/{id}/articles", ct) ?? [];
 
     public async Task<LegalDocumentDto> UploadLegalDocumentAsync(Stream stream, string fileName, string contentType,
-        string title, string? description, CancellationToken ct = default)
+        string title, string? description, string? sourceDocumentTitle = null, string? sourceDocumentNumber = null,
+        DateTime? sourceDocumentDate = null, CancellationToken ct = default)
     {
         using var form = new MultipartFormDataContent();
         var content = new StreamContent(stream);
@@ -409,9 +501,25 @@ public sealed class PetroProcureApiClient(
         form.Add(content, "file", fileName);
         form.Add(new StringContent(title), "title");
         if (!string.IsNullOrWhiteSpace(description)) form.Add(new StringContent(description), "description");
+        if (!string.IsNullOrWhiteSpace(sourceDocumentTitle)) form.Add(new StringContent(sourceDocumentTitle), "sourceDocumentTitle");
+        if (!string.IsNullOrWhiteSpace(sourceDocumentNumber)) form.Add(new StringContent(sourceDocumentNumber), "sourceDocumentNumber");
+        if (sourceDocumentDate.HasValue) form.Add(new StringContent(sourceDocumentDate.Value.ToString("O")), "sourceDocumentDate");
         var response = await Client().PostAsync("/api/legal/documents/upload", form, ct);
         await Ensure(response, ct);
         return (await response.Content.ReadFromJsonAsync<LegalDocumentDto>(cancellationToken: ct))!;
+    }
+
+    public async Task DeleteLegalDocumentAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await Client().DeleteAsync($"/api/legal/documents/{id}", ct);
+        await Ensure(response, ct);
+    }
+
+    public async Task<(byte[] Content, string ContentType, string FileName)> DownloadLegalDocumentAsync(Guid id, CancellationToken ct = default)
+    {
+        using var response = await SendGetAsync($"/api/legal/documents/{id}/download", ct);
+        await Ensure(response, ct);
+        return await ReadFileResponseAsync(response, "legal-document.pdf", ct);
     }
 
     public async Task<LegalArticleDto> CreateLegalArticleAsync(CreateLegalArticleRequest request, CancellationToken ct = default)
@@ -427,6 +535,17 @@ public sealed class PetroProcureApiClient(
         await Ensure(response, ct);
         return (await response.Content.ReadFromJsonAsync<LegalClauseDto>(cancellationToken: ct))!;
     }
+
+    public async Task<PagedResult<LegalArticleDto>> SearchLegalArticlesAsync(LegalArticleSearchRequest request, CancellationToken ct = default) =>
+        await GetJsonAsync<PagedResult<LegalArticleDto>>($"/api/legal/articles/search?{ToQuery(request)}", ct)
+        ?? new PagedResult<LegalArticleDto>([], request.PageNumber, request.PageSize, 0);
+
+    public async Task<PagedResult<LegalClauseContextDto>> SearchLegalClausesAsync(LegalClauseSearchRequest request, CancellationToken ct = default) =>
+        await GetJsonAsync<PagedResult<LegalClauseContextDto>>($"/api/legal/clauses/search?{ToQuery(request)}", ct)
+        ?? new PagedResult<LegalClauseContextDto>([], request.PageNumber, request.PageSize, 0);
+
+    public async Task<LegalClauseContextDto?> GetLegalClauseContextAsync(Guid id, CancellationToken ct = default) =>
+        await GetJsonAsync<LegalClauseContextDto>($"/api/legal/clauses/{id}/context", ct);
 
     public async Task<PagedResult<ProcurementRuleDto>> GetProcurementRulesAsync(ProcurementRuleListRequest request, CancellationToken ct = default) =>
         await GetJsonAsync<PagedResult<ProcurementRuleDto>>($"/api/procurement-rules?{ToQuery(request)}", ct)
@@ -1599,6 +1718,36 @@ public sealed class PetroProcureApiClient(
         {
             Pair("SearchTerm", request.SearchTerm),
             Pair("Status", request.Status?.ToString()),
+            Pair("IncludeDeleted", request.IncludeDeleted.ToString()),
+            Pair("PageNumber", request.PageNumber.ToString()),
+            Pair("PageSize", request.PageSize.ToString())
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    private static string ToQuery(LegalArticleSearchRequest request) =>
+        string.Join('&', new[]
+        {
+            Pair("Term", request.Term),
+            Pair("DocumentId", request.DocumentId?.ToString()),
+            Pair("ArticleNumber", request.ArticleNumber),
+            Pair("AppliesTo", request.AppliesTo),
+            Pair("Severity", request.Severity?.ToString()),
+            Pair("Tag", request.Tag),
+            Pair("IsActive", request.IsActive.ToString()),
+            Pair("PageNumber", request.PageNumber.ToString()),
+            Pair("PageSize", request.PageSize.ToString())
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+    private static string ToQuery(LegalClauseSearchRequest request) =>
+        string.Join('&', new[]
+        {
+            Pair("Term", request.Term),
+            Pair("DocumentId", request.DocumentId?.ToString()),
+            Pair("ArticleNumber", request.ArticleNumber),
+            Pair("ClauseNumber", request.ClauseNumber),
+            Pair("AppliesTo", request.AppliesTo),
+            Pair("Severity", request.Severity?.ToString()),
+            Pair("Tag", request.Tag),
+            Pair("IsActive", request.IsActive.ToString()),
             Pair("PageNumber", request.PageNumber.ToString()),
             Pair("PageSize", request.PageSize.ToString())
         }.Where(x => !string.IsNullOrWhiteSpace(x)));

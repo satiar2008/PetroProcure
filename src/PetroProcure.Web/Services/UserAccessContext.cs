@@ -96,6 +96,7 @@ public sealed class UserAccessContext : IUserAccessContext, IDisposable
         new("ماتریس گردش کار", "/admin/workflow-matrix", Icons.Material.Filled.AccountTree, "admin", "Admin.ManageSettings"),
         new("اسناد قانونی مناقصات", "/admin/legal-documents", Icons.Material.Filled.LibraryBooks, "admin", "LegalDocument.View"),
         new("قوانین مناقصه", "/admin/procurement-rules", Icons.Material.Filled.Policy, "admin", "ProcurementRule.View"),
+        new("ارائه‌دهندگان هوش مصنوعی", "/admin/ai/providers", Icons.Material.Filled.Psychology, "admin", "Ai.ProviderManage"),
         new("تنظیمات سیستم", "/admin/settings", Icons.Material.Filled.Settings, "admin", "Admin.ManageSettings"),
         new("گزارش ممیزی ادمین", "/admin/audit-log", Icons.Material.Filled.History, "admin", "Admin.ManageSettings"),
         new("گزارش‌ها", "/reports", Icons.Material.Filled.Assessment, "reports", "Report.View"),

@@ -1,0 +1,68 @@
+@inject IPetroProcureApiClient Api
+
+<MudPaper Class="pa-3" Elevation="0">
+    <MudTextField @bind-Value="_term" Label="@Label" Placeholder="شماره ماده، بند یا بخشی از متن را جستجو کنید"
+                  Disabled="Disabled" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
+    <MudButton Class="mt-2" Variant="Variant.Outlined" Disabled="Disabled || _loading" OnClick="SearchAsync">جستجو</MudButton>
+
+    @if (SelectedClause is not null)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-3">
+            <strong>@SelectedClause.ArticleNumber / @SelectedClause.ClauseNumber</strong> — @SelectedClause.DocumentTitle
+            <br />
+            @SelectedClause.Summary
+        </MudAlert>
+    }
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mt-3" />
+    }
+    else if (_searched && _items.Count == 0)
+    {
+        <EmptyState Title="بندی یافت نشد" Description="عبارت جستجو را تغییر دهید یا ابتدا ماده و بند قانونی ثبت کنید." />
+    }
+    else if (_items.Count > 0)
+    {
+        <MudTable Items="_items" Dense="true" Hover="true" Class="mt-3">
+            <HeaderContent><MudTh>ارجاع</MudTh><MudTh>سند</MudTh><MudTh>خلاصه</MudTh><MudTh></MudTh></HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.ArticleNumber / @context.ClauseNumber</MudTd>
+                <MudTd>@context.DocumentTitle</MudTd>
+                <MudTd>@context.Summary</MudTd>
+                <MudTd><MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" OnClick="@(() => SelectAsync(context))">انتخاب</MudButton></MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+</MudPaper>
+
+@code {
+    [Parameter] public string Label { get; set; } = "انتخاب بند قانونی";
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public Guid? DocumentId { get; set; }
+    [Parameter] public LegalClauseContextDto? SelectedClause { get; set; }
+    [Parameter] public EventCallback<LegalClauseContextDto?> SelectedClauseChanged { get; set; }
+
+    private string? _term;
+    private bool _loading;
+    private bool _searched;
+    private readonly List<LegalClauseContextDto> _items = [];
+
+    private async Task SearchAsync()
+    {
+        _loading = true; _searched = true;
+        try
+        {
+            var result = await Api.SearchLegalClausesAsync(new LegalClauseSearchRequest(_term, DocumentId, PageSize: 20));
+            _items.Clear();
+            _items.AddRange(result.Items);
+        }
+        finally { _loading = false; }
+    }
+
+    private async Task SelectAsync(LegalClauseContextDto item)
+    {
+        SelectedClause = item;
+        await SelectedClauseChanged.InvokeAsync(item);
+    }
+}

@@ -1,5 +1,5 @@
-using System.Security.Cryptography;
 using PetroProcure.Application.Security;
+using PetroProcure.Application.Documents;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Legal;
 using PetroProcure.Domain.Enums;
@@ -7,7 +7,10 @@ using PetroProcure.Domain.Modules.Legal;
 
 namespace PetroProcure.Application.Legal;
 
-public sealed record UploadLegalDocumentCommand(string Title, string OriginalFileName, Stream Content, string? Description);
+public sealed record UploadLegalDocumentCommand(string Title, string OriginalFileName, Stream Content,
+    string? MimeType, string? Description, string? SourceDocumentTitle = null,
+    string? SourceDocumentNumber = null, DateTime? SourceDocumentDate = null);
+public sealed record DeleteLegalDocumentCommand(Guid Id);
 public sealed record CreateLegalArticleCommand(CreateLegalArticleRequest Request);
 public sealed record CreateLegalClauseCommand(CreateLegalClauseRequest Request);
 public sealed record CreateProcurementRuleCommand(CreateProcurementRuleRequest Request);
@@ -21,7 +24,11 @@ public sealed record EvaluateTenderRulesCommand(Guid TenderId);
 
 public sealed record GetLegalDocumentsQuery(LegalDocumentListRequest Request);
 public sealed record GetLegalDocumentByIdQuery(Guid Id);
+public sealed record DownloadLegalDocumentQuery(Guid Id);
 public sealed record GetArticlesByDocumentQuery(Guid DocumentId);
+public sealed record SearchLegalArticlesQuery(LegalArticleSearchRequest Request);
+public sealed record SearchLegalClausesQuery(LegalClauseSearchRequest Request);
+public sealed record GetLegalClauseContextQuery(Guid ClauseId);
 public sealed record GetProcurementRulesQuery(ProcurementRuleListRequest Request);
 public sealed record GetRuleVersionsQuery(Guid RuleId);
 public sealed record GetPurchaseFileRuleEvaluationsQuery(Guid PurchaseFileId);
@@ -31,7 +38,18 @@ public sealed record RuleEvaluationContext(string EntityType, Guid EntityId, Gui
 
 public interface ILegalClauseSearchService
 {
-    Task<IReadOnlyList<LegalClauseDto>> SearchAsync(string term, CancellationToken ct = default);
+    Task<IReadOnlyList<LegalClauseContextDto>> SearchAsync(LegalClauseSearchRequest request, CancellationToken ct = default);
+}
+
+public sealed record StoredLegalDocument(string OriginalFileName, string StoredFileName, string RelativePath,
+    string Extension, string MimeType, long Size, string Hash);
+
+public interface ILegalDocumentStorageService
+{
+    Task<StoredLegalDocument> SaveAsync(Guid legalDocumentId, string originalFileName, Stream stream,
+        string? mimeType, CancellationToken ct = default);
+    Task<StoredFileContent> OpenAsync(LegalDocument document, CancellationToken ct = default);
+    Task DeletePhysicalAsync(string relativePath, CancellationToken ct = default);
 }
 
 public interface IPurchaseFileRuleContextBuilder
@@ -69,27 +87,49 @@ public interface ILegalRuleRepository
     Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest request, CancellationToken ct);
     Task<LegalDocumentDto?> GetLegalDocumentAsync(Guid id, CancellationToken ct);
     Task<IReadOnlyList<LegalArticleDto>> GetArticlesByDocumentAsync(Guid documentId, CancellationToken ct);
+    Task<PagedResult<LegalArticleDto>> SearchArticlesAsync(LegalArticleSearchRequest request, CancellationToken ct);
+    Task<PagedResult<LegalClauseContextDto>> SearchClauseContextsAsync(LegalClauseSearchRequest request, CancellationToken ct);
+    Task<LegalClauseContextDto?> GetClauseContextAsync(Guid clauseId, CancellationToken ct);
     Task<PagedResult<ProcurementRuleDto>> GetRulesAsync(ProcurementRuleListRequest request, CancellationToken ct);
     Task<IReadOnlyList<ProcurementRuleVersionDto>> GetRuleVersionsAsync(Guid ruleId, CancellationToken ct);
     Task<IReadOnlyList<ProcurementRuleEvaluationDto>> GetEvaluationsByPurchaseFileAsync(Guid purchaseFileId, CancellationToken ct);
-    Task<IReadOnlyList<LegalClauseDto>> SearchClausesAsync(string term, CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
 }
 
 public sealed class LegalRuleCommandHandler(
     ILegalRuleRepository repository,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    ILegalDocumentStorageService legalDocumentStorage)
 {
     public async Task<LegalDocumentDto> Handle(UploadLegalDocumentCommand command, CancellationToken ct = default)
     {
-        var hash = await Sha256(command.Content, ct);
-        var document = new LegalDocument(Guid.NewGuid(), command.Title, command.OriginalFileName, hash,
-            $"LegalDocuments/{DateTime.UtcNow:yyyy}/{Guid.NewGuid():N}-{Safe(command.OriginalFileName)}",
-            command.Description, currentUser.UserId);
-        await repository.AddLegalDocumentAsync(document, ct);
-        await Audit("LegalDocument", document.Id, "Upload", $"Uploaded legal document {document.Title}", ct);
+        var id = Guid.NewGuid();
+        var stored = await legalDocumentStorage.SaveAsync(id, command.OriginalFileName, command.Content, command.MimeType, ct);
+        try
+        {
+            var document = new LegalDocument(id, command.Title, stored.OriginalFileName, stored.StoredFileName,
+                stored.RelativePath, stored.Extension, stored.MimeType, stored.Size, stored.Hash,
+                command.Description, currentUser.UserId, command.SourceDocumentTitle,
+                command.SourceDocumentNumber, command.SourceDocumentDate);
+            await repository.AddLegalDocumentAsync(document, ct);
+            await Audit("LegalDocument", document.Id, "Upload", $"Uploaded legal document {document.Title}", ct);
+            await repository.SaveChangesAsync(ct);
+            return (await repository.GetLegalDocumentAsync(document.Id, ct))!;
+        }
+        catch
+        {
+            await legalDocumentStorage.DeletePhysicalAsync(stored.RelativePath, ct);
+            throw;
+        }
+    }
+
+    public async Task Handle(DeleteLegalDocumentCommand command, CancellationToken ct = default)
+    {
+        var document = await repository.FindLegalDocumentAsync(command.Id, ct)
+            ?? throw new LegalRuleNotFoundException("Legal document was not found.");
+        document.SoftDelete(currentUser.UserId);
+        await Audit("LegalDocument", document.Id, "SoftDelete", $"Deleted legal document {document.Title}", ct);
         await repository.SaveChangesAsync(ct);
-        return (await repository.GetLegalDocumentAsync(document.Id, ct))!;
     }
 
     public async Task<LegalArticleDto> Handle(CreateLegalArticleCommand command, CancellationToken ct = default)
@@ -109,7 +149,8 @@ public sealed class LegalRuleCommandHandler(
         var r = command.Request;
         var article = await repository.FindArticleAsync(r.LegalArticleId, ct)
             ?? throw new LegalRuleNotFoundException("Legal article was not found.");
-        var clause = new LegalClause(Guid.NewGuid(), r.LegalArticleId, r.ClauseNumber, r.Body, r.OrderNo, r.Note);
+        var clause = new LegalClause(Guid.NewGuid(), r.LegalArticleId, r.ClauseNumber, r.Body, r.OrderNo,
+            r.Note, r.AppliesTo, r.Severity, r.Tags);
         await repository.AddClauseAsync(clause, ct);
         await Audit("LegalClause", clause.Id, "Create", $"Created clause {clause.ClauseNumber}", ct);
         await repository.SaveChangesAsync(ct);
@@ -200,19 +241,6 @@ public sealed class LegalRuleCommandHandler(
     private async Task Audit(string entityType, Guid entityId, string action, string summary, CancellationToken ct) =>
         await repository.AddAuditAsync(new LegalRuleAuditLog(Guid.NewGuid(), entityType, entityId, action, summary, currentUser.UserId), ct);
 
-    private static async Task<string> Sha256(Stream stream, CancellationToken ct)
-    {
-        if (stream.CanSeek) stream.Position = 0;
-        var hash = await SHA256.HashDataAsync(stream, ct);
-        if (stream.CanSeek) stream.Position = 0;
-        return Convert.ToHexString(hash);
-    }
-
-    private static string Safe(string fileName)
-    {
-        foreach (var c in Path.GetInvalidFileNameChars()) fileName = fileName.Replace(c, '-');
-        return fileName.Replace(' ', '-');
-    }
 }
 
 public sealed class LegalRuleEvaluationHandler(IPurchaseFileRuleContextBuilder contextBuilder, IProcurementRuleEvaluator evaluator)
@@ -223,11 +251,21 @@ public sealed class LegalRuleEvaluationHandler(IPurchaseFileRuleContextBuilder c
         await evaluator.EvaluateAsync(await contextBuilder.BuildTenderAsync(command.TenderId, ct), ct);
 }
 
-public sealed class LegalRuleQueryHandler(ILegalRuleRepository repository)
+public sealed class LegalRuleQueryHandler(ILegalRuleRepository repository, ILegalDocumentStorageService legalDocumentStorage)
 {
     public Task<PagedResult<LegalDocumentDto>> Handle(GetLegalDocumentsQuery query, CancellationToken ct = default) => repository.GetLegalDocumentsAsync(query.Request, ct);
     public Task<LegalDocumentDto?> Handle(GetLegalDocumentByIdQuery query, CancellationToken ct = default) => repository.GetLegalDocumentAsync(query.Id, ct);
+    public async Task<StoredFileContent> Handle(DownloadLegalDocumentQuery query, CancellationToken ct = default)
+    {
+        var document = await repository.FindLegalDocumentAsync(query.Id, ct)
+            ?? throw new LegalRuleNotFoundException("Legal document was not found.");
+        if (document.IsDeleted) throw new LegalRuleNotFoundException("Legal document was deleted.");
+        return await legalDocumentStorage.OpenAsync(document, ct);
+    }
     public Task<IReadOnlyList<LegalArticleDto>> Handle(GetArticlesByDocumentQuery query, CancellationToken ct = default) => repository.GetArticlesByDocumentAsync(query.DocumentId, ct);
+    public Task<PagedResult<LegalArticleDto>> Handle(SearchLegalArticlesQuery query, CancellationToken ct = default) => repository.SearchArticlesAsync(query.Request, ct);
+    public Task<PagedResult<LegalClauseContextDto>> Handle(SearchLegalClausesQuery query, CancellationToken ct = default) => repository.SearchClauseContextsAsync(query.Request, ct);
+    public Task<LegalClauseContextDto?> Handle(GetLegalClauseContextQuery query, CancellationToken ct = default) => repository.GetClauseContextAsync(query.ClauseId, ct);
     public Task<PagedResult<ProcurementRuleDto>> Handle(GetProcurementRulesQuery query, CancellationToken ct = default) => repository.GetRulesAsync(query.Request, ct);
     public Task<IReadOnlyList<ProcurementRuleVersionDto>> Handle(GetRuleVersionsQuery query, CancellationToken ct = default) => repository.GetRuleVersionsAsync(query.RuleId, ct);
     public Task<IReadOnlyList<ProcurementRuleEvaluationDto>> Handle(GetPurchaseFileRuleEvaluationsQuery query, CancellationToken ct = default) => repository.GetEvaluationsByPurchaseFileAsync(query.PurchaseFileId, ct);
@@ -235,7 +273,8 @@ public sealed class LegalRuleQueryHandler(ILegalRuleRepository repository)
 
 public sealed class LegalClauseSearchService(ILegalRuleRepository repository) : ILegalClauseSearchService
 {
-    public Task<IReadOnlyList<LegalClauseDto>> SearchAsync(string term, CancellationToken ct = default) => repository.SearchClausesAsync(term, ct);
+    public async Task<IReadOnlyList<LegalClauseContextDto>> SearchAsync(LegalClauseSearchRequest request, CancellationToken ct = default) =>
+        (await repository.SearchClauseContextsAsync(request, ct)).Items;
 }
 
 public sealed class MockAiRuleExplanationService : IAiRuleExplanationService

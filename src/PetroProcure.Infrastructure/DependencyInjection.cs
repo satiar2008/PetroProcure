@@ -64,6 +64,7 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseFileRepository, PurchaseFileRepository>();
         services.AddScoped<IFileDocumentRepository, FileDocumentRepository>();
         services.AddScoped<IFileStorageService, FileStorageService>();
+        services.AddScoped<ILegalDocumentStorageService, LegalDocumentStorageService>();
         services.AddScoped<IFileScanner, NoOpFileScanner>();
         services.AddScoped<IOrphanFileCleanupService, OrphanFileCleanupService>();
         services.AddScoped<IWorkflowRepository, WorkflowRepository>();
@@ -89,6 +90,11 @@ public static class DependencyInjection
         services.AddScoped<AiRepository>();
         services.AddScoped<IAiEvaluationRepository>(sp => sp.GetRequiredService<AiRepository>());
         services.AddScoped<IPurchaseFileAiContextBuilder>(sp => sp.GetRequiredService<AiRepository>());
+        services.AddScoped<AiCoreRepository>();
+        services.AddScoped<IAiCoreSettingsProvider>(sp => sp.GetRequiredService<AiCoreRepository>());
+        services.AddScoped<IAiContextBuilder>(sp => sp.GetRequiredService<AiCoreRepository>());
+        services.AddScoped<IAiLegalRuleContextBuilder>(sp => sp.GetRequiredService<AiCoreRepository>());
+        services.AddScoped<IAiAnalysisRepository>(sp => sp.GetRequiredService<AiCoreRepository>());
         services.AddHostedService<AdminBootstrapService>();
 
         services.AddHealthChecks()

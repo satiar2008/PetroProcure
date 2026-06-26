@@ -45,19 +45,24 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
     public async Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest r, CancellationToken ct)
     {
         var query = db.LegalDocuments.AsNoTracking().AsQueryable();
+        if (!r.IncludeDeleted) query = query.Where(x => !x.IsDeleted);
         if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.SearchText.Contains(r.SearchTerm) || x.OriginalFileName.Contains(r.SearchTerm));
         if (r.Status.HasValue) query = query.Where(x => x.Status == r.Status);
         var total = await query.LongCountAsync(ct);
         var items = await query.OrderByDescending(x => x.UploadedAt).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize)
-            .Select(x => new LegalDocumentDto(x.Id, x.Title, x.OriginalFileName, x.FileHash, x.RelativePath,
-                x.Description, x.Status, x.UploadedByUserId, x.UploadedAt)).ToListAsync(ct);
+            .Select(x => new LegalDocumentDto(x.Id, x.Title, x.OriginalFileName, x.StoredFileName, x.FileHash,
+                x.RelativePath, x.Extension, x.MimeType, x.Size, x.Description, x.Status, x.UploadedByUserId,
+                x.UploadedAt, x.IsDeleted, x.DeletedAt, x.DeletedByUserId, x.SourceDocumentTitle,
+                x.SourceDocumentNumber, x.SourceDocumentDate)).ToListAsync(ct);
         return new PagedResult<LegalDocumentDto>(items, r.PageNumber, r.PageSize, total);
     }
 
     public Task<LegalDocumentDto?> GetLegalDocumentAsync(Guid id, CancellationToken ct) =>
         db.LegalDocuments.AsNoTracking().Where(x => x.Id == id)
-            .Select(x => new LegalDocumentDto(x.Id, x.Title, x.OriginalFileName, x.FileHash, x.RelativePath,
-                x.Description, x.Status, x.UploadedByUserId, x.UploadedAt)).SingleOrDefaultAsync(ct);
+            .Select(x => new LegalDocumentDto(x.Id, x.Title, x.OriginalFileName, x.StoredFileName, x.FileHash,
+                x.RelativePath, x.Extension, x.MimeType, x.Size, x.Description, x.Status, x.UploadedByUserId,
+                x.UploadedAt, x.IsDeleted, x.DeletedAt, x.DeletedByUserId, x.SourceDocumentTitle,
+                x.SourceDocumentNumber, x.SourceDocumentDate)).SingleOrDefaultAsync(ct);
 
     public async Task<IReadOnlyList<LegalArticleDto>> GetArticlesByDocumentAsync(Guid documentId, CancellationToken ct)
     {
@@ -65,7 +70,8 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
             .Join(db.LegalArticles.AsNoTracking().Where(a => a.LegalDocumentId == documentId),
                 c => c.LegalArticleId, a => a.Id, (c, a) => c)
             .OrderBy(x => x.OrderNo)
-            .Select(x => new LegalClauseDto(x.Id, x.LegalArticleId, x.ClauseNumber, x.Body, x.OrderNo, x.Note))
+            .Select(x => new LegalClauseDto(x.Id, x.LegalArticleId, x.ClauseNumber, x.Body, x.OrderNo,
+                x.Note, x.AppliesTo, x.Severity, x.Tags))
             .ToListAsync(ct);
         var lookup = clauses.GroupBy(x => x.LegalArticleId).ToDictionary(x => x.Key, x => (IReadOnlyList<LegalClauseDto>)x.ToArray());
         var articles = await db.LegalArticles.AsNoTracking().Where(x => x.LegalDocumentId == documentId).OrderBy(x => x.OrderNo)
@@ -74,15 +80,63 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
             x.OrderNo, lookup.TryGetValue(x.Id, out var list) ? list : [])).ToArray();
     }
 
+    public async Task<PagedResult<LegalArticleDto>> SearchArticlesAsync(LegalArticleSearchRequest r, CancellationToken ct)
+    {
+        var query = db.LegalArticles.AsNoTracking()
+            .Join(db.LegalDocuments.AsNoTracking().Where(d => !d.IsDeleted), a => a.LegalDocumentId, d => d.Id, (a, d) => a);
+        if (r.DocumentId.HasValue) query = query.Where(x => x.LegalDocumentId == r.DocumentId);
+        if (!string.IsNullOrWhiteSpace(r.ArticleNumber)) query = query.Where(x => x.ArticleNumber.Contains(r.ArticleNumber));
+        if (!string.IsNullOrWhiteSpace(r.AppliesTo))
+            query = query.Where(x => db.LegalClauses.Any(c => c.LegalArticleId == x.Id && c.AppliesTo == r.AppliesTo));
+        if (r.Severity.HasValue)
+            query = query.Where(x => db.LegalClauses.Any(c => c.LegalArticleId == x.Id && c.Severity == r.Severity));
+        if (!string.IsNullOrWhiteSpace(r.Tag))
+            query = query.Where(x => db.LegalClauses.Any(c => c.LegalArticleId == x.Id && c.Tags != null && c.Tags.Contains(r.Tag)));
+        if (!string.IsNullOrWhiteSpace(r.Term))
+        {
+            var term = r.Term.Trim();
+            query = query.Where(x => x.SearchText.Contains(term));
+        }
+        var total = await query.LongCountAsync(ct);
+        var rows = await query.OrderBy(x => x.ArticleNumber).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize)
+            .Select(x => new { x.Id, x.LegalDocumentId, x.ArticleNumber, x.Title, x.Body, x.OrderNo }).ToListAsync(ct);
+        return new PagedResult<LegalArticleDto>(rows.Select(x => new LegalArticleDto(x.Id, x.LegalDocumentId,
+            x.ArticleNumber, x.Title, x.Body, x.OrderNo, [])).ToArray(), r.PageNumber, r.PageSize, total);
+    }
+
+    public async Task<PagedResult<LegalClauseContextDto>> SearchClauseContextsAsync(LegalClauseSearchRequest r, CancellationToken ct)
+    {
+        var query = ClauseContextRows();
+        if (r.DocumentId.HasValue) query = query.Where(x => x.DocumentId == r.DocumentId);
+        if (!string.IsNullOrWhiteSpace(r.ArticleNumber)) query = query.Where(x => x.ArticleNumber.Contains(r.ArticleNumber));
+        if (!string.IsNullOrWhiteSpace(r.ClauseNumber)) query = query.Where(x => x.ClauseNumber.Contains(r.ClauseNumber));
+        if (!string.IsNullOrWhiteSpace(r.AppliesTo)) query = query.Where(x => x.AppliesTo == r.AppliesTo);
+        if (r.Severity.HasValue) query = query.Where(x => x.Severity == r.Severity);
+        if (!string.IsNullOrWhiteSpace(r.Tag)) query = query.Where(x => x.Tags != null && x.Tags.Contains(r.Tag));
+        if (!string.IsNullOrWhiteSpace(r.Term))
+        {
+            var term = r.Term.Trim();
+            query = query.Where(x => x.DocumentTitle.Contains(term) || x.ArticleTitle.Contains(term)
+                || x.ArticleNumber.Contains(term) || x.ClauseNumber.Contains(term) || x.ClauseText.Contains(term));
+        }
+        var total = await query.LongCountAsync(ct);
+        var rows = await query.OrderBy(x => x.ArticleNumber).ThenBy(x => x.ClauseNumber)
+            .Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize).ToListAsync(ct);
+        return new PagedResult<LegalClauseContextDto>(rows.Select(x => x.ToDto()).ToArray(), r.PageNumber, r.PageSize, total);
+    }
+
+    public async Task<LegalClauseContextDto?> GetClauseContextAsync(Guid clauseId, CancellationToken ct) =>
+        (await ClauseContextRows().SingleOrDefaultAsync(x => x.ClauseId == clauseId, ct))?.ToDto();
+
     public async Task<PagedResult<ProcurementRuleDto>> GetRulesAsync(ProcurementRuleListRequest r, CancellationToken ct)
     {
         var query = RuleQuery();
-        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.Rule.Code.Contains(r.SearchTerm) || x.Rule.Title.Contains(r.SearchTerm) || (x.Version != null && x.Version.SearchText.Contains(r.SearchTerm)));
-        if (r.Status.HasValue) query = query.Where(x => x.Version != null && x.Version.Status == r.Status);
-        if (r.RuleType.HasValue) query = query.Where(x => x.Version != null && x.Version.RuleType == r.RuleType);
-        if (r.Severity.HasValue) query = query.Where(x => x.Version != null && x.Version.Severity == r.Severity);
+        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.Code.Contains(r.SearchTerm) || x.Title.Contains(r.SearchTerm) || (x.VersionSearchText != null && x.VersionSearchText.Contains(r.SearchTerm)));
+        if (r.Status.HasValue) query = query.Where(x => x.VersionStatus == r.Status);
+        if (r.RuleType.HasValue) query = query.Where(x => x.VersionRuleType == r.RuleType);
+        if (r.Severity.HasValue) query = query.Where(x => x.VersionSeverity == r.Severity);
         var total = await query.LongCountAsync(ct);
-        var items = await query.OrderBy(x => x.Rule.Code).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize).ToListAsync(ct);
+        var items = await query.OrderBy(x => x.Code).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize).ToListAsync(ct);
         return new PagedResult<ProcurementRuleDto>(items.Select(ToDto).ToArray(), r.PageNumber, r.PageSize, total);
     }
 
@@ -104,15 +158,6 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
         return evaluations.Select(x => new ProcurementRuleEvaluationDto(x.Id, x.EntityType, x.EntityId,
             x.PurchaseFileId, x.TenderId, x.Summary, x.EvaluatedByUserId, x.EvaluatedAt,
             lookup.TryGetValue(x.Id, out var list) ? list : [])).ToArray();
-    }
-
-    public async Task<IReadOnlyList<LegalClauseDto>> SearchClausesAsync(string term, CancellationToken ct)
-    {
-        if (string.IsNullOrWhiteSpace(term)) return [];
-        return await db.LegalClauses.AsNoTracking().Where(x => x.SearchText.Contains(term))
-            .OrderBy(x => x.ClauseNumber).Take(20)
-            .Select(x => new LegalClauseDto(x.Id, x.LegalArticleId, x.ClauseNumber, x.Body, x.OrderNo, x.Note))
-            .ToListAsync(ct);
     }
 
     public async Task<RuleEvaluationContext> BuildPurchaseFileAsync(Guid purchaseFileId, CancellationToken ct = default)
@@ -142,11 +187,61 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
         from rule in db.LegalProcurementRules.AsNoTracking()
         join active in db.LegalProcurementRuleVersions.AsNoTracking() on rule.ActiveVersionId equals active.Id into activeVersions
         from active in activeVersions.DefaultIfEmpty()
-        select new RuleProjection(rule, active);
+        select new RuleProjection
+        {
+            Id = rule.Id,
+            Code = rule.Code,
+            Title = rule.Title,
+            RuleSetId = rule.RuleSetId,
+            ActiveVersionId = rule.ActiveVersionId,
+            CreatedAt = rule.CreatedAt,
+            VersionId = active == null ? null : active.Id,
+            VersionProcurementRuleId = active == null ? null : active.ProcurementRuleId,
+            VersionNo = active == null ? null : active.VersionNo,
+            VersionTitle = active == null ? null : active.Title,
+            VersionRuleType = active == null ? null : active.RuleType,
+            VersionSeverity = active == null ? null : active.Severity,
+            VersionEvaluationMode = active == null ? null : active.EvaluationMode,
+            VersionStatus = active == null ? null : active.Status,
+            VersionLegalArticleId = active == null ? null : active.LegalArticleId,
+            VersionLegalClauseId = active == null ? null : active.LegalClauseId,
+            VersionLegalReference = active == null ? null : active.LegalReference,
+            VersionConditionType = active == null ? null : active.ConditionType,
+            VersionConditionValue = active == null ? null : active.ConditionValue,
+            VersionConditionDescription = active == null ? null : active.ConditionDescription,
+            VersionCreatedAt = active == null ? null : active.CreatedAt,
+            VersionApprovedAt = active == null ? null : active.ApprovedAt,
+            VersionSearchText = active == null ? null : active.SearchText
+        };
+
+    private IQueryable<LegalClauseContextRow> ClauseContextRows() =>
+        from clause in db.LegalClauses.AsNoTracking()
+        join article in db.LegalArticles.AsNoTracking() on clause.LegalArticleId equals article.Id
+        join document in db.LegalDocuments.AsNoTracking().Where(x => !x.IsDeleted) on article.LegalDocumentId equals document.Id
+        select new LegalClauseContextRow
+        {
+            ClauseId = clause.Id,
+            ArticleId = article.Id,
+            DocumentId = document.Id,
+            DocumentTitle = document.Title,
+            ArticleNumber = article.ArticleNumber,
+            ArticleTitle = article.Title,
+            ClauseNumber = clause.ClauseNumber,
+            ClauseText = clause.Body,
+            Note = clause.Note,
+            AppliesTo = clause.AppliesTo,
+            Severity = clause.Severity,
+            Tags = clause.Tags
+        };
 
     private static ProcurementRuleDto ToDto(RuleProjection p) =>
-        new(p.Rule.Id, p.Rule.Code, p.Rule.Title, p.Rule.RuleSetId, p.Rule.ActiveVersionId, p.Rule.CreatedAt,
-            p.Version is null ? null : ToVersionDto(p.Version));
+        new(p.Id, p.Code, p.Title, p.RuleSetId, p.ActiveVersionId, p.CreatedAt,
+            p.VersionId is null ? null : new ProcurementRuleVersionDto(p.VersionId.Value,
+                p.VersionProcurementRuleId!.Value, p.VersionNo!.Value, p.VersionTitle!,
+                p.VersionRuleType!.Value, p.VersionSeverity!.Value, p.VersionEvaluationMode!.Value,
+                p.VersionStatus!.Value, p.VersionLegalArticleId, p.VersionLegalClauseId,
+                p.VersionLegalReference!, p.VersionConditionType!, p.VersionConditionValue!,
+                p.VersionConditionDescription, p.VersionCreatedAt!.Value, p.VersionApprovedAt));
 
     private static ProcurementRuleVersionDto ToVersionDto(ProcurementRuleVersion x) =>
         new(x.Id, x.ProcurementRuleId, x.VersionNo, x.Title, x.RuleType, x.Severity, x.EvaluationMode,
@@ -157,5 +252,52 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
         new(x.Id, x.ProcurementRuleEvaluationId, x.ProcurementRuleId, x.RuleVersionId, x.Result, x.Severity,
             x.Title, x.Description, x.LegalReference, x.LegalArticleId, x.LegalClauseId);
 
-    private sealed record RuleProjection(ProcurementRule Rule, ProcurementRuleVersion? Version);
+    private sealed class RuleProjection
+    {
+        public Guid Id { get; init; }
+        public string Code { get; init; } = string.Empty;
+        public string Title { get; init; } = string.Empty;
+        public Guid? RuleSetId { get; init; }
+        public Guid? ActiveVersionId { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public Guid? VersionId { get; init; }
+        public Guid? VersionProcurementRuleId { get; init; }
+        public int? VersionNo { get; init; }
+        public string? VersionTitle { get; init; }
+        public RuleType? VersionRuleType { get; init; }
+        public RuleSeverity? VersionSeverity { get; init; }
+        public RuleEvaluationMode? VersionEvaluationMode { get; init; }
+        public RuleStatus? VersionStatus { get; init; }
+        public Guid? VersionLegalArticleId { get; init; }
+        public Guid? VersionLegalClauseId { get; init; }
+        public string? VersionLegalReference { get; init; }
+        public string? VersionConditionType { get; init; }
+        public string? VersionConditionValue { get; init; }
+        public string? VersionConditionDescription { get; init; }
+        public DateTime? VersionCreatedAt { get; init; }
+        public DateTime? VersionApprovedAt { get; init; }
+        public string? VersionSearchText { get; init; }
+    }
+
+    private sealed class LegalClauseContextRow
+    {
+        public Guid ClauseId { get; init; }
+        public Guid ArticleId { get; init; }
+        public Guid DocumentId { get; init; }
+        public string DocumentTitle { get; init; } = string.Empty;
+        public string ArticleNumber { get; init; } = string.Empty;
+        public string ArticleTitle { get; init; } = string.Empty;
+        public string ClauseNumber { get; init; } = string.Empty;
+        public string ClauseText { get; init; } = string.Empty;
+        public string? Note { get; init; }
+        public string? AppliesTo { get; init; }
+        public RuleSeverity? Severity { get; init; }
+        public string? Tags { get; init; }
+        public LegalClauseContextDto ToDto() => new(ClauseId, ArticleId, DocumentId, DocumentTitle,
+            ArticleNumber, ArticleTitle, ClauseNumber, ClauseText,
+            string.IsNullOrWhiteSpace(Note) ? (ClauseText.Length > 240 ? ClauseText[..240] : ClauseText) : Note,
+            AppliesTo, Severity, string.IsNullOrWhiteSpace(Tags)
+                ? []
+                : Tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
 }

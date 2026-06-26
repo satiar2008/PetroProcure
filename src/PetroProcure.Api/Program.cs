@@ -67,9 +67,16 @@ if (app.Environment.IsDevelopment())
 app.UseExceptionHandler(exceptionHandlerApp => exceptionHandlerApp.Run(async context =>
 {
     var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-    context.RequestServices.GetRequiredService<ILoggerFactory>()
-        .CreateLogger("PetroProcure.Api.ExceptionHandler")
-        .LogError(exception, "Unhandled API exception for {Path}", context.Request.Path);
+    var logger = context.RequestServices.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("PetroProcure.Api.ExceptionHandler");
+    if (exception is OperationCanceledException && context.RequestAborted.IsCancellationRequested)
+    {
+        logger.LogDebug("API request was canceled by the client for {Path}", context.Request.Path);
+        context.Response.StatusCode = 499;
+        return;
+    }
+
+    logger.LogError(exception, "Unhandled API exception for {Path}", context.Request.Path);
     var (statusCode, title) = exception switch
     {
         PetroProcure.Application.Mesc.MescCatalogValidationException => (StatusCodes.Status400BadRequest, "Validation error"),

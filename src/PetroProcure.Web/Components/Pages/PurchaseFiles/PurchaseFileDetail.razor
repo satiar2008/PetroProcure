@@ -120,6 +120,8 @@ else if (_summary.Data is { } file)
                 @foreach(var finding in evaluation.Findings){<MudAlert Severity="@AiSeverity(finding.Severity)" Variant="Variant.Outlined" Class="mb-2"><strong>@finding.Title</strong><br/>@finding.Description</MudAlert>}
                 @foreach(var recommendation in evaluation.Recommendations){<div class="ai-recommendation"><MudIcon Icon="@Icons.Material.Filled.Lightbulb" /><div><strong>@recommendation.Title</strong><span>@recommendation.Description</span></div></div>}
                 </MudPaper> } }
+            <MudDivider Class="my-4" />
+            <AiEvaluationPanel EntityType="PurchaseFile" EntityId="Id" />
         </MudTabPanel>
     </MudTabs>
 }

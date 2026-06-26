@@ -36,7 +36,7 @@
             <MudItem xs="12" md="3"><MudSelect @bind-Value="_ruleType" Label="نوع"><MudSelectItem Value="_ruleType">@RuleTypeText(_ruleType)</MudSelectItem>@foreach (var value in Enum.GetValues<RuleType>()) { <MudSelectItem Value="@value">@RuleTypeText(value)</MudSelectItem> }</MudSelect></MudItem>
             <MudItem xs="12" md="3"><MudSelect @bind-Value="_severity" Label="اهمیت">@foreach (var value in Enum.GetValues<RuleSeverity>()) { <MudSelectItem Value="@value">@SeverityText(value)</MudSelectItem> }</MudSelect></MudItem>
             <MudItem xs="12" md="3"><MudSelect @bind-Value="_mode" Label="روش ارزیابی">@foreach (var value in Enum.GetValues<RuleEvaluationMode>()) { <MudSelectItem Value="@value">@ModeText(value)</MudSelectItem> }</MudSelect></MudItem>
-            <MudItem xs="12" md="3"><MudTextField @bind-Value="_legalClauseId" Label="شناسه بند قانونی" /></MudItem>
+            <MudItem xs="12"><LegalClauseSelector @bind-SelectedClause="_selectedClause" /></MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_conditionType" Label="نوع شرط" HelperText="alwayspass, alwaysfail, requiredDocumentType, minimumItems, hasTender, purchaseFileStatus" /></MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_conditionValue" Label="مقدار شرط" /></MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_conditionDescription" Label="شرح شرط" /></MudItem>
@@ -92,7 +92,7 @@ else
     private string _code = "";
     private string _title = "";
     private string _legalReference = "";
-    private string _legalClauseId = "";
+    private LegalClauseContextDto? _selectedClause;
     private RuleType _ruleType = RuleType.Checklist;
     private RuleSeverity _severity = RuleSeverity.Warning;
     private RuleEvaluationMode _mode = RuleEvaluationMode.Automatic;
@@ -121,17 +121,16 @@ else
             Snackbar.Add("کد، عنوان و ارجاع قانونی الزامی است.", Severity.Warning);
             return;
         }
-        Guid? clauseId = Guid.TryParse(_legalClauseId, out var parsedClause) ? parsedClause : null;
-        if (clauseId is null)
+        if (_selectedClause is null)
         {
-            Snackbar.Add("برای ردیابی حقوقی، شناسه بند قانونی معتبر الزامی است.", Severity.Warning);
+            Snackbar.Add("برای ردیابی حقوقی، انتخاب بند قانونی الزامی است.", Severity.Warning);
             return;
         }
         _busy = true;
         try
         {
             await Api.CreateProcurementRuleAsync(new CreateProcurementRuleRequest(_code, _title, null, _ruleType, _severity, _mode,
-                null, clauseId, _legalReference, _conditionType, _conditionValue, _conditionDescription));
+                _selectedClause.ArticleId, _selectedClause.ClauseId, _legalReference, _conditionType, _conditionValue, _conditionDescription));
             Snackbar.Add("Rule به صورت پیش‌نویس ثبت شد.", Severity.Success);
             _showCreate = false;
             await LoadAsync();

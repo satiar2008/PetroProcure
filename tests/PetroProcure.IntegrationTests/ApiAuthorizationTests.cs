@@ -26,6 +26,7 @@ using PetroProcure.Contracts.V1.Orders;
 using PetroProcure.Contracts.V1.Commission;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Tenders;
+using PetroProcure.Contracts.V1.Ai;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Orders;
 
@@ -405,6 +406,26 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
         var client = factory.CreateAuthenticatedClient(ApplicationPermissions.TenderView);
         using var form = new MultipartFormDataContent();
         var response = await client.PostAsync($"/api/tenders/{Guid.NewGuid()}/documents/upload", form);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UnauthorizedUserCannotConfigureAiCoreProvider()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiAgentUse);
+        var response = await client.PutAsJsonAsync("/api/ai/providers/aicore/settings",
+            new ConfigureAiCoreProviderRequest("https://aicore.local", "model", IsEnabled: true));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UserWithoutAiPermissionCannotRunAnalysis()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.PurchaseFileView);
+        var response = await client.PostAsJsonAsync($"/api/ai/purchase-files/{SeedDataIds.SamplePurchaseFileId}/analyze",
+            new AnalyzePurchaseFileRequest("Summary"));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

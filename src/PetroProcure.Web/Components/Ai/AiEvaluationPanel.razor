@@ -1,0 +1,156 @@
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4" Elevation="0" Outlined="true">
+    <MudStack Spacing="2">
+        <MudAlert Severity="Severity.Info" Dense="true">
+            تحلیل هوش مصنوعی صرفاً جنبه کمکی دارد و جایگزین تصمیم کارشناسی، حقوقی یا کمیسیون نیست.
+        </MudAlert>
+
+        <MudStack Row="true" Spacing="2" Class="flex-wrap">
+            <PermissionView Permission="AiAgent.Use">
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                           Disabled="_running" OnClick='@(() => RunAsync("Summary"))'>
+                    خلاصه هوشمند
+                </MudButton>
+            </PermissionView>
+            <PermissionView Permission="AiAgent.EvaluatePurchaseRules">
+                <MudButton Color="Color.Secondary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Policy"
+                           Disabled="_running" OnClick='@(() => RunAsync("LegalCompliance"))'>
+                    بررسی قوانین مناقصه
+                </MudButton>
+            </PermissionView>
+            <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_loading" OnClick="LoadAsync">
+                بروزرسانی
+            </MudButton>
+        </MudStack>
+
+        <DataStateView TItem="AiAnalysisResultDto" Loading="_loading" Error="@_error" Items="_evaluations" OnRetry="LoadAsync">
+            <MudExpansionPanels MultiExpansion="true">
+                @foreach (var evaluation in _evaluations)
+                {
+                    <MudExpansionPanel Text="@($"{DisplayType(evaluation.AnalysisType)} - {evaluation.CreatedAt:yyyy/MM/dd HH:mm}")">
+                        <MudStack Spacing="2">
+                            <MudStack Row="true" Spacing="1" Class="flex-wrap">
+                                <MudChip T="string" Size="Size.Small" Color="Color.Info">@evaluation.Provider</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="@RiskColor(evaluation.RiskLevel)">@evaluation.RiskLevel</MudChip>
+                                <MudChip T="string" Size="Size.Small" Color="@StatusColor(evaluation.Status)">@evaluation.Status</MudChip>
+                            </MudStack>
+                            <MudText Typo="Typo.body2">@evaluation.Summary</MudText>
+
+                            @if (evaluation.Findings.Count > 0)
+                            {
+                                <MudText Typo="Typo.subtitle2">یافته‌ها</MudText>
+                                @foreach (var finding in evaluation.Findings)
+                                {
+                                    <MudAlert Severity="@AlertSeverity(finding.Severity)" Dense="true">
+                                        <strong>@finding.Title</strong>
+                                        <div>@finding.Description</div>
+                                        @if (!string.IsNullOrWhiteSpace(finding.LegalReference))
+                                        {
+                                            <small>مرجع قانونی: @finding.LegalReference</small>
+                                        }
+                                    </MudAlert>
+                                }
+                            }
+
+                            @if (evaluation.Recommendations.Count > 0)
+                            {
+                                <MudText Typo="Typo.subtitle2">پیشنهادها</MudText>
+                                @foreach (var recommendation in evaluation.Recommendations)
+                                {
+                                    <MudAlert Severity="Severity.Info" Dense="true">
+                                        <strong>@recommendation.Title</strong>
+                                        <div>@recommendation.Description</div>
+                                    </MudAlert>
+                                }
+                            }
+                        </MudStack>
+                    </MudExpansionPanel>
+                }
+            </MudExpansionPanels>
+        </DataStateView>
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string EntityType { get; set; } = "";
+    [Parameter, EditorRequired] public Guid EntityId { get; set; }
+
+    private List<AiAnalysisResultDto> _evaluations = [];
+    private bool _loading;
+    private bool _running;
+    private string? _error;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _evaluations = await Api.GetAiAnalysisEvaluationsAsync(EntityType, EntityId);
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task RunAsync(string analysisType)
+    {
+        _running = true;
+        try
+        {
+            _ = EntityType switch
+            {
+                "PurchaseFile" => await Api.AnalyzePurchaseFileAsync(EntityId, new AnalyzePurchaseFileRequest(analysisType)),
+                "Tender" => await Api.AnalyzeTenderAsync(EntityId, new AnalyzeTenderRequest(analysisType)),
+                "Contract" => await Api.AnalyzeContractAsync(EntityId, new AnalyzeContractRequest(analysisType)),
+                "PurchaseOrder" => await Api.AnalyzePurchaseOrderAsync(EntityId, new AnalyzePurchaseOrderRequest(analysisType)),
+                "WarehouseReceipt" => await Api.AnalyzeWarehouseReceiptAsync(EntityId, new AnalyzeWarehouseReceiptRequest(analysisType)),
+                _ => await Api.AnalyzeLegalComplianceAsync(new AnalyzeLegalComplianceRequest(EntityType, EntityId, EntityType, analysisType))
+            };
+            Snackbar.Add("تحلیل هوش مصنوعی ذخیره شد.", Severity.Success);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"اجرای تحلیل ناموفق بود: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private static string DisplayType(string type) => type switch
+    {
+        "Summary" => "خلاصه",
+        "LegalCompliance" => "انطباق قانونی",
+        _ => type
+    };
+
+    private static Color RiskColor(string risk) => risk.ToLowerInvariant() switch
+    {
+        "critical" or "high" => Color.Error,
+        "warning" or "medium" => Color.Warning,
+        _ => Color.Info
+    };
+
+    private static Color StatusColor(string status) => status.Equals("Completed", StringComparison.OrdinalIgnoreCase)
+        ? Color.Success
+        : status.Equals("Failed", StringComparison.OrdinalIgnoreCase) ? Color.Error : Color.Default;
+
+    private static Severity AlertSeverity(AiSeverity severity) => severity switch
+    {
+        AiSeverity.Critical or AiSeverity.High => Severity.Error,
+        AiSeverity.Medium => Severity.Warning,
+        _ => Severity.Info
+    };
+}

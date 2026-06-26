@@ -150,6 +150,10 @@ public sealed class PetroProcureDbContext : IdentityDbContext<ApplicationUser, I
     public DbSet<AiRecommendation> AiRecommendations => Set<AiRecommendation>();
     public DbSet<AiConversation> AiConversations => Set<AiConversation>();
     public DbSet<AiMessage> AiMessages => Set<AiMessage>();
+    public DbSet<AiAnalysisEvaluation> AiAnalysisEvaluations => Set<AiAnalysisEvaluation>();
+    public DbSet<AiAnalysisFinding> AiAnalysisFindings => Set<AiAnalysisFinding>();
+    public DbSet<AiAnalysisRecommendation> AiAnalysisRecommendations => Set<AiAnalysisRecommendation>();
+    public DbSet<AiProviderRequestLog> AiProviderRequestLogs => Set<AiProviderRequestLog>();
     public DbSet<LegalDocument> LegalDocuments => Set<LegalDocument>();
     public DbSet<LegalArticle> LegalArticles => Set<LegalArticle>();
     public DbSet<LegalClause> LegalClauses => Set<LegalClause>();

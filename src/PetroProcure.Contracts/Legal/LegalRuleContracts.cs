@@ -3,15 +3,22 @@ using PetroProcure.Domain.Enums;
 
 namespace PetroProcure.Contracts.V1.Legal;
 
-public sealed record LegalDocumentDto(Guid Id, string Title, string OriginalFileName, string FileHash,
-    string? RelativePath, string? Description, LegalDocumentStatus Status, Guid UploadedByUserId,
-    DateTime UploadedAt);
+public sealed record LegalDocumentDto(Guid Id, string Title, string OriginalFileName, string StoredFileName,
+    string FileHash, string? RelativePath, string Extension, string MimeType, long Size,
+    string? Description, LegalDocumentStatus Status, Guid UploadedByUserId, DateTime UploadedAt,
+    bool IsDeleted, DateTime? DeletedAt, Guid? DeletedByUserId,
+    string? SourceDocumentTitle, string? SourceDocumentNumber, DateTime? SourceDocumentDate);
 
 public sealed record LegalArticleDto(Guid Id, Guid LegalDocumentId, string ArticleNumber, string Title,
     string Body, int OrderNo, IReadOnlyList<LegalClauseDto> Clauses);
 
 public sealed record LegalClauseDto(Guid Id, Guid LegalArticleId, string ClauseNumber, string Body,
-    int OrderNo, string? Note);
+    int OrderNo, string? Note, string? AppliesTo = null, RuleSeverity? Severity = null, string? Tags = null);
+
+public sealed record LegalClauseContextDto(Guid ClauseId, Guid ArticleId, Guid DocumentId,
+    string DocumentTitle, string ArticleNumber, string ArticleTitle, string ClauseNumber,
+    string ClauseText, string Summary, string? AppliesTo, RuleSeverity? Severity,
+    IReadOnlyList<string> Tags);
 
 public sealed record ProcurementRuleDto(Guid Id, string Code, string Title, Guid? RuleSetId,
     Guid? ActiveVersionId, DateTime CreatedAt, ProcurementRuleVersionDto? ActiveVersion);
@@ -30,15 +37,26 @@ public sealed record ProcurementRuleFindingDto(Guid Id, Guid ProcurementRuleEval
     string Title, string Description, string LegalReference, Guid? LegalArticleId, Guid? LegalClauseId);
 
 public sealed record LegalDocumentListRequest(string? SearchTerm = null, LegalDocumentStatus? Status = null,
-    int PageNumber = 1, int PageSize = 20);
+    bool IncludeDeleted = false, int PageNumber = 1, int PageSize = 20);
 
-public sealed record UploadLegalDocumentRequest(string Title, string? Description);
+public sealed record UploadLegalDocumentRequest(string Title, string? Description,
+    string? SourceDocumentTitle = null, string? SourceDocumentNumber = null, DateTime? SourceDocumentDate = null);
 
 public sealed record CreateLegalArticleRequest(Guid LegalDocumentId, string ArticleNumber,
     string Title, string Body, int OrderNo);
 
 public sealed record CreateLegalClauseRequest(Guid LegalArticleId, string ClauseNumber,
-    string Body, int OrderNo, string? Note);
+    string Body, int OrderNo, string? Note, string? AppliesTo = null, RuleSeverity? Severity = null,
+    string? Tags = null);
+
+public sealed record LegalArticleSearchRequest(string? Term = null, Guid? DocumentId = null,
+    string? ArticleNumber = null, string? AppliesTo = null, RuleSeverity? Severity = null,
+    string? Tag = null, bool IsActive = true, int PageNumber = 1, int PageSize = 20);
+
+public sealed record LegalClauseSearchRequest(string? Term = null, Guid? DocumentId = null,
+    string? ArticleNumber = null, string? ClauseNumber = null, string? AppliesTo = null,
+    RuleSeverity? Severity = null, string? Tag = null, bool IsActive = true,
+    int PageNumber = 1, int PageSize = 20);
 
 public sealed record ProcurementRuleListRequest(string? SearchTerm = null, RuleStatus? Status = null,
     RuleType? RuleType = null, RuleSeverity? Severity = null, int PageNumber = 1, int PageSize = 20);

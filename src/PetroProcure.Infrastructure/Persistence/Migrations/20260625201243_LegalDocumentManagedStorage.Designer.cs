@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PetroProcure.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using PetroProcure.Infrastructure.Persistence;
 namespace PetroProcure.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(PetroProcureDbContext))]
-    partial class PetroProcureDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260625201243_LegalDocumentManagedStorage")]
+    partial class LegalDocumentManagedStorage
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -270,157 +273,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.ToTable("AiAgentDefinitions", "ai");
                 });
 
-            modelBuilder.Entity("PetroProcure.AI.AiAnalysisEvaluation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AnalysisType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid>("CreatedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("EntityId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("MetadataJson")
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<string>("Model")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("PromptSummary")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("ResultSummary")
-                        .IsRequired()
-                        .HasMaxLength(8000)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("RiskLevel")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CreatedAt");
-
-                    b.HasIndex("EntityType", "EntityId");
-
-                    b.ToTable("AiAnalysisEvaluations", "ai");
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiAnalysisFinding", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<Guid>("EvaluationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Evidence")
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<string>("LegalReference")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Recommendation")
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<Guid?>("RelatedRuleClauseId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EvaluationId");
-
-                    b.ToTable("AiAnalysisFindings", "ai");
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiAnalysisRecommendation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<Guid>("EvaluationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("RelatedAction")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EvaluationId");
-
-                    b.ToTable("AiAnalysisRecommendations", "ai");
-                });
-
             modelBuilder.Entity("PetroProcure.AI.AiConversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -635,70 +487,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("AiProviders", "ai");
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiProviderRequestLog", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AnalysisType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<decimal?>("Cost")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("decimal(18,4)");
-
-                    b.Property<long?>("DurationMs")
-                        .HasColumnType("bigint");
-
-                    b.Property<Guid>("EntityId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("EntityType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("ErrorCode")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("ErrorMessage")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
-
-                    b.Property<string>("Provider")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<int?>("TokenInput")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("TokenOutput")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("StartedAt");
-
-                    b.HasIndex("EntityType", "EntityId");
-
-                    b.ToTable("AiProviderRequestLogs", "ai");
                 });
 
             modelBuilder.Entity("PetroProcure.AI.AiRecommendation", b =>
@@ -2497,10 +2285,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("AppliesTo")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
                     b.Property<string>("Body")
                         .IsRequired()
                         .HasMaxLength(8000)
@@ -2526,19 +2310,7 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .HasMaxLength(8000)
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Severity")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Tags")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("AppliesTo");
-
-                    b.HasIndex("Severity");
 
                     b.HasIndex("LegalArticleId", "ClauseNumber")
                         .IsUnique();
@@ -5290,78 +5062,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
-                            Id = new Guid("4643b130-6d7e-9359-333d-0e946eb6cefc"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.Admin",
-                            IsActive = true,
-                            Name = "Ai.Admin"
-                        },
-                        new
-                        {
-                            Id = new Guid("8bf3d6db-8312-adf4-bc7c-19cb6ccd65d9"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.ProviderManage",
-                            IsActive = true,
-                            Name = "Ai.ProviderManage"
-                        },
-                        new
-                        {
-                            Id = new Guid("d7213324-0e14-c5fa-d827-ab71e1130599"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.ProviderTest",
-                            IsActive = true,
-                            Name = "Ai.ProviderTest"
-                        },
-                        new
-                        {
-                            Id = new Guid("faf17e48-06b2-d689-8392-2dccd6898072"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.AnalyzePurchaseFile",
-                            IsActive = true,
-                            Name = "Ai.AnalyzePurchaseFile"
-                        },
-                        new
-                        {
-                            Id = new Guid("6fcd3d3c-ce4a-75f1-b6a8-012e25afbf1a"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.AnalyzeTender",
-                            IsActive = true,
-                            Name = "Ai.AnalyzeTender"
-                        },
-                        new
-                        {
-                            Id = new Guid("3cd45a10-afd7-70cf-d197-ad42685d65f8"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.AnalyzeContract",
-                            IsActive = true,
-                            Name = "Ai.AnalyzeContract"
-                        },
-                        new
-                        {
-                            Id = new Guid("240cc9dc-34a6-993e-902d-cc049f139fce"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.AnalyzePurchaseOrder",
-                            IsActive = true,
-                            Name = "Ai.AnalyzePurchaseOrder"
-                        },
-                        new
-                        {
-                            Id = new Guid("9d1b1ce6-817f-390d-9161-ff0848410a29"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.AnalyzeWarehouseReceipt",
-                            IsActive = true,
-                            Name = "Ai.AnalyzeWarehouseReceipt"
-                        },
-                        new
-                        {
-                            Id = new Guid("cf7fad3a-d53a-da48-4378-cff936268636"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            Description = "Ai.ViewEvaluations",
-                            IsActive = true,
-                            Name = "Ai.ViewEvaluations"
-                        },
-                        new
-                        {
                             Id = new Guid("c247e927-997a-aff8-e1fe-ce1655470418"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "LegalDocument.View",
@@ -6329,69 +6029,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("ccdb4e52-960f-c90e-d3cf-7b381ee1f5a4"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             PermissionId = new Guid("12ad9300-f80e-f386-070c-c93f0117b66f"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("a19b03ff-4756-d8ef-94f9-7ad98c1fde59"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("4643b130-6d7e-9359-333d-0e946eb6cefc"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("d0cc6fe2-b73d-3e8f-f4e5-69f64466042d"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("8bf3d6db-8312-adf4-bc7c-19cb6ccd65d9"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("1974c95c-285c-b0c0-fe59-689ba8df4c83"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("d7213324-0e14-c5fa-d827-ab71e1130599"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("013d7411-c704-1028-0e41-dc06872feefd"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("faf17e48-06b2-d689-8392-2dccd6898072"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("4fd7ee53-afd4-8035-540d-ea1cca2e4a1a"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("6fcd3d3c-ce4a-75f1-b6a8-012e25afbf1a"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("1c61cb83-82ff-d313-69c1-ef6e3c54a8d8"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("3cd45a10-afd7-70cf-d197-ad42685d65f8"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("09adb56b-35cc-0e8c-a815-4149e482705d"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("240cc9dc-34a6-993e-902d-cc049f139fce"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("f81eaac3-9be7-10b2-e8d8-dd3b2f214193"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("9d1b1ce6-817f-390d-9161-ff0848410a29"),
-                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
-                        },
-                        new
-                        {
-                            Id = new Guid("9272e727-b568-4bad-7bf2-b60fea82b108"),
-                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            PermissionId = new Guid("cf7fad3a-d53a-da48-4378-cff936268636"),
                             RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
                         },
                         new
@@ -10678,24 +10315,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.HasOne("PetroProcure.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiAnalysisFinding", b =>
-                {
-                    b.HasOne("PetroProcure.AI.AiAnalysisEvaluation", null)
-                        .WithMany()
-                        .HasForeignKey("EvaluationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiAnalysisRecommendation", b =>
-                {
-                    b.HasOne("PetroProcure.AI.AiAnalysisEvaluation", null)
-                        .WithMany()
-                        .HasForeignKey("EvaluationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

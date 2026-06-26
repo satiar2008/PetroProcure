@@ -1,4 +1,4 @@
-@if (Visible)
+@if (Visible || IsVisible)
 {
     <div class="loading-overlay">
         <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
@@ -7,5 +7,6 @@
 }
 @code {
     [Parameter] public bool Visible { get; set; }
+    [Parameter] public bool IsVisible { get; set; }
     [Parameter] public string Text { get; set; } = "در حال دریافت اطلاعات...";
 }

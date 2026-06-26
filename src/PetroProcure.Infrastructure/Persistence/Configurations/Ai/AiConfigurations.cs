@@ -20,3 +20,68 @@ internal sealed class AiFindingConfiguration : IEntityTypeConfiguration<AiFindin
 internal sealed class AiRecommendationConfiguration : IEntityTypeConfiguration<AiRecommendation> { public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AiRecommendation> b) { b.ToTable("AiRecommendations", DatabaseSchemas.Ai); b.ConfigureEntity(); b.Property(x => x.Title).HasMaxLength(500); b.Property(x => x.Description).HasMaxLength(4000); } }
 internal sealed class AiConversationConfiguration : IEntityTypeConfiguration<AiConversation> { public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AiConversation> b) { b.ToTable("AiConversations", DatabaseSchemas.Ai); b.ConfigureEntity(); b.Property(x => x.Title).HasMaxLength(500); } }
 internal sealed class AiMessageConfiguration : IEntityTypeConfiguration<AiMessage> { public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AiMessage> b) { b.ToTable("AiMessages", DatabaseSchemas.Ai); b.ConfigureEntity(); b.Property(x => x.Role).HasMaxLength(50); b.Property(x => x.Content).HasMaxLength(8000); } }
+internal sealed class AiAnalysisEvaluationConfiguration : IEntityTypeConfiguration<AiAnalysisEvaluation>
+{
+    public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AiAnalysisEvaluation> b)
+    {
+        b.ToTable("AiAnalysisEvaluations", DatabaseSchemas.Ai);
+        b.ConfigureEntity();
+        b.Property(x => x.EntityType).HasMaxLength(100);
+        b.Property(x => x.AnalysisType).HasMaxLength(100);
+        b.Property(x => x.Provider).HasMaxLength(100);
+        b.Property(x => x.Model).HasMaxLength(200);
+        b.Property(x => x.Status).HasMaxLength(50);
+        b.Property(x => x.PromptSummary).HasMaxLength(2000);
+        b.Property(x => x.ResultSummary).HasMaxLength(8000);
+        b.Property(x => x.RiskLevel).HasMaxLength(50);
+        b.Property(x => x.ErrorMessage).HasMaxLength(2000);
+        b.Property(x => x.MetadataJson).HasMaxLength(4000);
+        b.HasIndex(x => new { x.EntityType, x.EntityId });
+        b.HasIndex(x => x.CreatedAt);
+    }
+}
+internal sealed class AiAnalysisFindingConfiguration : IEntityTypeConfiguration<AiAnalysisFinding>
+{
+    public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AiAnalysisFinding> b)
+    {
+        b.ToTable("AiAnalysisFindings", DatabaseSchemas.Ai);
+        b.ConfigureEntity();
+        b.Property(x => x.Severity).HasMaxLength(50);
+        b.Property(x => x.Title).HasMaxLength(500);
+        b.Property(x => x.Description).HasMaxLength(4000);
+        b.Property(x => x.Evidence).HasMaxLength(4000);
+        b.Property(x => x.Recommendation).HasMaxLength(4000);
+        b.Property(x => x.LegalReference).HasMaxLength(1000);
+        b.HasOne<AiAnalysisEvaluation>().WithMany().HasForeignKey(x => x.EvaluationId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+internal sealed class AiAnalysisRecommendationConfiguration : IEntityTypeConfiguration<AiAnalysisRecommendation>
+{
+    public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AiAnalysisRecommendation> b)
+    {
+        b.ToTable("AiAnalysisRecommendations", DatabaseSchemas.Ai);
+        b.ConfigureEntity();
+        b.Property(x => x.Severity).HasMaxLength(50);
+        b.Property(x => x.Title).HasMaxLength(500);
+        b.Property(x => x.Description).HasMaxLength(4000);
+        b.Property(x => x.RelatedAction).HasMaxLength(300);
+        b.HasOne<AiAnalysisEvaluation>().WithMany().HasForeignKey(x => x.EvaluationId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+internal sealed class AiProviderRequestLogConfiguration : IEntityTypeConfiguration<AiProviderRequestLog>
+{
+    public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<AiProviderRequestLog> b)
+    {
+        b.ToTable("AiProviderRequestLogs", DatabaseSchemas.Ai);
+        b.ConfigureEntity();
+        b.Property(x => x.Provider).HasMaxLength(100);
+        b.Property(x => x.EntityType).HasMaxLength(100);
+        b.Property(x => x.AnalysisType).HasMaxLength(100);
+        b.Property(x => x.Status).HasMaxLength(50);
+        b.Property(x => x.ErrorCode).HasMaxLength(100);
+        b.Property(x => x.ErrorMessage).HasMaxLength(2000);
+        b.Property(x => x.Cost).HasPrecision(18, 4);
+        b.HasIndex(x => new { x.EntityType, x.EntityId });
+        b.HasIndex(x => x.StartedAt);
+    }
+}
