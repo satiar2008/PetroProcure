@@ -5,6 +5,8 @@ using PetroProcure.Api.Security;
 using PetroProcure.Contracts.V1.PurchaseFiles;
 using PetroProcure.Api.Contracts;
 using PetroProcure.Contracts.V1.Common;
+using PetroProcure.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace PetroProcure.Api.Endpoints;
 
@@ -29,6 +31,9 @@ public static class PurchaseFileEndpoints
             .RequirePermission(ApplicationPermissions.PurchaseFileView);
         files.MapGet("/{id:guid}/timeline", async (Guid id, PurchaseFileQueryHandler handler, CancellationToken ct) =>
             (await handler.Handle(new GetPurchaseFileTimelineQuery(id), ct)).ToContract()).RequirePermission(ApplicationPermissions.PurchaseFileView);
+        files.MapGet("/{id:guid}/lifecycle", async (Guid id, PetroProcureDbContext db, CancellationToken ct) =>
+            await BuildLifecycleAsync(id, db, ct) is { } lifecycle ? Results.Ok(lifecycle) : Results.NotFound())
+            .RequirePermission(ApplicationPermissions.PurchaseFileView);
         files.MapGet("/{id:guid}/items/grouped", async (Guid id, PurchaseFileQueryHandler handler, CancellationToken ct) =>
             (await handler.Handle(new GetPurchaseFileItemsGroupedByMescGeneralGroupQuery(id), ct)).Select(x => x.ToContract())).RequirePermission(ApplicationPermissions.PurchaseFileView);
 
@@ -82,6 +87,153 @@ public static class PurchaseFileEndpoints
             await handler.Handle(new ArchivePurchaseFileCommand(id, request.Reason), ct); return Results.NoContent();
         }).RequirePermission(ApplicationPermissions.PurchaseFileArchive);
         return app;
+    }
+
+    private static async Task<PurchaseFileLifecycleDto?> BuildLifecycleAsync(Guid id, PetroProcureDbContext db, CancellationToken ct)
+    {
+        var file = await db.PurchaseFiles.AsNoTracking()
+            .Where(x => x.Id == id)
+            .Select(x => new
+            {
+                x.Id,
+                x.FileNumber,
+                x.Title,
+                x.Status,
+                x.SourceIndentId,
+                x.CreatedAt,
+                x.CompletedAt,
+                x.ArchivedAt
+            })
+            .SingleOrDefaultAsync(ct);
+
+        if (file is null) return null;
+
+        var indent = file.SourceIndentId.HasValue
+            ? await db.Indents.AsNoTracking()
+                .Where(x => x.Id == file.SourceIndentId.Value)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.IndentNumber,
+                    x.Title,
+                    x.Status,
+                    x.CreatedAt,
+                    x.SourceMaterialNeedId,
+                    x.SourceShortageAlertId
+                })
+                .SingleOrDefaultAsync(ct)
+            : null;
+
+        var inquiries = await db.Inquiries.AsNoTracking()
+            .Where(x => x.PurchaseFileId == id)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new PurchaseFileLifecycleRelatedEntityDto(
+                x.Id, x.InquiryNumber, x.Title, x.Status.ToString(), x.IssueDate, $"/purchase/inquiries/{x.Id}"))
+            .ToListAsync(ct);
+
+        var tenders = await db.Tenders.AsNoTracking()
+            .Where(x => x.PurchaseFileId == id)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new PurchaseFileLifecycleRelatedEntityDto(
+                x.Id, x.TenderNumber, x.Title, x.Status.ToString(), x.IssueDate, $"/purchase/tenders/{x.Id}"))
+            .ToListAsync(ct);
+
+        var commissionSessions = await db.TenderCommissionSessions.AsNoTracking()
+            .Where(x => x.PurchaseFileId == id)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new PurchaseFileLifecycleRelatedEntityDto(
+                x.Id, x.SessionNumber, x.Title, x.Status.ToString(), x.SessionDate, $"/tender-commission/sessions/{x.Id}"))
+            .ToListAsync(ct);
+
+        var contracts = await db.PurchaseContracts.AsNoTracking()
+            .Where(x => x.PurchaseFileId == id)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new PurchaseFileLifecycleRelatedEntityDto(
+                x.Id, x.ContractNumber, x.Title, x.Status.ToString(), x.CreatedAt, $"/contracts/{x.Id}"))
+            .ToListAsync(ct);
+
+        var purchaseOrders = await db.PurchaseOrders.AsNoTracking()
+            .Where(x => x.PurchaseFileId == id)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new PurchaseFileLifecycleRelatedEntityDto(
+                x.Id, x.PurchaseOrderNumber, x.Title, x.Status.ToString(), x.OrderDate ?? x.CreatedAt, $"/purchase-orders/{x.Id}"))
+            .ToListAsync(ct);
+
+        var warehouseReceipts = await db.WarehouseReceipts.AsNoTracking()
+            .Where(x => x.PurchaseFileId == id)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new PurchaseFileLifecycleRelatedEntityDto(
+                x.Id, x.ReceiptNumber, x.DeliveryNoteNumber, x.Status.ToString(), x.ReceiptDate, $"/warehouse/receipts/{x.Id}"))
+            .ToListAsync(ct);
+
+        var documentsCount = await db.FileDocuments.AsNoTracking()
+            .CountAsync(x => x.PurchaseFileId == id && !x.IsDeleted, ct);
+        var reportsCount = await db.FileDocuments.AsNoTracking()
+            .CountAsync(x => x.PurchaseFileId == id && !x.IsDeleted && x.DocumentType == DocumentType.FinalReport, ct);
+        var legalEvaluationsCount = await db.LegalProcurementRuleEvaluations.AsNoTracking()
+            .CountAsync(x => x.PurchaseFileId == id, ct);
+        var aiEvaluationsCount = await db.AiAnalysisEvaluations.AsNoTracking()
+            .CountAsync(x => x.EntityType == "PurchaseFile" && x.EntityId == id, ct);
+
+        var sourceIndentItems = indent is null
+            ? []
+            : new[]
+            {
+                new PurchaseFileLifecycleRelatedEntityDto(
+                    indent.Id,
+                    indent.IndentNumber,
+                    indent.Title,
+                    indent.Status.ToString(),
+                    indent.CreatedAt,
+                    $"/indents/{indent.Id}")
+            };
+
+        var steps = new List<PurchaseFileLifecycleStepDto>
+        {
+            new("Indent", "تقاضای کالا", indent is not null, sourceIndentItems.Length, sourceIndentItems),
+            new("Inquiry", "استعلام", inquiries.Count > 0, inquiries.Count, inquiries),
+            new("Tender", "مناقصه", tenders.Count > 0, tenders.Count, tenders),
+            new("Commission", "جلسه کمیسیون", commissionSessions.Count > 0, commissionSessions.Count, commissionSessions),
+            new("Contract", "قرارداد", contracts.Count > 0, contracts.Count, contracts),
+            new("PurchaseOrder", "سفارش خرید", purchaseOrders.Count > 0, purchaseOrders.Count, purchaseOrders),
+            new("WarehouseReceipt", "رسید انبار", warehouseReceipts.Count > 0, warehouseReceipts.Count, warehouseReceipts),
+            new("Documents", "اسناد", documentsCount > 0, documentsCount, []),
+            new("LegalEvaluations", "ارزیابی حقوقی", legalEvaluationsCount > 0, legalEvaluationsCount, []),
+            new("AiEvaluations", "ارزیابی هوش مصنوعی", aiEvaluationsCount > 0, aiEvaluationsCount, [])
+        };
+
+        var latestActionDate = new[]
+            {
+                file.CreatedAt,
+                file.CompletedAt,
+                file.ArchivedAt,
+                indent?.CreatedAt
+            }
+            .Concat(inquiries.Select(x => x.Date))
+            .Concat(tenders.Select(x => x.Date))
+            .Concat(commissionSessions.Select(x => x.Date))
+            .Concat(contracts.Select(x => x.Date))
+            .Concat(purchaseOrders.Select(x => x.Date))
+            .Concat(warehouseReceipts.Select(x => x.Date))
+            .Where(x => x.HasValue)
+            .Max();
+
+        var currentStage = steps.LastOrDefault(x => x.Count > 0)?.Stage ?? file.Status.ToString();
+
+        return new PurchaseFileLifecycleDto(
+            file.Id,
+            file.FileNumber,
+            file.Title,
+            file.Status.ToString(),
+            file.SourceIndentId,
+            indent?.IndentNumber,
+            indent?.SourceMaterialNeedId,
+            indent?.SourceShortageAlertId,
+            documentsCount,
+            reportsCount,
+            latestActionDate,
+            currentStage,
+            steps);
     }
 
 }

@@ -29,6 +29,7 @@ public interface IPetroProcureApiClient
 {
     Task<PagedResult<PurchaseFileSummaryDto>> GetPurchaseFilesAsync(PurchaseFileListRequest request, CancellationToken ct = default);
     Task<PurchaseFileDto?> GetPurchaseFileAsync(Guid id, CancellationToken ct = default);
+    Task<PurchaseFileLifecycleDto?> GetPurchaseFileLifecycleAsync(Guid id, CancellationToken ct = default);
     Task<List<PurchaseFileGroupedItemsDto>> GetGroupedItemsAsync(Guid id, CancellationToken ct = default);
     Task<List<MescItemDto>> SearchMescItemsAsync(string term, CancellationToken ct = default);
     Task<IndentDto?> GetIndentAsync(Guid id, CancellationToken ct = default);
@@ -45,13 +46,14 @@ public interface IPetroProcureApiClient
     Task<PurchaseFileDto> CreateFromIndentAsync(Guid indentId, CreatePurchaseFileFromIndentRequest request, CancellationToken ct = default);
     Task<byte[]> GetPurchaseFileSummaryPdfAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task SavePurchaseFileSummaryAsync(Guid purchaseFileId, CancellationToken ct = default);
-    Task<AiEvaluationResultDto> RunAiAsync(Guid purchaseFileId, string action, CancellationToken ct = default);
+    Task<CreateAiJobResponse> RunAiAsync(Guid purchaseFileId, string action, CancellationToken ct = default);
     Task<List<AiEvaluationResultDto>> GetAiEvaluationsAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<List<AiProviderDto>> GetAiProvidersAsync(CancellationToken ct = default);
     Task<AiCoreProviderSettingsDto> GetAiCoreSettingsAsync(CancellationToken ct = default);
     Task UpdateAiCoreSettingsAsync(ConfigureAiCoreProviderRequest request, CancellationToken ct = default);
     Task<AiProviderHealthDto> TestAiCoreAsync(CancellationToken ct = default);
     Task<AiAnalysisResultDto> AnalyzePurchaseFileAsync(Guid purchaseFileId, AnalyzePurchaseFileRequest request, CancellationToken ct = default);
+    Task<CreateAiJobResponse> CreatePurchaseFileAiAnalysisJobAsync(Guid purchaseFileId, AnalyzePurchaseFileRequest request, CancellationToken ct = default);
     Task<AiAnalysisResultDto> AnalyzeTenderAsync(Guid tenderId, AnalyzeTenderRequest request, CancellationToken ct = default);
     Task<AiAnalysisResultDto> AnalyzeContractAsync(Guid contractId, AnalyzeContractRequest request, CancellationToken ct = default);
     Task<AiAnalysisResultDto> AnalyzePurchaseOrderAsync(Guid purchaseOrderId, AnalyzePurchaseOrderRequest request, CancellationToken ct = default);
@@ -324,6 +326,9 @@ public sealed class PetroProcureApiClient(
     public Task<PurchaseFileDto?> GetPurchaseFileAsync(Guid id, CancellationToken ct = default) =>
         GetJsonAsync<PurchaseFileDto>($"/api/purchase-files/{id}", ct);
 
+    public Task<PurchaseFileLifecycleDto?> GetPurchaseFileLifecycleAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<PurchaseFileLifecycleDto>($"/api/purchase-files/{id}/lifecycle", ct);
+
     public async Task<List<PurchaseFileGroupedItemsDto>> GetGroupedItemsAsync(Guid id, CancellationToken ct = default) =>
         await GetJsonAsync<List<PurchaseFileGroupedItemsDto>>($"/api/purchase-files/{id}/items/grouped", ct) ?? [];
 
@@ -388,11 +393,11 @@ public sealed class PetroProcureApiClient(
         await Ensure(response, ct);
     }
 
-    public async Task<AiEvaluationResultDto> RunAiAsync(Guid id, string action, CancellationToken ct = default)
+    public async Task<CreateAiJobResponse> RunAiAsync(Guid id, string action, CancellationToken ct = default)
     {
-        var response = await Client().PostAsync($"/api/ai/purchase-files/{id}/{action}", null, ct);
+        var response = await Client().PostAsync($"/api/ai/purchase-files/{id}/jobs/{action}", null, ct);
         await Ensure(response, ct);
-        return (await response.Content.ReadFromJsonAsync<AiEvaluationResultDto>(cancellationToken: ct))!;
+        return (await response.Content.ReadFromJsonAsync<CreateAiJobResponse>(cancellationToken: ct))!;
     }
 
     public async Task<List<AiEvaluationResultDto>> GetAiEvaluationsAsync(Guid id, CancellationToken ct = default) =>
@@ -424,6 +429,13 @@ public sealed class PetroProcureApiClient(
         var response = await Client().PostAsJsonAsync($"/api/ai/purchase-files/{id}/analyze", request, ct);
         await Ensure(response, ct);
         return (await response.Content.ReadFromJsonAsync<AiAnalysisResultDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<CreateAiJobResponse> CreatePurchaseFileAiAnalysisJobAsync(Guid id, AnalyzePurchaseFileRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/ai/purchase-files/{id}/jobs/analyze", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<CreateAiJobResponse>(cancellationToken: ct))!;
     }
 
     public async Task<AiAnalysisResultDto> AnalyzeTenderAsync(Guid id, AnalyzeTenderRequest request, CancellationToken ct = default)

@@ -14,7 +14,8 @@ else if (_summary.Data is { } file)
     <PageHeader Title="@file.Title" Subtitle="@file.FileNumber">
         <Actions><StatusChip Text="@PurchaseFileList.StatusText(file.Status)" Color="@PurchaseFileList.StatusColor(file.Status)" /></Actions>
     </PageHeader>
-    <MudTabs Rounded="true" ApplyEffectsToContainer="true" PanelClass="detail-tab-panel" Elevation="0">
+    <MudTabs Rounded="true" ApplyEffectsToContainer="true" PanelClass="detail-tab-panel" Elevation="0"
+             ActivePanelIndexChanged="OnTabChanged">
         <MudTabPanel Text="خلاصه" Icon="@Icons.Material.Filled.Dashboard">
             <MudPaper Class="form-panel" Elevation="0"><div class="summary-grid">
                 <SummaryItem Label="شماره پرونده" Value="@file.FileNumber" />
@@ -67,6 +68,10 @@ else if (_summary.Data is { } file)
             @TabBody(_workflow, LoadWorkflow, WorkflowContent)
         </MudTabPanel>
 
+        <MudTabPanel Text="گردش کامل خرید" Icon="@Icons.Material.Filled.Timeline">
+            @TabBody(_lifecycle, LoadLifecycle, LifecycleContent)
+        </MudTabPanel>
+
         <MudTabPanel Text="یادداشت‌ها" Icon="@Icons.Material.Filled.Notes">
             <MudPaper Class="form-panel mb-4" Elevation="0">
                 <MudTextField @bind-Value="_noteText" Label="یادداشت جدید" Lines="3" Variant="Variant.Outlined" />
@@ -105,21 +110,7 @@ else if (_summary.Data is { } file)
 
         <MudTabPanel Text="دستیار هوشمند" Icon="@Icons.Material.Filled.AutoAwesome">
             <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3">نتایج هوش مصنوعی صرفاً پیشنهاد و تحلیل هستند و تصمیم نهایی بر عهده کاربران مجاز و کمیسیون‌ها است.</MudAlert>
-            <div class="report-actions mb-4">
-                <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_aiBusy" OnClick="@(()=>RunAi("summarize"))">خلاصه پرونده</MudButton>
-                <MudButton Variant="Variant.Outlined" Disabled="_aiBusy" OnClick="@(()=>RunAi("check-missing-documents"))">بررسی نقص مدارک</MudButton>
-                <MudButton Variant="Variant.Outlined" Disabled="_aiBusy" OnClick="@(()=>RunAi("evaluate-rules"))">بررسی قوانین خرید</MudButton>
-                <MudButton Variant="Variant.Outlined" Color="Color.Secondary" Disabled="_aiBusy" OnClick="EvaluateTenderLegalRules">بررسی قوانین مناقصه</MudButton>
-            </div>
-            @if (_ai.Loading || _aiBusy) { <MudProgressLinear Indeterminate="true" /> }
-            else if (_ai.Error is not null) { @ErrorState(_ai.Error, LoadAi) }
-            else if (_ai.Data is null || _ai.Data.Count == 0) { <EmptyState Title="هنوز تحلیلی انجام نشده" Description="یکی از عملیات بالا را اجرا کنید." /> }
-            else { @foreach(var evaluation in _ai.Data.OrderByDescending(x=>x.CreatedAt)) {
-                <MudPaper Class="ai-result-card mb-3" Elevation="0"><MudText Typo="Typo.h6">@AiType(evaluation.EvaluationType)</MudText>
-                <MudText Typo="Typo.body2" Class="mb-3">@evaluation.Summary</MudText>
-                @foreach(var finding in evaluation.Findings){<MudAlert Severity="@AiSeverity(finding.Severity)" Variant="Variant.Outlined" Class="mb-2"><strong>@finding.Title</strong><br/>@finding.Description</MudAlert>}
-                @foreach(var recommendation in evaluation.Recommendations){<div class="ai-recommendation"><MudIcon Icon="@Icons.Material.Filled.Lightbulb" /><div><strong>@recommendation.Title</strong><span>@recommendation.Description</span></div></div>}
-                </MudPaper> } }
+            <AiJobPanel PurchaseFileId="Id" />
             <MudDivider Class="my-4" />
             <AiEvaluationPanel EntityType="PurchaseFile" EntityId="Id" />
         </MudTabPanel>
@@ -132,12 +123,13 @@ else if (_summary.Data is { } file)
     private readonly TabLoadState<List<PurchaseFileGroupedItemsDto>> _items = new();
     private readonly TabLoadState<List<FileDocumentDto>> _documents = new();
     private readonly TabLoadState<PurchaseFileWorkflowStateDto> _workflow = new();
+    private readonly TabLoadState<PurchaseFileLifecycleDto> _lifecycle = new();
     private readonly TabLoadState<List<WorkflowActionDto>> _workflowActions = new();
     private readonly TabLoadState<List<PurchaseFileNoteDto>> _notes = new();
-    private readonly TabLoadState<List<AiEvaluationResultDto>> _ai = new();
     private readonly TabLoadState<List<PurchaseContractSummaryDto>> _contracts = new();
     private readonly TabLoadState<List<PurchaseOrderSummaryDto>> _purchaseOrders = new();
-    private bool _showPreview, _savingReport, _aiBusy, _noteBusy, _internalNote, _reportLoading;
+    private bool _showPreview, _savingReport, _noteBusy, _internalNote, _reportLoading;
+    private bool _documentsExplorerView;
     private string? _noteText, _mescSearch, _documentDescription; private List<MescItemDto> _mescResults = [];
     private string? _purchaseFilePdfDataUrl;
     private DocumentType _documentType = DocumentType.TechnicalSpecification;
@@ -146,10 +138,32 @@ else if (_summary.Data is { } file)
     private bool Editable => _summary.Data?.Status is not PurchaseFileStatus.Completed and not PurchaseFileStatus.Archived;
     private bool CanEdit => _summary.Data is { } value && PurchaseFileUiPolicy.CanEdit(value.Status, Access.HasPermission);
 
+    private readonly HashSet<int> _loadedTabs = [];
+
     protected override async Task OnParametersSetAsync()
     {
+        // Lazy loading: only the summary is fetched up front. Each tab loads its own
+        // data the first time it is opened (see OnTabChanged), avoiding a burst of
+        // parallel requests on heavy purchase files.
+        _loadedTabs.Clear();
         await LoadSummary();
-        _ = LoadItems(); _ = LoadDocuments(); _ = LoadWorkflow(); _ = LoadNotes(); _ = LoadAi(); _ = LoadContracts(); _ = LoadPurchaseOrders();
+    }
+
+    private async Task OnTabChanged(int index)
+    {
+        if (!_loadedTabs.Add(index)) return; // already loaded once
+        var load = index switch
+        {
+            1 => LoadItems(),
+            2 => LoadDocuments(),
+            3 => LoadWorkflow(),
+            4 => LoadLifecycle(),
+            5 => LoadNotes(),
+            7 => LoadContracts(),
+            8 => LoadPurchaseOrders(),
+            _ => Task.CompletedTask // 0 = summary (eager), 6 = reports, 9 = AI (self-managed components)
+        };
+        await load;
     }
     private async Task LoadSummary() => await Load(_summary, async () =>
         await Api.GetPurchaseFileAsync(Id) ?? throw new HttpRequestException("پرونده یافت نشد."), "خلاصه پرونده دریافت نشد.");
@@ -168,7 +182,8 @@ else if (_summary.Data is { } file)
             ?? throw new HttpRequestException("پرونده یافت نشد."), "یادداشت‌ها دریافت نشد.");
         _notes.Loading = false; _notes.Error = state.Error; _notes.Data = state.Data?.Notes.ToList() ?? [];
     }
-    private async Task LoadAi() => await Load(_ai, () => Api.GetAiEvaluationsAsync(Id), "نتایج هوش مصنوعی دریافت نشد.");
+    private async Task LoadLifecycle() => await Load(_lifecycle, async () =>
+        await Api.GetPurchaseFileLifecycleAsync(Id) ?? throw new HttpRequestException("گردش کامل خرید یافت نشد."), "گردش کامل خرید دریافت نشد.");
     private async Task LoadContracts() => await Load(_contracts, () => Api.GetPurchaseFileContractsAsync(Id), "قراردادهای پرونده دریافت نشد.");
     private async Task LoadPurchaseOrders() => await Load(_purchaseOrders, () => Api.GetPurchaseFilePurchaseOrdersAsync(Id), "سفارش‌های خرید پرونده دریافت نشد.");
     private async Task Load<T>(TabLoadState<T> state, Func<Task<T>> loader, string message)
@@ -201,12 +216,52 @@ else if (_summary.Data is { } file)
         @if(CanEdit){<MudPaper Class="form-panel mb-4" Elevation="0"><MudGrid>
             <MudItem xs="12" md="4"><MudSelect T="DocumentType" @bind-Value="_documentType" Label="نوع سند">@foreach(var type in Enum.GetValues<DocumentType>()){<MudSelectItem Value="@type">@DocumentTypeText(type)</MudSelectItem>}</MudSelect></MudItem>
             <MudItem xs="12" md="5"><MudTextField @bind-Value="_documentDescription" Label="توضیحات سند" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><InputFile OnChange="UploadDocument" disabled="@_uploadBusy" /></MudItem>
+            <MudItem xs="12" md="3" Class="d-flex align-center">
+                <label class="doc-uploader @(_uploadBusy ? "doc-uploader-busy" : "")">
+                    <InputFile OnChange="UploadDocument" disabled="@_uploadBusy" />
+                    <MudIcon Icon="@Icons.Material.Filled.CloudUpload" Size="Size.Small" />
+                    <span>@(_uploadBusy ? "در حال بارگذاری..." : "انتخاب فایل")</span>
+                </label>
+            </MudItem>
         </MudGrid>@if(_uploadLimits is not null){<MudText Typo="Typo.caption">حداکثر @_uploadLimits.MaxFileSizeMb مگابایت؛ پسوندهای مجاز: @string.Join("، ",_uploadLimits.AllowedExtensions)</MudText>}</MudPaper>}
         @if(docs.Count==0){<EmptyState Title="سندی ثبت نشده است" Description="فایل مورد نظر را با نوع سند مناسب بارگذاری کنید." />}
-        else {<MudTable Items="docs"><HeaderContent><MudTh>نام فایل</MudTh><MudTh>نوع</MudTh><MudTh>نسخه</MudTh><MudTh>حجم</MudTh><MudTh>بارگذار</MudTh><MudTh>تاریخ</MudTh><MudTh></MudTh></HeaderContent>
-        <RowTemplate><MudTd>@context.OriginalFileName</MudTd><MudTd>@DocumentTypeText(context.DocumentType)</MudTd><MudTd>@context.VersionNo</MudTd><MudTd>@FormatSize(context.Size)</MudTd><MudTd><UserDisplay UserId="@context.UploadedByUserId" /></MudTd><MudTd><DateDisplay Value="@context.UploadedAt" /></MudTd>
-        <MudTd><MudIconButton Icon="@Icons.Material.Filled.Download" OnClick="@(()=>DownloadDocument(context.Id))" />@if(CanEdit){<label class="mud-button-root mud-icon-button"><InputFile OnChange="@(e=>UploadVersion(context.Id,e))" style="display:none" /><MudIcon Icon="@Icons.Material.Filled.UploadFile" /></label><MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(()=>DeleteDocument(context.Id))" />}</MudTd></RowTemplate></MudTable>}
+        else {
+            <div class="doc-toolbar">
+                <MudText Typo="Typo.subtitle2">@docs.Count سند</MudText>
+                <div class="doc-view-toggle">
+                    <MudButton StartIcon="@Icons.Material.Filled.TableRows" Class="@(!_documentsExplorerView ? "active" : "")" OnClick="@(()=>_documentsExplorerView=false)">جدول</MudButton>
+                    <MudButton StartIcon="@Icons.Material.Filled.GridView" Class="@(_documentsExplorerView ? "active" : "")" OnClick="@(()=>_documentsExplorerView=true)">کاوشگر فایل</MudButton>
+                </div>
+            </div>
+            @if(_documentsExplorerView){
+                <div class="doc-explorer">
+                    @foreach(var doc in docs){
+                        <div class="doc-card">
+                            <div class="doc-icon @FileIconClass(doc.OriginalFileName)">
+                                <MudIcon Icon="@FileIcon(doc.OriginalFileName)" />
+                                <span class="doc-ext">@FileExtensionLabel(doc.OriginalFileName)</span>
+                            </div>
+                            <div class="doc-card-body">
+                                <strong class="doc-name" title="@doc.OriginalFileName">@doc.OriginalFileName</strong>
+                                <span class="doc-meta">@DocumentTypeText(doc.DocumentType) · نسخه @doc.VersionNo</span>
+                                <span class="doc-meta">@FormatSize(doc.Size) · <DateDisplay Value="@doc.UploadedAt" /></span>
+                                <span class="doc-meta"><UserDisplay UserId="@doc.UploadedByUserId" /></span>
+                            </div>
+                            <div class="doc-card-actions">
+                                <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small" OnClick="@(()=>DownloadDocument(doc.Id))" aria-label="دانلود" />
+                                @if(CanEdit){
+                                    <label class="mud-icon-button doc-version-btn" title="بارگذاری نسخه جدید"><InputFile OnChange="@(e=>UploadVersion(doc.Id,e))" style="display:none" /><MudIcon Icon="@Icons.Material.Filled.UploadFile" Size="Size.Small" /></label>
+                                    <MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" Size="Size.Small" OnClick="@(()=>DeleteDocument(doc.Id))" aria-label="حذف" />
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else {<MudTable Items="docs"><HeaderContent><MudTh>نام فایل</MudTh><MudTh>نوع</MudTh><MudTh>نسخه</MudTh><MudTh>حجم</MudTh><MudTh>بارگذار</MudTh><MudTh>تاریخ</MudTh><MudTh></MudTh></HeaderContent>
+            <RowTemplate><MudTd><div class="doc-row-name"><span class="doc-row-icon @FileIconClass(context.OriginalFileName)"><MudIcon Icon="@FileIcon(context.OriginalFileName)" Size="Size.Small" /></span>@context.OriginalFileName</div></MudTd><MudTd>@DocumentTypeText(context.DocumentType)</MudTd><MudTd>@context.VersionNo</MudTd><MudTd>@FormatSize(context.Size)</MudTd><MudTd><UserDisplay UserId="@context.UploadedByUserId" /></MudTd><MudTd><DateDisplay Value="@context.UploadedAt" /></MudTd>
+            <MudTd><MudIconButton Icon="@Icons.Material.Filled.Download" OnClick="@(()=>DownloadDocument(context.Id))" />@if(CanEdit){<label class="mud-button-root mud-icon-button"><InputFile OnChange="@(e=>UploadVersion(context.Id,e))" style="display:none" /><MudIcon Icon="@Icons.Material.Filled.UploadFile" /></label><MudIconButton Icon="@Icons.Material.Filled.DeleteOutline" Color="Color.Error" OnClick="@(()=>DeleteDocument(context.Id))" />}</MudTd></RowTemplate></MudTable>}
+        }
     </div>;
     private RenderFragment<List<PurchaseContractSummaryDto>> ContractsContent => contracts => @<div>
         <div class="d-flex justify-end mb-3">
@@ -264,6 +319,42 @@ else if (_summary.Data is { } file)
             </MudTable>
         }
     </div>;
+    private RenderFragment<PurchaseFileLifecycleDto> LifecycleContent => lifecycle => @<div>
+        <MudPaper Class="form-panel mb-4" Elevation="0">
+            <div class="summary-grid">
+                <SummaryItem Label="مرحله جاری" Value="@LifecycleStageText(lifecycle.CurrentStage)" />
+                <SummaryItem Label="تعداد اسناد" Value="@lifecycle.DocumentsCount.ToString()" />
+                <SummaryItem Label="تعداد گزارش‌ها" Value="@lifecycle.ReportsCount.ToString()" />
+                <div class="summary-item"><span>آخرین اقدام</span><strong><DateDisplay Value="@lifecycle.LatestActionDate" IncludeTime="true" /></strong></div>
+            </div>
+        </MudPaper>
+        @foreach (var step in lifecycle.Steps)
+        {
+            <MudPaper Class="item-group" Elevation="0">
+                <div class="group-header">
+                    <div><strong>@step.Title</strong><span>@(step.Count == 0 ? "موردی ثبت نشده است." : $"{step.Count} مورد ثبت شده")</span></div>
+                    <MudChip T="string" Color="@(step.IsComplete ? Color.Success : Color.Default)" Size="Size.Small">@(step.IsComplete ? "تکمیل شده" : "بدون داده")</MudChip>
+                </div>
+                @if (step.Items.Count == 0)
+                {
+                    <EmptyState Title="@($"{step.Title} ثبت نشده")" Description="در این بخش هنوز رکوردی به پرونده متصل نشده است." />
+                }
+                else
+                {
+                    @foreach (var item in step.Items)
+                    {
+                        <div class="timeline-row">
+                            <div class="timeline-marker"></div>
+                            <div>
+                                <MudLink Href="@item.DetailRoute">@item.Number</MudLink>
+                                <small>@(item.Title ?? "بدون عنوان") · @item.Status · <DateDisplay Value="@item.Date" IncludeTime="true" /></small>
+                            </div>
+                        </div>
+                    }
+                }
+            </MudPaper>
+        }
+    </div>;
     private RenderFragment<PurchaseFileWorkflowStateDto> WorkflowContent => state => @<div>
         <MudPaper Class="form-panel mb-4" Elevation="0"><MudText>واحد جاری: <DepartmentDisplay DepartmentId="@state.CurrentDepartmentId" /></MudText><MudText>وضعیت: @PurchaseFileList.StatusText(Enum.Parse<PurchaseFileStatus>(state.Status))</MudText>
         @if(_workflowActions.Loading){<MudProgressLinear Indeterminate="true" />}
@@ -301,11 +392,30 @@ else if (_summary.Data is { } file)
     private async Task TogglePurchaseFilePreview(){_showPreview=!_showPreview;if(_showPreview)await EnsurePurchaseFilePdfLoaded();}
     private async Task OpenPurchaseFilePdf(){await EnsurePurchaseFilePdfLoaded();if(_purchaseFilePdfDataUrl is not null)await JS.InvokeVoidAsync("open",_purchaseFilePdfDataUrl,"_blank");}
     private async Task EnsurePurchaseFilePdfLoaded(){if(_purchaseFilePdfDataUrl is not null)return;_reportLoading=true;try{var bytes=await Api.GetPurchaseFileSummaryPdfAsync(Id);_purchaseFilePdfDataUrl=$"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";}catch(Exception ex){Snackbar.Add("دریافت گزارش ناموفق بود: "+ex.Message,Severity.Error);}finally{_reportLoading=false;}}
-    private async Task RunAi(string action){_aiBusy=true;try{await Api.RunAiAsync(Id,action);await LoadAi();Snackbar.Add("تحلیل تکمیل شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_aiBusy=false;}}
-    private async Task EvaluateTenderLegalRules(){_aiBusy=true;try{var result=await Api.EvaluatePurchaseFileLegalRulesAsync(Id);var fail=result.Findings.Count(x=>x.Result==RuleResult.Fail);var warning=result.Findings.Count(x=>x.Result==RuleResult.Warning||x.Result==RuleResult.NeedHumanReview);Snackbar.Add($"بررسی قوانین مناقصه انجام شد. خطا: {fail}، هشدار/نیازمند بررسی: {warning}",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}finally{_aiBusy=false;}}
     private string DepartmentName(Guid id)=>Access.Departments.FirstOrDefault(x=>x.Id==id)?.Title??FakeDirectory.DepartmentName(id);
     private static string FormatSize(long size)=>size<1024?$"{size} B":size<1048576?$"{size/1024d:0.#} KB":$"{size/1048576d:0.#} MB";
+    private static string FileExt(string? name){if(string.IsNullOrWhiteSpace(name))return"";var i=name.LastIndexOf('.');return i<0?"":name[(i+1)..].ToLowerInvariant();}
+    private static string FileExtensionLabel(string? name){var ext=FileExt(name);return string.IsNullOrEmpty(ext)?"FILE":ext.ToUpperInvariant();}
+    private static string FileIcon(string? name)=>FileExt(name) switch{
+        "pdf"=>Icons.Material.Filled.PictureAsPdf,
+        "doc" or "docx" or "rtf" or "odt"=>Icons.Material.Filled.Description,
+        "xls" or "xlsx" or "csv" or "ods"=>Icons.Material.Filled.TableChart,
+        "ppt" or "pptx"=>Icons.Material.Filled.Slideshow,
+        "png" or "jpg" or "jpeg" or "gif" or "bmp" or "webp" or "svg" or "tif" or "tiff"=>Icons.Material.Filled.Image,
+        "zip" or "rar" or "7z" or "tar" or "gz"=>Icons.Material.Filled.FolderZip,
+        "txt" or "log" or "md"=>Icons.Material.Filled.Article,
+        "dwg" or "dxf"=>Icons.Material.Filled.Architecture,
+        _=>Icons.Material.Filled.InsertDriveFile};
+    private static string FileIconClass(string? name)=>FileExt(name) switch{
+        "pdf"=>"doc-icon-pdf",
+        "doc" or "docx" or "rtf" or "odt"=>"doc-icon-word",
+        "xls" or "xlsx" or "csv" or "ods"=>"doc-icon-excel",
+        "ppt" or "pptx"=>"doc-icon-ppt",
+        "png" or "jpg" or "jpeg" or "gif" or "bmp" or "webp" or "svg" or "tif" or "tiff"=>"doc-icon-image",
+        "zip" or "rar" or "7z" or "tar" or "gz"=>"doc-icon-archive",
+        "txt" or "log" or "md"=>"doc-icon-text",
+        "dwg" or "dxf"=>"doc-icon-cad",
+        _=>"doc-icon-generic"};
     private static string DocumentTypeText(DocumentType type)=>type switch{DocumentType.Indent=>"درخواست خرید",DocumentType.TechnicalSpecification=>"مشخصات فنی",DocumentType.CommercialOffer=>"پیشنهاد تجاری",DocumentType.Correspondence=>"مکاتبات",DocumentType.TenderDocument=>"اسناد مناقصه",DocumentType.TenderCommissionMinutes=>"صورتجلسه کمیسیون",DocumentType.Contract=>"قرارداد",DocumentType.PurchaseOrder=>"سفارش خرید",DocumentType.WarehouseReceipt=>"رسید انبار",DocumentType.FinalReport=>"گزارش نهایی",_=>type.ToString()};
-    private static string AiType(string type)=>type switch{"Summary"=>"خلاصه پرونده","MissingDocuments"=>"بررسی نقص مدارک","Rules"=>"ارزیابی قوانین خرید",_=>type};
-    private static Severity AiSeverity(PetroProcure.Contracts.V1.Ai.AiSeverity s)=>s>=PetroProcure.Contracts.V1.Ai.AiSeverity.High?Severity.Error:s>=PetroProcure.Contracts.V1.Ai.AiSeverity.Medium?Severity.Warning:Severity.Info;
+    private static string LifecycleStageText(string stage)=>stage switch{"Indent"=>"تقاضای کالا","Inquiry"=>"استعلام","Tender"=>"مناقصه","Commission"=>"جلسه کمیسیون","Contract"=>"قرارداد","PurchaseOrder"=>"سفارش خرید","WarehouseReceipt"=>"رسید انبار","Documents"=>"اسناد","LegalEvaluations"=>"ارزیابی حقوقی","AiEvaluations"=>"ارزیابی هوش مصنوعی",_=>stage};
 }
