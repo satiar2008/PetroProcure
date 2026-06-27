@@ -2,8 +2,10 @@
 @inject IPetroProcureApiClient Api
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject IUserAccessContext Access
+@inject IDialogService Dialog
 
-<PageHeader Title="@(_rule?.Title ?? "ویرایش Rule")" Subtitle="ویرایش Rule فعال مستقیماً انجام نمی‌شود؛ ابتدا نسخه پیش‌نویس ساخته می‌شود." />
+<PageHeader Title="@(_rule?.Title ?? "ویرایش قانون مناقصه")" Subtitle="ویرایش قانون فعال مستقیماً انجام نمی‌شود؛ ابتدا نسخه پیش‌نویس ساخته می‌شود." />
 
 @if (_loading)
 {
@@ -11,15 +13,17 @@
 }
 else if (_error is not null)
 {
-    <MudAlert Severity="Severity.Error">@_error</MudAlert>
-    <MudButton Class="mt-2" OnClick="LoadAsync">تلاش مجدد</MudButton>
+    <RetryPanel Message="@_error" OnRetry="LoadAsync" />
 }
 else if (_rule is not null)
 {
     <MudPaper Class="pa-4 mb-4" Elevation="0">
         <MudText Typo="Typo.h6">@_rule.Code</MudText>
         <MudText Color="Color.Secondary">نسخه فعال: @(_rule.ActiveVersion?.VersionNo.ToString() ?? "ندارد")</MudText>
-        <MudButton Class="mt-3" Variant="Variant.Outlined" OnClick="CloneDraftAsync" Disabled="_busy">ساخت نسخه پیش‌نویس از نسخه فعال</MudButton>
+        @if (Access.HasPermission("ProcurementRule.Manage"))
+        {
+            <MudButton Class="mt-3" Variant="Variant.Outlined" OnClick="CloneDraftAsync" Disabled="_busy">ساخت نسخه پیش‌نویس از نسخه فعال</MudButton>
+        }
         <MudButton Class="mt-3 mx-2" Variant="Variant.Text" OnClick="@(() => Nav.NavigateTo("/admin/procurement-rules"))">بازگشت</MudButton>
     </MudPaper>
 
@@ -75,9 +79,15 @@ else if (_rule is not null)
                         <MudAlert Severity="Severity.Info" Class="mt-3">نسخه فعال یا تأییدشده قابل ویرایش مستقیم نیست. برای تغییر، نسخه Draft بسازید.</MudAlert>
                     }
                     <MudStack Row="true" Class="mt-3">
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!_isDraft || _busy)" OnClick="UpdateDraftAsync">ذخیره Draft</MudButton>
-                        <MudButton Variant="Variant.Outlined" Disabled="@(!_isDraft || _busy)" OnClick="SubmitAsync">ارسال برای تأیید</MudButton>
-                        <MudButton Color="Color.Success" Variant="Variant.Outlined" Disabled="@(_selected.Status != RuleStatus.PendingApproval || _busy)" OnClick="ApproveAsync">تأیید و فعال‌سازی</MudButton>
+                        @if (Access.HasPermission("ProcurementRule.Manage"))
+                        {
+                            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!_isDraft || _busy)" OnClick="UpdateDraftAsync">ذخیره پیش‌نویس</MudButton>
+                            <MudButton Variant="Variant.Outlined" Disabled="@(!_isDraft || _busy)" OnClick="SubmitAsync">ارسال برای تأیید</MudButton>
+                        }
+                        @if (Access.HasPermission("ProcurementRule.Approve"))
+                        {
+                            <MudButton Color="Color.Success" Variant="Variant.Outlined" Disabled="@(_selected.Status != RuleStatus.PendingApproval || _busy)" OnClick="ApproveAsync">تأیید و فعال‌سازی</MudButton>
+                        }
                     </MudStack>
                 </MudPaper>
             }
@@ -117,7 +127,7 @@ else if (_rule is not null)
             _versions.AddRange(await Api.GetProcurementRuleVersionsAsync(Id));
             SelectVersion(_versions.OrderByDescending(x => x.VersionNo).FirstOrDefault());
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
         finally { _loading = false; }
     }
 
@@ -146,7 +156,7 @@ else if (_rule is not null)
             Snackbar.Add("نسخه پیش‌نویس ساخته شد.", Severity.Success);
             await LoadAsync();
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
     }
 
@@ -168,7 +178,7 @@ else if (_rule is not null)
             Snackbar.Add("Draft ذخیره شد.", Severity.Success);
             await LoadAsync();
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
     }
 
@@ -185,17 +195,30 @@ else if (_rule is not null)
 
     private async Task SubmitAsync()
     {
+        if (!await Confirm("ارسال برای تأیید", "نسخه پیش‌نویس برای تأیید ارسال شود؟", Color.Primary)) return;
         _busy = true;
         try { await Api.SubmitProcurementRuleAsync(Id, "ارسال از رابط مدیریتی"); Snackbar.Add("برای تأیید ارسال شد.", Severity.Success); await LoadAsync(); }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
     }
 
     private async Task ApproveAsync()
     {
+        if (!await Confirm("تأیید و فعال‌سازی", "این نسخه قانون فعال شود؟", Color.Success)) return;
         _busy = true;
         try { await Api.ApproveProcurementRuleAsync(Id, "تأیید از رابط مدیریتی"); Snackbar.Add("نسخه فعال شد.", Severity.Success); await LoadAsync(); }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
+    }
+
+    private async Task<bool> Confirm(string title, string message, Color color)
+    {
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>(title, new DialogParameters
+        {
+            ["Message"] = message,
+            ["ConfirmColor"] = color
+        });
+        var result = await dialog.Result;
+        return result is not null && !result.Canceled;
     }
 }

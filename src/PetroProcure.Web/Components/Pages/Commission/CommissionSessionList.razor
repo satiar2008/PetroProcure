@@ -4,6 +4,7 @@
 @inject IUserAccessContext Access
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService Dialog
 
 <PageTitle>جلسات کمیسیون</PageTitle>
 <PageHeader Title="جلسات کمیسیون مناقصه" Subtitle="مدیریت جلسات رسمی کمیسیون، صورتجلسه‌ها و تصمیمات مناقصه">
@@ -86,19 +87,19 @@
                 <MudButton Size="Size.Small" Href="@($"/tender-commission/sessions/{context.Id}")">مشاهده</MudButton>
                 @if (CommissionUiPolicy.CanStart(context.Status, Access.HasPermission))
                 {
-                    <MudButton Size="Size.Small" Color="Color.Primary" OnClick='@(() => ChangeStatus(context.Id, "start", "جلسه شروع شد."))'>شروع</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Primary" Disabled="_busy" OnClick='@(() => ChangeStatus(context.Id, "start", "جلسه شروع شد."))'>شروع</MudButton>
                 }
                 @if (CommissionUiPolicy.CanComplete(context.Status, Access.HasPermission))
                 {
-                    <MudButton Size="Size.Small" Color="Color.Secondary" OnClick='@(() => ChangeStatus(context.Id, "complete", "جلسه تکمیل شد."))'>تکمیل</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Secondary" Disabled="_busy" OnClick='@(() => ChangeStatus(context.Id, "complete", "جلسه تکمیل شد."))'>تکمیل</MudButton>
                 }
                 @if (CommissionUiPolicy.CanApprove(context.Status, Access.HasPermission))
                 {
-                    <MudButton Size="Size.Small" Color="Color.Success" OnClick='@(() => ChangeStatus(context.Id, "approve", "جلسه تأیید شد."))'>تأیید</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Success" Disabled="_busy" OnClick='@(() => ChangeStatus(context.Id, "approve", "جلسه تأیید شد."))'>تأیید</MudButton>
                 }
                 @if (CommissionUiPolicy.CanCancel(context.Status, Access.HasPermission))
                 {
-                    <MudButton Size="Size.Small" Color="Color.Error" OnClick='@(() => ChangeStatus(context.Id, "cancel", "جلسه لغو شد.", new CancelCommissionSessionRequest("لغو از فهرست جلسات")))'>لغو</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Error" Disabled="_busy" OnClick='@(() => ChangeStatus(context.Id, "cancel", "جلسه لغو شد.", new CancelCommissionSessionRequest("لغو از فهرست جلسات")))'>لغو</MudButton>
                 }
             </MudTd>
         </RowTemplate>
@@ -115,6 +116,7 @@
 
 @code {
     private bool _loading = true;
+    private bool _busy;
     private string? _error, _search, _tenderNumber, _purchaseFileNumber;
     private TenderCommissionSessionStatus? _status;
     private DateTime? _dateFrom, _dateTo;
@@ -161,7 +163,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = UiErrorText.From(ex);
         }
         finally
         {
@@ -201,6 +203,16 @@
 
     private async Task ChangeStatus(Guid id, string action, string successMessage, object? body = null)
     {
+        if (_busy) return;
+        if (action is "approve" or "cancel" &&
+            !await Confirm(action == "approve" ? "تأیید جلسه" : "لغو جلسه",
+                action == "approve" ? "جلسه کمیسیون تأیید شود؟" : "جلسه کمیسیون لغو شود؟",
+                action == "approve" ? Color.Success : Color.Error))
+        {
+            return;
+        }
+
+        _busy = true;
         try
         {
             await Api.ChangeCommissionSessionStatusAsync(id, action, body);
@@ -209,7 +221,22 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.Add(UiErrorText.From(ex), Severity.Error);
         }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<bool> Confirm(string title, string message, Color color)
+    {
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>(title, new DialogParameters
+        {
+            ["Message"] = message,
+            ["ConfirmColor"] = color
+        });
+        var result = await dialog.Result;
+        return result is not null && !result.Canceled;
     }
 }

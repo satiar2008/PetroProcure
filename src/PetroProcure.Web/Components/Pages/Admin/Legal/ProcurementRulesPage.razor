@@ -2,6 +2,7 @@
 @inject IPetroProcureApiClient Api
 @inject ISnackbar Snackbar
 @inject NavigationManager Nav
+@inject IUserAccessContext Access
 
 <PageHeader Title="قوانین مناقصه" Subtitle="Ruleهای نسخه‌دار، قابل ارجاع به ماده/بند قانونی و قابل استفاده توسط AI" />
 
@@ -20,12 +21,18 @@
     </MudItem>
     <MudItem xs="12" md="5" Class="d-flex align-center gap-2">
         <MudButton Variant="Variant.Outlined" OnClick="LoadAsync">جستجو</MudButton>
-        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => _showCreate = !_showCreate)">Rule جدید</MudButton>
-        <MudButton Variant="Variant.Text" OnClick="@(() => Nav.NavigateTo("/admin/procurement-rules/test"))">آزمون Ruleها</MudButton>
+        @if (Access.HasPermission("ProcurementRule.Manage"))
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="@(() => _showCreate = !_showCreate)">Rule جدید</MudButton>
+        }
+        @if (Access.HasPermission("ProcurementRule.Evaluate"))
+        {
+            <MudButton Variant="Variant.Text" OnClick="@(() => Nav.NavigateTo("/admin/procurement-rules/test"))">آزمون Ruleها</MudButton>
+        }
     </MudItem>
 </MudGrid>
 
-@if (_showCreate)
+@if (_showCreate && Access.HasPermission("ProcurementRule.Manage"))
 {
     <MudPaper Class="pa-4 mb-4" Elevation="0">
         <MudText Typo="Typo.h6">ایجاد Rule پیش‌نویس</MudText>
@@ -76,7 +83,12 @@ else
             <MudTd>@(context.ActiveVersion is null ? "-" : RuleTypeText(context.ActiveVersion.RuleType))</MudTd>
             <MudTd>@(context.ActiveVersion is null ? "-" : SeverityText(context.ActiveVersion.Severity))</MudTd>
             <MudTd><StatusChip Text="@(context.ActiveVersion is null ? "پیش‌نویس" : RuleStatusText(context.ActiveVersion.Status))" /></MudTd>
-            <MudTd><MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo($"/admin/procurement-rules/{context.Id}/edit"))">ویرایش نسخه‌ها</MudButton></MudTd>
+            <MudTd>
+                @if (Access.HasPermission("ProcurementRule.Manage") || Access.HasPermission("ProcurementRule.Approve"))
+                {
+                    <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo($"/admin/procurement-rules/{context.Id}/edit"))">ویرایش نسخه‌ها</MudButton>
+                }
+            </MudTd>
         </RowTemplate>
     </MudTable>
 }
@@ -110,7 +122,7 @@ else
             var result = await Api.GetProcurementRulesAsync(new ProcurementRuleListRequest(_search, _status, PageSize: 50));
             _rules.Clear(); _rules.AddRange(result.Items);
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
         finally { _loading = false; }
     }
 
@@ -135,7 +147,7 @@ else
             _showCreate = false;
             await LoadAsync();
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
     }
 

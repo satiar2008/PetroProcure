@@ -36,8 +36,7 @@
 }
 else if (_error is not null)
 {
-    <MudAlert Severity="Severity.Error">@_error</MudAlert>
-    <MudButton Class="mt-2" OnClick="LoadAsync">تلاش مجدد</MudButton>
+    <RetryPanel Message="@_error" OnRetry="LoadAsync" />
 }
 else if (_documents.Count == 0)
 {
@@ -52,7 +51,6 @@ else
             <MudTh>منبع</MudTh>
             <MudTh>حجم</MudTh>
             <MudTh>وضعیت</MudTh>
-            <MudTh>هش</MudTh>
             <MudTh>تاریخ بارگذاری</MudTh>
             <MudTh>عملیات</MudTh>
         </HeaderContent>
@@ -62,7 +60,6 @@ else
             <MudTd>@(context.SourceDocumentTitle ?? context.SourceDocumentNumber ?? "-")</MudTd>
             <MudTd>@FormatSize(context.Size)</MudTd>
             <MudTd><StatusChip Text="@StatusText(context.Status)" /></MudTd>
-            <MudTd><MudText Typo="Typo.caption">@context.FileHash[..Math.Min(12, context.FileHash.Length)]...</MudText></MudTd>
             <MudTd><DateDisplay Value="@context.UploadedAt" /></MudTd>
             <MudTd>
                 <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => Nav.NavigateTo($"/admin/legal-documents/{context.Id}"))">جزئیات</MudButton>
@@ -97,7 +94,7 @@ else
             _documents.Clear();
             _documents.AddRange(result.Items);
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
         finally { _loading = false; }
     }
 
@@ -120,7 +117,7 @@ else
             Snackbar.Add("سند قانونی بارگذاری شد.", Severity.Success);
             await LoadAsync();
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
     }
 
@@ -131,7 +128,7 @@ else
             var file = await Api.DownloadLegalDocumentAsync(id);
             await JS.InvokeVoidAsync("petroProcureDownloadFile", file.Content, file.ContentType, file.FileName);
         }
-        catch (Exception ex) { Snackbar.Add("دانلود سند ناموفق بود: " + ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add("دانلود سند ناموفق بود. " + UiErrorText.From(ex), Severity.Error); }
     }
 
     private async Task DeleteAsync(Guid id)
@@ -146,7 +143,7 @@ else
             Snackbar.Add("سند قانونی حذف شد.", Severity.Success);
             await LoadAsync();
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
     }
 
     private static string FormatSize(long size) => size <= 0 ? "-" :

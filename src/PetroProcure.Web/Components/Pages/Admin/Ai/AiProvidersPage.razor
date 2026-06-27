@@ -2,6 +2,7 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize]
 @inject IPetroProcureApiClient Api
 @inject ISnackbar Snackbar
+@inject IUserAccessContext Access
 
 <PageHeader Title="ارائه‌دهندگان هوش مصنوعی" Subtitle="تنظیم اتصال AiCore بدون ذخیره‌سازی کلید محرمانه در پایگاه داده" />
 
@@ -9,14 +10,14 @@
     <MudGrid>
         <MudItem xs="12" md="4">
             <MudPaper Class="pa-4" Outlined="true">
-                <MudText Typo="Typo.h6">وضعیت provider</MudText>
+                <MudText Typo="Typo.h6">وضعیت ارائه‌دهنده</MudText>
                 @foreach (var provider in _providers)
                 {
                     <MudList T="string" Dense="true">
                         <MudListItem Text="@provider.Name" Icon="@Icons.Material.Filled.Psychology" />
                         <MudListItem Text="@($"مدل پیش‌فرض: {provider.DefaultModel ?? "—"}")" />
                         <MudListItem Text="@($"وضعیت: {(provider.IsEnabled ? "فعال" : "غیرفعال")}")" />
-                        <MudListItem Text="@($"BaseUrl: {provider.BaseUrl ?? "ثبت نشده"}")" />
+                        <MudListItem Text="@($"آدرس پایه: {provider.BaseUrl ?? "ثبت نشده"}")" />
                     </MudList>
                 }
                 @if (_health is not null)
@@ -29,10 +30,13 @@
                         }
                     </MudAlert>
                 }
-                <MudButton Class="mt-3" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NetworkCheck"
-                           Disabled="_testing" OnClick="TestAsync">
-                    تست اتصال
-                </MudButton>
+                @if (CanTest)
+                {
+                    <MudButton Class="mt-3" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.NetworkCheck"
+                               Disabled="_testing" OnClick="TestAsync">
+                        تست اتصال
+                    </MudButton>
+                }
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="8">
@@ -42,10 +46,10 @@
                     <MudTextField @bind-Value="_baseUrl" Label="آدرس AiCore" Variant="Variant.Outlined" />
                     <MudTextField @bind-Value="_analysisPath" Label="مسیر تحلیل" Variant="Variant.Outlined"
                                   HelperText="برای AI Server Core: /api/ai/text" />
-                    <MudTextField @bind-Value="_healthPath" Label="مسیر Health" Variant="Variant.Outlined"
+                    <MudTextField @bind-Value="_healthPath" Label="مسیر سلامت" Variant="Variant.Outlined"
                                   HelperText="برای تست اتصال عمومی AI Server Core: /health/ready" />
                     <MudTextField @bind-Value="_defaultModel" Label="مدل پیش‌فرض" Variant="Variant.Outlined" />
-                    <MudNumericField T="int" @bind-Value="_timeoutSeconds" Label="Timeout ثانیه" Variant="Variant.Outlined" Min="5" Max="300" />
+                    <MudNumericField T="int" @bind-Value="_timeoutSeconds" Label="مهلت پاسخ ثانیه" Variant="Variant.Outlined" Min="5" Max="300" />
                     <MudNumericField T="int?" @bind-Value="_maxInputTokens" Label="حداکثر توکن ورودی" Variant="Variant.Outlined" />
                     <MudNumericField T="int?" @bind-Value="_maxOutputTokens" Label="حداکثر توکن خروجی" Variant="Variant.Outlined" />
                     <MudSwitch T="bool" @bind-Value="_useStreaming" Color="Color.Secondary" Label="Streaming فعال شود" Disabled="true" />
@@ -57,10 +61,13 @@
                         @(_hasApiKey ? "کلید محرمانه از منبع امن قابل خواندن است." : "کلید محرمانه تنظیم نشده یا قابل خواندن نیست.")
                     </MudAlert>
                     <MudStack Row="true" Spacing="2" Class="mt-4">
-                        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
-                                   Disabled="_saving" OnClick="SaveAsync">
-                            ذخیره تنظیمات
-                        </MudButton>
+                        @if (CanManage)
+                        {
+                            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Save"
+                                       Disabled="_saving" OnClick="SaveAsync">
+                                ذخیره تنظیمات
+                            </MudButton>
+                        }
                         <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">
                             بارگذاری مجدد
                         </MudButton>
@@ -93,6 +100,8 @@
     private string _analysisPath = "/api/ai/text";
     private string _healthPath = "/health/ready";
     private bool _hasApiKey;
+    private bool CanManage => Access.HasPermission("Ai.ProviderManage") || Access.HasPermission("Admin.ManageSettings") || Access.HasPermission("Ai.Admin");
+    private bool CanTest => Access.HasPermission("Ai.ProviderTest") || Access.HasPermission("Admin.ManageSettings") || Access.HasPermission("Ai.Admin");
 
     protected override Task OnInitializedAsync() => LoadAsync();
 
@@ -120,7 +129,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = UiErrorText.From(ex);
         }
         finally
         {
@@ -141,7 +150,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"ذخیره تنظیمات ناموفق بود: {ex.Message}", Severity.Error);
+            Snackbar.Add("ذخیره تنظیمات ناموفق بود. " + UiErrorText.From(ex), Severity.Error);
         }
         finally
         {
@@ -159,7 +168,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add($"تست اتصال ناموفق بود: {ex.Message}", Severity.Error);
+            Snackbar.Add("تست اتصال ناموفق بود. " + UiErrorText.From(ex), Severity.Error);
         }
         finally
         {

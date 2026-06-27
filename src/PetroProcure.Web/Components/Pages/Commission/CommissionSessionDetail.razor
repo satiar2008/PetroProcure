@@ -4,29 +4,30 @@
 @inject IUserAccessContext Access
 @inject NavigationManager Navigation
 @inject ISnackbar Snackbar
+@inject IDialogService Dialog
 
 <PageTitle>جزئیات جلسه کمیسیون</PageTitle>
 <PageHeader Title="@(_detail?.Session.SessionNumber ?? "جلسه کمیسیون")" Subtitle="@(_detail?.Session.Title ?? "در حال دریافت اطلاعات")">
     <Actions>
         @if (_detail is not null && Access.HasPermission(CommissionUiPolicy.Schedule) && _detail.Session.Status == TenderCommissionSessionStatus.Draft)
         {
-            <MudButton Color="Color.Info" Variant="Variant.Outlined" OnClick="Schedule">زمان‌بندی</MudButton>
+            <MudButton Color="Color.Info" Variant="Variant.Outlined" Disabled="_busy" OnClick="Schedule">زمان‌بندی</MudButton>
         }
         @if (_detail is not null && CommissionUiPolicy.CanStart(_detail.Session.Status, Access.HasPermission))
         {
-            <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="StartSession">شروع جلسه</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="StartSession">شروع جلسه</MudButton>
         }
         @if (_detail is not null && CommissionUiPolicy.CanComplete(_detail.Session.Status, Access.HasPermission))
         {
-            <MudButton Color="Color.Secondary" Variant="Variant.Filled" OnClick="CompleteSession">تکمیل جلسه</MudButton>
+            <MudButton Color="Color.Secondary" Variant="Variant.Filled" Disabled="_busy" OnClick="CompleteSession">تکمیل جلسه</MudButton>
         }
         @if (_detail is not null && CommissionUiPolicy.CanApprove(_detail.Session.Status, Access.HasPermission))
         {
-            <MudButton Color="Color.Success" Variant="Variant.Filled" OnClick="ApproveSession">تأیید جلسه</MudButton>
+            <MudButton Color="Color.Success" Variant="Variant.Filled" Disabled="_busy" OnClick="ApproveSession">تأیید جلسه</MudButton>
         }
         @if (_detail is not null && CommissionUiPolicy.CanCancel(_detail.Session.Status, Access.HasPermission))
         {
-            <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="Cancel">لغو جلسه</MudButton>
+            <MudButton Color="Color.Error" Variant="Variant.Outlined" Disabled="_busy" OnClick="Cancel">لغو جلسه</MudButton>
         }
     </Actions>
 </PageHeader>
@@ -111,7 +112,7 @@
                     <MudTd>@context.FullNameSnapshot</MudTd>
                     <MudTd>@CommissionUiPolicy.RoleText(context.Role)</MudTd>
                     <MudTd>@CommissionUiPolicy.AttendanceText(context.AttendanceStatus)</MudTd>
-                    <MudTd>@(context.VoteStatus?.ToString() ?? "—")</MudTd>
+                    <MudTd>@VoteStatusText(context.VoteStatus)</MudTd>
                     <MudTd>@(context.VoteNote ?? "—")</MudTd>
                     <MudTd>
                         @if (Access.HasPermission(CommissionUiPolicy.ManageMembers) && IsEditable)
@@ -375,7 +376,7 @@
         }
         catch (Exception ex)
         {
-            _error = ex.Message;
+            _error = UiErrorText.From(ex);
         }
         finally
         {
@@ -409,6 +410,14 @@
     private async Task ChangeStatus(string action, string successMessage, object? body = null)
     {
         if (_detail is null) return;
+        if (action is "approve" or "cancel" &&
+            !await Confirm(action == "approve" ? "تأیید جلسه" : "لغو جلسه",
+                action == "approve" ? "جلسه کمیسیون تأیید شود؟" : "جلسه کمیسیون لغو شود؟",
+                action == "approve" ? Color.Success : Color.Error))
+        {
+            return;
+        }
+
         _busy = true;
         try
         {
@@ -418,7 +427,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.Add(UiErrorText.From(ex), Severity.Error);
         }
         finally
         {
@@ -451,6 +460,7 @@
     private async Task RemoveMember(Guid memberId)
     {
         if (_detail is null) return;
+        if (!await Confirm("حذف عضو", "عضو از جلسه کمیسیون حذف شود؟", Color.Error)) return;
         await Execute(async () => { await Api.RemoveCommissionMemberAsync(_detail.Session.Id, memberId); }, "عضو از جلسه حذف شد.");
     }
 
@@ -512,12 +522,14 @@
     private async Task ApproveDecision(Guid decisionId)
     {
         if (_detail is null) return;
+        if (!await Confirm("تأیید تصمیم", "تصمیم کمیسیون تأیید شود؟", Color.Success)) return;
         await Execute(async () => { await Api.ApproveCommissionDecisionAsync(_detail.Session.Id, decisionId); }, "تصمیم تأیید شد.");
     }
 
     private async Task RejectDecision(Guid decisionId)
     {
         if (_detail is null) return;
+        if (!await Confirm("رد تصمیم", "تصمیم کمیسیون رد شود؟", Color.Error)) return;
         await Execute(async () => { await Api.RejectCommissionDecisionAsync(_detail.Session.Id, decisionId); }, "تصمیم رد شد.");
     }
 
@@ -532,7 +544,7 @@
         }
         catch (Exception ex)
         {
-            Snackbar.Add(ex.Message, Severity.Error);
+            Snackbar.Add(UiErrorText.From(ex), Severity.Error);
         }
         finally
         {
@@ -546,4 +558,24 @@
         var bid = _tender?.Bids.FirstOrDefault(x => x.Id == bidId);
         return bid is null ? "پیشنهاد منتخب" : $"{bid.SupplierName ?? "تأمین‌کننده"} — {bid.BidNumber ?? "بدون شماره"}";
     }
+
+    private async Task<bool> Confirm(string title, string message, Color color)
+    {
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>(title, new DialogParameters
+        {
+            ["Message"] = message,
+            ["ConfirmColor"] = color
+        });
+        var result = await dialog.Result;
+        return result is not null && !result.Canceled;
+    }
+
+    private static string VoteStatusText(TenderCommissionVoteStatus? status) => status switch
+    {
+        TenderCommissionVoteStatus.Approve => "موافق",
+        TenderCommissionVoteStatus.Reject => "مخالف",
+        TenderCommissionVoteStatus.Abstain => "ممتنع",
+        null => "—",
+        _ => status.ToString() ?? "—"
+    };
 }

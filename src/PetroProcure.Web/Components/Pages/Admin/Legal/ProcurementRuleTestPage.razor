@@ -1,6 +1,8 @@
 @page "/admin/procurement-rules/test"
 @inject IPetroProcureApiClient Api
 @inject ISnackbar Snackbar
+@inject IUserAccessContext Access
+@inject NavigationManager Nav
 
 <PageHeader Title="آزمون قوانین مناقصه" Subtitle="اجرای آزمایشی Rule Engine قطعی روی پرونده خرید؛ نتیجه فقط پیشنهاد و هشدار است." />
 
@@ -9,7 +11,7 @@
 </MudAlert>
 
 <MudPaper Class="pa-4 mb-4" Elevation="0">
-    <MudTextField @bind-Value="_purchaseFileId" Label="شناسه پرونده خرید" HelperText="Guid پرونده خرید را وارد کنید." />
+    <MudTextField @bind-Value="_purchaseFileId" Label="کد داخلی پرونده خرید" HelperText="از مسیر جزئیات پرونده خرید قابل دریافت است." />
     <MudButton Class="mt-3" Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="EvaluateAsync">اجرای ارزیابی</MudButton>
 </MudPaper>
 
@@ -36,11 +38,19 @@
     private bool _busy;
     private ProcurementRuleEvaluationDto? _evaluation;
 
+    protected override void OnInitialized()
+    {
+        if (!Access.HasPermission("ProcurementRule.Evaluate") && !Access.HasPermission("AiAgent.EvaluatePurchaseRules"))
+        {
+            Nav.NavigateTo("/access-denied");
+        }
+    }
+
     private async Task EvaluateAsync()
     {
         if (!Guid.TryParse(_purchaseFileId, out var id))
         {
-            Snackbar.Add("شناسه پرونده خرید معتبر نیست.", Severity.Warning);
+            Snackbar.Add("کد داخلی پرونده خرید معتبر نیست.", Severity.Warning);
             return;
         }
 
@@ -50,7 +60,7 @@
             _evaluation = await Api.EvaluatePurchaseFileLegalRulesAsync(id);
             Snackbar.Add("ارزیابی قوانین مناقصه انجام شد.", Severity.Success);
         }
-        catch (Exception ex) { Snackbar.Add(ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
     }
 
