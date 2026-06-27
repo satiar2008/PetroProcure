@@ -49,11 +49,16 @@
                               Required="true" RequiredError="نام کاربری یا ایمیل الزامی است"
                               Variant="Variant.Outlined" Adornment="Adornment.Start"
                               AdornmentIcon="@Icons.Material.Filled.PersonOutline" />
-                <MudTextField @bind-Value="_password" Label="رمز عبور" InputType="InputType.Password"
+                <MudTextField @bind-Value="_password" Label="رمز عبور"
+                              InputType="@(_showPassword ? InputType.Text : InputType.Password)"
                               Immediate="true"
                               Required="true" RequiredError="رمز عبور الزامی است"
                               Variant="Variant.Outlined" Class="mt-4"
-                              Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Lock" />
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showPassword ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="@(() => _showPassword = !_showPassword)"
+                              AdornmentAriaLabel="نمایش یا پنهان‌سازی رمز"
+                              OnKeyDown="OnPasswordKeyDown" />
                 <MudCheckBox @bind-Value="_rememberMe" Label="مرا به خاطر بسپار" Class="mt-2" />
                 @if (!string.IsNullOrWhiteSpace(_error))
                 {
@@ -69,6 +74,11 @@
                 <MudIcon Icon="@Icons.Material.Filled.Security" Size="Size.Small" />
                 <span>ورود شما ثبت و مطابق سیاست‌های امنیتی سازمان کنترل می‌شود.</span>
             </div>
+
+            <div class="login-designer">
+                <span>طراحی و توسعه</span>
+                <img src="/logo/Me_logo_noBack.png" alt="طراح و سازنده برنامه" />
+            </div>
         </section>
     </MudPaper>
 </div>
@@ -81,6 +91,13 @@
     private string? _error;
     private bool _rememberMe;
     private bool _busy;
+    private bool _showPassword;
+
+    private async Task OnPasswordKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or "NumpadEnter" && !_busy)
+            await LoginAsync();
+    }
 
     private static RenderFragment Feature(string icon, string text) =>
         @<div class="login-feature animated-card">

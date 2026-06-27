@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PetroProcure.Web\PetroProcure.Web.csproj" />
     <ProjectReference Include="..\PetroProcure.Api\PetroProcure.Api.csproj" />
+    <ProjectReference Include="..\PetroProcure.Worker\PetroProcure.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>

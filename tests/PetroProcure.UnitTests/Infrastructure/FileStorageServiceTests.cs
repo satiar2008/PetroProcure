@@ -1,7 +1,10 @@
 using System.Text;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PetroProcure.Application.Documents;
+using PetroProcure.Application.Rag;
 using PetroProcure.Domain.Enums;
+using PetroProcure.Domain.Modules.Ai;
 using PetroProcure.Domain.Modules.Documents;
 using PetroProcure.Domain.Modules.PurchaseFiles;
 using PetroProcure.Infrastructure.Storage;
@@ -12,6 +15,7 @@ public sealed class FileStorageServiceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "PetroProcureTests", Guid.NewGuid().ToString("N"));
     private readonly FakeRepository _repository = new();
+    private readonly FakeIngestionQueue _ingestionQueue = new();
 
     [Fact]
     public async Task RootFolderPathIsReadFromConfiguration()
@@ -54,6 +58,10 @@ public sealed class FileStorageServiceTests : IDisposable
         Assert.StartsWith("PurchaseFiles/2026/PF-2026-000001/02-Technical/", document.RelativePath);
         Assert.Equal("3912bd04e65862ba9498979e16868021d42956898115bf5bc55246e4cdd4f7c1", document.Hash);
         Assert.True(File.Exists(ToPhysical(document.RelativePath)));
+        var job = Assert.Single(_ingestionQueue.Payloads);
+        Assert.Equal(AiDocumentSourceType.PurchaseFileDocument, job.SourceType);
+        Assert.Equal(document.Id, job.SourceId);
+        Assert.False(job.ForceRebuild);
     }
 
     [Fact]
@@ -89,6 +97,8 @@ public sealed class FileStorageServiceTests : IDisposable
         Assert.Equal(2, version.VersionNo);
         Assert.Contains("-v2.pdf", version.StoredFileName);
         Assert.Single(_repository.Document!.Versions);
+        Assert.Equal(2, _ingestionQueue.Payloads.Count);
+        Assert.True(_ingestionQueue.Payloads[1].ForceRebuild);
     }
 
     [Fact]
@@ -138,7 +148,8 @@ public sealed class FileStorageServiceTests : IDisposable
     }
 
     private FileStorageService CreateService() =>
-        new(_repository, Options.Create(TestOptions()), new NoOpFileScanner());
+        new(_repository, Options.Create(TestOptions()), new NoOpFileScanner(), _ingestionQueue,
+            NullLogger<FileStorageService>.Instance);
     private FileStorageOptions TestOptions() => new()
     {
         RootPath = _root,
@@ -173,5 +184,18 @@ public sealed class FileStorageServiceTests : IDisposable
             Task.FromResult<IReadOnlyList<FileDocumentDto>>([]);
         public Task SaveChangesAsync(CancellationToken cancellationToken) =>
             FailSave ? Task.FromException(new InvalidOperationException("DB failure")) : Task.CompletedTask;
+    }
+
+    private sealed class FakeIngestionQueue : IRagIngestionQueue
+    {
+        public List<EmbeddingIngestionPayload> Payloads { get; } = [];
+
+        public Task<PetroProcure.Contracts.V1.Ai.CreateAiJobResponse> EnqueueAsync(
+            EmbeddingIngestionPayload payload, Guid? createdByUserId, CancellationToken ct = default)
+        {
+            Payloads.Add(payload);
+            return Task.FromResult(new PetroProcure.Contracts.V1.Ai.CreateAiJobResponse(
+                Guid.NewGuid(), "Queued", "queued", DateTime.UtcNow));
+        }
     }
 }

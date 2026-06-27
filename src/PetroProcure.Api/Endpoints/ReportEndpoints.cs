@@ -22,6 +22,20 @@ public static class ReportEndpoints
                 {
                     ["PurchaseFileId"] = purchaseFileId
                 }, ct))).RequirePermission(ApplicationPermissions.ReportExportPdf);
+        app.MapGet("/api/reports/legal-compliance/{purchaseFileId:guid}/pdf", async (
+            Guid purchaseFileId, IReportGenerator generator, CancellationToken ct) =>
+        {
+            var bytes = await generator.GeneratePdfAsync(ReportNames.LegalCompliance,
+                new Dictionary<string, object?> { ["PurchaseFileId"] = purchaseFileId }, ct);
+            return Results.File(bytes, "application/pdf", $"legal-compliance-{purchaseFileId}.pdf");
+        }).RequireAnyPermission(ApplicationPermissions.ReportExportPdf, ApplicationPermissions.ProcurementRuleView);
+        app.MapPost("/api/reports/legal-compliance/{purchaseFileId:guid}/save-to-file", async (
+            Guid purchaseFileId, IReportGenerator generator, CancellationToken ct) =>
+            Results.Ok(await generator.SaveGeneratedReportToPurchaseFileAsync(purchaseFileId,
+                ReportNames.LegalCompliance, new Dictionary<string, object?>
+                {
+                    ["PurchaseFileId"] = purchaseFileId
+                }, ct))).RequireAnyPermission(ApplicationPermissions.ReportExportPdf, ApplicationPermissions.ProcurementRuleView);
         app.MapGet("/api/reports/indent/{indentId:guid}/pdf", async (
             Guid indentId, IReportGenerator generator, CancellationToken ct) =>
         {

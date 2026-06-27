@@ -2,6 +2,7 @@ using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.PurchaseFiles;
 using PetroProcure.Application.Documents;
 using PetroProcure.Application.Security;
+using PetroProcure.Application.Legal;
 
 namespace PetroProcure.Application.PurchaseFiles;
 
@@ -27,7 +28,8 @@ public sealed record ArchivePurchaseFileCommand(Guid Id, string? Reason);
 public sealed class PurchaseFileCommandHandler(
     IPurchaseFileRepository repository, IPurchaseFileNumberService numberService,
     ICurrentUserService currentUser,
-    IFileStorageService? fileStorageService = null)
+    IFileStorageService? fileStorageService = null,
+    IProcurementRuleGateService? gateService = null)
 {
     public async Task<PurchaseFileDto> Handle(CreatePurchaseFileCommand command, CancellationToken ct = default)
     {
@@ -116,13 +118,17 @@ public sealed class PurchaseFileCommandHandler(
     }
 
     public Task Handle(CompletePurchaseFileCommand command, CancellationToken ct = default) =>
-        Mutate(command.Id, file => file.Complete(currentUser.UserId, command.Reason), ct);
+        Mutate(command.Id, file => file.Complete(currentUser.UserId, command.Reason),
+            ProcurementRuleGateTransitions.PurchaseFileComplete, ct);
     public Task Handle(ArchivePurchaseFileCommand command, CancellationToken ct = default) =>
-        Mutate(command.Id, file => file.Archive(currentUser.UserId, command.Reason), ct);
+        Mutate(command.Id, file => file.Archive(currentUser.UserId, command.Reason),
+            ProcurementRuleGateTransitions.PurchaseFileArchive, ct);
 
-    private async Task Mutate(Guid id, Action<PurchaseFile> action, CancellationToken ct)
+    private async Task Mutate(Guid id, Action<PurchaseFile> action, string? gatedTransitionName, CancellationToken ct)
     {
         var file = await Required(id, true, ct);
+        if (gatedTransitionName is not null)
+            await EnsureGateAllowsAsync(file.Id, gatedTransitionName, ct);
         Execute(() => action(file));
         await repository.SaveChangesAsync(ct);
     }
@@ -146,6 +152,15 @@ public sealed class PurchaseFileCommandHandler(
     {
         try { action(); }
         catch (InvalidOperationException ex) { throw new PurchaseFileValidationException(ex.Message); }
+    }
+
+    private async Task EnsureGateAllowsAsync(Guid entityId, string transitionName, CancellationToken ct)
+    {
+        if (gateService is null) return;
+        var result = await gateService.CheckTransitionAsync(entityId, transitionName,
+            new ProcurementRuleGateUserContext(currentUser.UserId, currentUser.IsSystemAdmin, currentUser.Permissions), ct);
+        if (result.IsBlocked)
+            throw new LegalRuleValidationException("Sensitive transition is blocked by unresolved legal rule findings.");
     }
 
     internal static PurchaseFileDto ToDto(PurchaseFile file) => new(

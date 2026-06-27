@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using PetroProcure.Domain.Enums;
+using PetroProcure.Domain.Modules.Legal;
 using PetroProcure.Reporting;
 
 namespace PetroProcure.Infrastructure.Persistence.Repositories;
@@ -16,6 +17,58 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
         var items = await db.PurchaseFileItems.AsNoTracking().Where(x => x.PurchaseFileId == id).OrderBy(x => x.MescCode).ToListAsync(ct);
         return new(file.Id, file.FileNumber, file.Title, file.Status.ToString(), department, file.CreatedAt, indent, Group(items.Select(x =>
             new ReportItemData(x.MescCode, x.MescGeneralGroupCode, x.GeneralDescription, x.SpecificDescription, Unit(x.UnitOfMeasureId), x.RequestedQuantity))));
+    }
+
+    public async Task<LegalComplianceReportData?> GetLegalComplianceAsync(Guid purchaseFileId, CancellationToken ct)
+    {
+        var file = await db.PurchaseFiles.AsNoTracking()
+            .Where(x => x.Id == purchaseFileId)
+            .Select(x => new { x.Id, x.FileNumber, x.Title, x.Status, x.CreatedAt })
+            .SingleOrDefaultAsync(ct);
+        if (file is null) return null;
+
+        var evaluation = await db.LegalProcurementRuleEvaluations.AsNoTracking()
+            .Where(x => x.PurchaseFileId == purchaseFileId || x.EntityId == purchaseFileId)
+            .OrderByDescending(x => x.EvaluatedAt)
+            .FirstOrDefaultAsync(ct);
+
+        var findings = evaluation is null
+            ? new List<ProcurementRuleFinding>()
+            : await db.LegalProcurementRuleFindings.AsNoTracking()
+                .Where(x => x.ProcurementRuleEvaluationId == evaluation.Id)
+                .OrderBy(x => x.Severity)
+                .ThenBy(x => x.Title)
+                .ToListAsync(ct);
+
+        var audits = await db.LegalRuleAuditLogs.AsNoTracking()
+            .Where(x => x.PurchaseFileId == purchaseFileId || x.EntityId == purchaseFileId)
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(ct);
+
+        var users = await db.Users.AsNoTracking()
+            .Where(x => audits.Select(a => a.UserId).Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.UserName ?? x.Email ?? x.Id.ToString(), ct);
+        var findingTitles = findings.ToDictionary(x => x.Id, x => x.Title);
+
+        return new LegalComplianceReportData(file.Id, file.FileNumber, file.Title, Text(file.Status), file.CreatedAt,
+            evaluation?.EvaluatedAt, evaluation?.Summary ?? "ارزیابی حقوقی ثبت نشده است.",
+            new LegalComplianceSummaryData(
+                findings.Count(x => x.Result == RuleResult.Pass),
+                findings.Count(x => x.Result == RuleResult.Fail),
+                findings.Count(x => x.Result == RuleResult.Warning),
+                findings.Count(x => x.Result == RuleResult.NotApplicable),
+                findings.Count(x => x.Result == RuleResult.NeedHumanReview || x.NeedHumanReview)),
+            findings.Where(x => x.Severity == RuleSeverity.Blocking && x.Result == RuleResult.Fail).Select(Finding).ToArray(),
+            findings.Where(x => x.Result == RuleResult.Warning || x.Severity == RuleSeverity.Warning).Select(Finding).ToArray(),
+            findings.Where(x => x.Result == RuleResult.NeedHumanReview || x.NeedHumanReview).Select(Finding).ToArray(),
+            audits.Select(x => new LegalComplianceAuditReportData(
+                x.Action,
+                x.FindingId.HasValue && findingTitles.TryGetValue(x.FindingId.Value, out var title) ? title : "—",
+                x.PreviousResult ?? "—",
+                x.NewResult ?? "—",
+                users.TryGetValue(x.UserId, out var user) ? user : x.UserId.ToString(),
+                x.Reason ?? x.Summary,
+                Date(x.CreatedAt))).ToArray());
     }
 
     public async Task<IndentReportData?> GetIndentAsync(Guid id, CancellationToken ct)
@@ -322,6 +375,54 @@ internal sealed class ReportDataProvider(PetroProcureDbContext db) : IReportData
         TenderType.NegotiatedTender => "مذاکره‌ای",
         _ => value.ToString()
     };
+    private static string Text(PurchaseFileStatus value) => value switch
+    {
+        PurchaseFileStatus.Draft => "پیش‌نویس",
+        PurchaseFileStatus.WaitingForIndentReview => "در انتظار بازبینی درخواست",
+        PurchaseFileStatus.WaitingForPurchaseDepartment => "در انتظار واحد خرید",
+        PurchaseFileStatus.InPurchaseDepartment => "در واحد خرید",
+        PurchaseFileStatus.WaitingForTechnicalReview => "در انتظار بررسی فنی",
+        PurchaseFileStatus.WaitingForTenderCommission => "در انتظار کمیسیون مناقصه",
+        PurchaseFileStatus.InTender => "در مناقصه",
+        PurchaseFileStatus.WaitingForContract => "در انتظار قرارداد",
+        PurchaseFileStatus.WaitingForPurchaseOrder => "در انتظار سفارش خرید",
+        PurchaseFileStatus.WaitingForWarehouseReceipt => "در انتظار رسید انبار",
+        PurchaseFileStatus.Completed => "تکمیل‌شده",
+        PurchaseFileStatus.Cancelled => "لغوشده",
+        PurchaseFileStatus.Archived => "بایگانی‌شده",
+        _ => value.ToString()
+    };
+    private static string Text(RuleResult value) => value switch
+    {
+        RuleResult.Pass => "قبول",
+        RuleResult.Fail => "رد",
+        RuleResult.Warning => "هشدار",
+        RuleResult.NotApplicable => "غیرقابل اعمال",
+        RuleResult.NeedHumanReview => "نیازمند بازبینی انسانی",
+        _ => value.ToString()
+    };
+    private static string Text(RuleSeverity value) => value switch
+    {
+        RuleSeverity.Info => "اطلاعی",
+        RuleSeverity.Warning => "هشدار",
+        RuleSeverity.Critical => "بحرانی",
+        RuleSeverity.Blocking => "مسدودکننده",
+        _ => value.ToString()
+    };
+
+    private static LegalComplianceFindingReportData Finding(ProcurementRuleFinding finding) =>
+        new(
+            finding.Title,
+            Text(finding.Result),
+            Text(finding.Severity),
+            finding.LegalReference,
+            finding.Description,
+            finding.Result == RuleResult.Fail
+                ? "رفع علت عدم انطباق و اجرای دوباره ارزیابی حقوقی."
+                : "پیگیری طبق توضیح و مرجع حقوقی ثبت‌شده.",
+            finding.IsAiGenerated,
+            finding.NeedHumanReview,
+            finding.CitationReferences ?? "—");
     private static string Text(TenderStatus value) => value switch
     {
         TenderStatus.Draft => "پیش‌نویس",

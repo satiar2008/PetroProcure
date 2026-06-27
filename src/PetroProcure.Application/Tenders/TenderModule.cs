@@ -1,4 +1,5 @@
 using PetroProcure.Application.Security;
+using PetroProcure.Application.Legal;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Tenders;
 using PetroProcure.Domain.Enums;
@@ -95,7 +96,8 @@ public interface ITenderComparisonService;
 public sealed class TenderComparisonService : ITenderComparisonService;
 
 public sealed class TenderCommandHandler(ITenderRepository repository, ITenderNumberService numbers,
-    ITenderEligibilityService eligibility, ICurrentUserService currentUser)
+    ITenderEligibilityService eligibility, ICurrentUserService currentUser,
+    IProcurementRuleGateService? gateService = null)
 {
     public async Task<TenderDetailDto> Handle(CreateTenderCommand command, CancellationToken ct = default)
     {
@@ -182,6 +184,7 @@ public sealed class TenderCommandHandler(ITenderRepository repository, ITenderNu
     {
         EnsureUser();
         var tender = await Find(command.TenderId, true, ct);
+        await EnsureGateAllowsAsync(tender.Id, ProcurementRuleGateTransitions.TenderPublish, ct);
         tender.Publish(currentUser.UserId);
         await repository.SaveChangesAsync(ct);
     }
@@ -248,6 +251,7 @@ public sealed class TenderCommandHandler(ITenderRepository repository, ITenderNu
     {
         EnsureUser();
         var tender = await Find(command.TenderId, true, ct);
+        await EnsureGateAllowsAsync(tender.Id, ProcurementRuleGateTransitions.TenderSelectWinner, ct);
         tender.SelectWinner(command.TenderBidId, currentUser.UserId, command.Reason, command.Notes);
         await repository.SaveChangesAsync(ct);
     }
@@ -289,6 +293,16 @@ public sealed class TenderCommandHandler(ITenderRepository repository, ITenderNu
     private async Task<TenderDetailDto> Detail(Guid id, CancellationToken ct) =>
         await repository.GetDetailAsync(id, ct) ?? throw new TenderNotFoundException("Tender was not found.");
     private void EnsureUser() { if (!currentUser.IsAuthenticated || currentUser.UserId == Guid.Empty) throw new CurrentUserNotAuthenticatedException(); }
+    private async Task EnsureGateAllowsAsync(Guid entityId, string transitionName, CancellationToken ct)
+    {
+        if (gateService is null) return;
+        var result = await gateService.CheckTransitionAsync(entityId, transitionName, GateUser(), ct);
+        if (result.IsBlocked)
+            throw new LegalRuleValidationException("Sensitive transition is blocked by unresolved legal rule findings.");
+    }
+
+    private ProcurementRuleGateUserContext GateUser() =>
+        new(currentUser.UserId, currentUser.IsSystemAdmin, currentUser.Permissions);
 }
 
 public sealed class TenderQueryHandler(ITenderRepository repository)

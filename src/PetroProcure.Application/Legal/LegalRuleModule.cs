@@ -1,8 +1,10 @@
 using PetroProcure.Application.Security;
 using PetroProcure.Application.Documents;
+using PetroProcure.Application.Rag;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Legal;
 using PetroProcure.Domain.Enums;
+using PetroProcure.Domain.Modules.Ai;
 using PetroProcure.Domain.Modules.Legal;
 
 namespace PetroProcure.Application.Legal;
@@ -30,11 +32,50 @@ public sealed record SearchLegalArticlesQuery(LegalArticleSearchRequest Request)
 public sealed record SearchLegalClausesQuery(LegalClauseSearchRequest Request);
 public sealed record GetLegalClauseContextQuery(Guid ClauseId);
 public sealed record GetProcurementRulesQuery(ProcurementRuleListRequest Request);
+public sealed record GetProcurementRuleByIdQuery(Guid Id);
 public sealed record GetRuleVersionsQuery(Guid RuleId);
 public sealed record GetPurchaseFileRuleEvaluationsQuery(Guid PurchaseFileId);
 
+// AI-RAG-01: expanded evaluation context. The original eight positional members are preserved
+// (backward compatible — existing constructions and the six built-in conditions still work).
+// All new members are init-only with safe defaults / empty collections, so evaluation stays
+// null-safe when tender, supplier, amount, deadline, approval, or workflow data is missing.
 public sealed record RuleEvaluationContext(string EntityType, Guid EntityId, Guid? PurchaseFileId, Guid? TenderId,
-    string? Status, bool HasTender, int ItemCount, IReadOnlySet<string> DocumentTypes);
+    string? Status, bool HasTender, int ItemCount, IReadOnlySet<string> DocumentTypes)
+{
+    public string? FileNumber { get; init; }
+    public Guid? CurrentDepartmentId { get; init; }
+    public Guid? RequestingDepartmentId { get; init; }
+    public Guid? ApplicantDepartmentId { get; init; }
+    public decimal? EstimatedAmount { get; init; }
+    public decimal? FinalAmount { get; init; }
+    public string? Currency { get; init; }
+    public decimal TotalRequestedQuantity { get; init; }
+    public string? TenderType { get; init; }
+    public int SupplierCount { get; init; }
+    public int OfferCount { get; init; }
+    public int ExistingDocumentCount { get; init; }
+    public string? Priority { get; init; }
+    public DateTime? CreatedAt { get; init; }
+    public DateTime? InquiryDeadline { get; init; }
+    public DateTime? TenderDeadline { get; init; }
+    public DateTime? TechnicalReviewDeadline { get; init; }
+    public IReadOnlyList<string> ApprovalStatuses { get; init; } = [];
+    public IReadOnlyList<string> WorkflowStatuses { get; init; } = [];
+    public IReadOnlyList<string> LegalReferences { get; init; } = [];
+    public IReadOnlyList<Guid> UserDepartmentIds { get; init; } = [];
+}
+
+public static class RuleEvaluationContextMapping
+{
+    public static RuleEvaluationContextDto ToDto(this RuleEvaluationContext c) => new(
+        c.EntityType, c.EntityId, c.PurchaseFileId, c.TenderId, c.FileNumber, c.Status,
+        c.CurrentDepartmentId, c.RequestingDepartmentId, c.ApplicantDepartmentId, c.EstimatedAmount,
+        c.FinalAmount, c.Currency, c.ItemCount, c.TotalRequestedQuantity, c.HasTender, c.TenderType,
+        c.SupplierCount, c.OfferCount, c.DocumentTypes.ToArray(), c.ExistingDocumentCount, c.CreatedAt,
+        c.InquiryDeadline, c.TenderDeadline, c.TechnicalReviewDeadline, c.ApprovalStatuses,
+        c.WorkflowStatuses, c.LegalReferences, c.UserDepartmentIds);
+}
 
 public interface ILegalClauseSearchService
 {
@@ -63,6 +104,28 @@ public interface IAiRuleExplanationService
     Task<string> ExplainAsync(ProcurementRuleFindingDto finding, CancellationToken ct = default);
 }
 
+public sealed record AiLegalEvaluationCitation(string Title, string Reference, string Preview);
+
+public sealed record AiLegalEvaluationRequest(
+    RuleEvaluationContext Context,
+    ProcurementRuleVersion Rule,
+    ConditionEvaluationResult DeterministicOutcome,
+    IReadOnlyList<AiLegalEvaluationCitation> Citations);
+
+public sealed record AiLegalEvaluationFinding(
+    string Title,
+    string Description,
+    RuleSeverity Severity,
+    decimal? Confidence = null,
+    string? LegalReference = null,
+    IReadOnlyList<string>? CitationReferences = null);
+
+public interface IAiLegalEvaluationService
+{
+    Task<IReadOnlyList<AiLegalEvaluationFinding>> AnalyzeAsync(
+        AiLegalEvaluationRequest request, CancellationToken ct = default);
+}
+
 public interface IProcurementRuleEvaluator
 {
     Task<ProcurementRuleEvaluationDto> EvaluateAsync(RuleEvaluationContext context, CancellationToken ct = default);
@@ -77,6 +140,8 @@ public interface ILegalRuleRepository
     Task AddClauseAsync(LegalClause clause, CancellationToken ct);
     Task AddRuleAsync(ProcurementRule rule, ProcurementRuleVersion version, CancellationToken ct);
     Task<ProcurementRule?> FindRuleAsync(Guid id, bool includeVersions, CancellationToken ct);
+    Task<ProcurementRule?> FindRuleByCodeAsync(string code, bool includeVersions, CancellationToken ct);
+    Task<ProcurementRuleDto?> GetRuleAsync(Guid id, CancellationToken ct);
     Task<ProcurementRuleVersion?> FindRuleVersionAsync(Guid id, CancellationToken ct);
     Task<ProcurementRuleVersion?> FindLatestDraftVersionAsync(Guid ruleId, CancellationToken ct);
     Task<ProcurementRuleVersion?> FindPendingVersionAsync(Guid ruleId, CancellationToken ct);
@@ -99,7 +164,8 @@ public interface ILegalRuleRepository
 public sealed class LegalRuleCommandHandler(
     ILegalRuleRepository repository,
     ICurrentUserService currentUser,
-    ILegalDocumentStorageService legalDocumentStorage)
+    ILegalDocumentStorageService legalDocumentStorage,
+    IRagIngestionQueue ingestionQueue)
 {
     public async Task<LegalDocumentDto> Handle(UploadLegalDocumentCommand command, CancellationToken ct = default)
     {
@@ -154,6 +220,9 @@ public sealed class LegalRuleCommandHandler(
         await repository.AddClauseAsync(clause, ct);
         await Audit("LegalClause", clause.Id, "Create", $"Created clause {clause.ClauseNumber}", ct);
         await repository.SaveChangesAsync(ct);
+        await ingestionQueue.EnqueueAsync(new EmbeddingIngestionPayload(
+            AiDocumentSourceType.LegalClause,
+            clause.Id), currentUser.UserId, ct);
         return (await repository.GetArticlesByDocumentAsync(article.LegalDocumentId, ct))
             .SelectMany(x => x.Clauses).Single(x => x.Id == clause.Id);
     }
@@ -218,6 +287,10 @@ public sealed class LegalRuleCommandHandler(
         rule.SetActiveVersion(pending.Id);
         await Audit("ProcurementRuleVersion", pending.Id, "Approve", command.Comment ?? "Approved rule version", ct);
         await repository.SaveChangesAsync(ct);
+        if (pending.LegalClauseId is { } legalClauseId)
+            await ingestionQueue.EnqueueAsync(new EmbeddingIngestionPayload(
+                AiDocumentSourceType.LegalClause,
+                legalClauseId), currentUser.UserId, ct);
     }
 
     public async Task Handle(DeprecateRuleCommand command, CancellationToken ct = default)
@@ -267,6 +340,7 @@ public sealed class LegalRuleQueryHandler(ILegalRuleRepository repository, ILega
     public Task<PagedResult<LegalClauseContextDto>> Handle(SearchLegalClausesQuery query, CancellationToken ct = default) => repository.SearchClauseContextsAsync(query.Request, ct);
     public Task<LegalClauseContextDto?> Handle(GetLegalClauseContextQuery query, CancellationToken ct = default) => repository.GetClauseContextAsync(query.ClauseId, ct);
     public Task<PagedResult<ProcurementRuleDto>> Handle(GetProcurementRulesQuery query, CancellationToken ct = default) => repository.GetRulesAsync(query.Request, ct);
+    public Task<ProcurementRuleDto?> Handle(GetProcurementRuleByIdQuery query, CancellationToken ct = default) => repository.GetRuleAsync(query.Id, ct);
     public Task<IReadOnlyList<ProcurementRuleVersionDto>> Handle(GetRuleVersionsQuery query, CancellationToken ct = default) => repository.GetRuleVersionsAsync(query.RuleId, ct);
     public Task<IReadOnlyList<ProcurementRuleEvaluationDto>> Handle(GetPurchaseFileRuleEvaluationsQuery query, CancellationToken ct = default) => repository.GetEvaluationsByPurchaseFileAsync(query.PurchaseFileId, ct);
 }
@@ -283,8 +357,22 @@ public sealed class MockAiRuleExplanationService : IAiRuleExplanationService
         Task.FromResult($"{finding.Title}: {finding.Description} مرجع: {finding.LegalReference}");
 }
 
-public sealed class DeterministicProcurementRuleEvaluator(ILegalRuleRepository repository, ICurrentUserService currentUser) : IProcurementRuleEvaluator
+public sealed class NullAiLegalEvaluationService : IAiLegalEvaluationService
 {
+    public Task<IReadOnlyList<AiLegalEvaluationFinding>> AnalyzeAsync(
+        AiLegalEvaluationRequest request, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AiLegalEvaluationFinding>>([]);
+}
+
+public sealed class DeterministicProcurementRuleEvaluator(
+    ILegalRuleRepository repository,
+    ICurrentUserService currentUser,
+    IConditionEvaluator? conditionEvaluator = null) : IProcurementRuleEvaluator
+{
+    // AI-RAG-02: JSON-driven condition engine. Falls back to the legacy ConditionType switch
+    // when ConditionValue is not a valid JSON condition (backward compatibility).
+    private readonly IConditionEvaluator _conditions = conditionEvaluator ?? JsonRuleConditionEvaluator.CreateDefault();
+
     public async Task<ProcurementRuleEvaluationDto> EvaluateAsync(RuleEvaluationContext context, CancellationToken ct = default)
     {
         var versions = await repository.GetActiveRuleVersionsAsync(ct);
@@ -295,9 +383,11 @@ public sealed class DeterministicProcurementRuleEvaluator(ILegalRuleRepository r
 
         foreach (var version in versions)
         {
-            var result = Evaluate(version, context);
+            var outcome = await ResolveAsync(version, context, ct);
+            var severity = outcome.SeverityOverride ?? version.Severity;
+            var description = outcome.Message ?? Description(version, outcome.Result);
             evaluation.AddFinding(new ProcurementRuleFinding(Guid.NewGuid(), evaluation.Id, version.ProcurementRuleId,
-                version.Id, result, version.Severity, version.Title, Description(version, result),
+                version.Id, outcome.Result, severity, version.Title, description,
                 version.LegalReference, version.LegalArticleId, version.LegalClauseId));
         }
 
@@ -307,10 +397,20 @@ public sealed class DeterministicProcurementRuleEvaluator(ILegalRuleRepository r
             .OrderByDescending(x => x.EvaluatedAt).First(x => x.Id == evaluation.Id);
     }
 
-    private static RuleResult Evaluate(ProcurementRuleVersion rule, RuleEvaluationContext context)
+    private async Task<ConditionEvaluationResult> ResolveAsync(ProcurementRuleVersion version,
+        RuleEvaluationContext context, CancellationToken ct)
     {
-        if (rule.EvaluationMode == RuleEvaluationMode.ManualReview) return RuleResult.NeedHumanReview;
-        return rule.ConditionType.Trim().ToLowerInvariant() switch
+        if (version.EvaluationMode == RuleEvaluationMode.ManualReview)
+            return new ConditionEvaluationResult(RuleResult.NeedHumanReview);
+
+        if (_conditions.CanEvaluate(version))
+            return await _conditions.EvaluateAsync(version, context, ct);
+
+        return new ConditionEvaluationResult(EvaluateLegacy(version, context));
+    }
+
+    private static RuleResult EvaluateLegacy(ProcurementRuleVersion rule, RuleEvaluationContext context) =>
+        rule.ConditionType.Trim().ToLowerInvariant() switch
         {
             "alwayspass" => RuleResult.Pass,
             "alwaysfail" => RuleResult.Fail,
@@ -320,7 +420,143 @@ public sealed class DeterministicProcurementRuleEvaluator(ILegalRuleRepository r
             "purchasefilestatus" => string.Equals(context.Status, rule.ConditionValue, StringComparison.OrdinalIgnoreCase) ? RuleResult.Pass : RuleResult.NotApplicable,
             _ => RuleResult.NotApplicable
         };
+
+    private static string Description(ProcurementRuleVersion rule, RuleResult result) => result switch
+    {
+        RuleResult.Pass => $"قاعده «{rule.Title}» رعایت شده است.",
+        RuleResult.Fail => $"قاعده «{rule.Title}» رعایت نشده است و نیازمند بررسی مسئول پرونده است.",
+        RuleResult.Warning => $"قاعده «{rule.Title}» هشدار ایجاد کرده است.",
+        RuleResult.NeedHumanReview => $"قاعده «{rule.Title}» نیازمند بررسی انسانی است.",
+        _ => $"قاعده «{rule.Title}» برای این پرونده قابل اعمال نیست."
+    };
+}
+
+public sealed class HybridProcurementRuleEvaluator(
+    ILegalRuleRepository repository,
+    ICurrentUserService currentUser,
+    IAiLegalEvaluationService ai,
+    IRagRetriever rag,
+    IConditionEvaluator? conditionEvaluator = null) : IProcurementRuleEvaluator
+{
+    private readonly IConditionEvaluator _conditions = conditionEvaluator ?? JsonRuleConditionEvaluator.CreateDefault();
+
+    public async Task<ProcurementRuleEvaluationDto> EvaluateAsync(RuleEvaluationContext context, CancellationToken ct = default)
+    {
+        var versions = await repository.GetActiveRuleVersionsAsync(ct);
+        var evaluation = new ProcurementRuleEvaluation(Guid.NewGuid(), context.EntityType, context.EntityId,
+            context.PurchaseFileId, context.TenderId,
+            "ارزیابی ترکیبی قوانین انجام شد. نتایج هوش مصنوعی پیشنهادی هستند و جایگزین تصمیم انسانی یا قواعد قطعی نمی‌شوند.",
+            currentUser.UserId);
+
+        foreach (var version in versions)
+        {
+            var outcome = await ResolveDeterministicAsync(version, context, ct);
+            var severity = outcome.SeverityOverride ?? version.Severity;
+            var description = outcome.Message ?? Description(version, outcome.Result);
+            evaluation.AddFinding(new ProcurementRuleFinding(Guid.NewGuid(), evaluation.Id, version.ProcurementRuleId,
+                version.Id, outcome.Result, severity, version.Title, description,
+                version.LegalReference, version.LegalArticleId, version.LegalClauseId,
+                needHumanReview: outcome.Result == RuleResult.NeedHumanReview));
+
+            if (!ShouldRequestAi(version)) continue;
+
+            foreach (var finding in await TryAnalyzeWithAiAsync(version, context, outcome, ct))
+            {
+                evaluation.AddFinding(new ProcurementRuleFinding(Guid.NewGuid(), evaluation.Id, version.ProcurementRuleId,
+                    version.Id, RuleResult.NeedHumanReview, AdvisorySeverity(finding.Severity),
+                    finding.Title, finding.Description,
+                    string.IsNullOrWhiteSpace(finding.LegalReference) ? version.LegalReference : finding.LegalReference,
+                    version.LegalArticleId, version.LegalClauseId,
+                    isAiGenerated: true, needHumanReview: true, confidence: finding.Confidence,
+                    citationReferences: CitationReferences(finding.CitationReferences)));
+            }
+        }
+
+        await repository.AddEvaluationAsync(evaluation, ct);
+        await repository.SaveChangesAsync(ct);
+        return (await repository.GetEvaluationsByPurchaseFileAsync(context.PurchaseFileId ?? context.EntityId, ct))
+            .OrderByDescending(x => x.EvaluatedAt).First(x => x.Id == evaluation.Id);
     }
+
+    private async Task<ConditionEvaluationResult> ResolveDeterministicAsync(ProcurementRuleVersion version,
+        RuleEvaluationContext context, CancellationToken ct)
+    {
+        if (version.EvaluationMode == RuleEvaluationMode.ManualReview)
+            return new ConditionEvaluationResult(RuleResult.NeedHumanReview);
+
+        if (_conditions.CanEvaluate(version))
+            return await _conditions.EvaluateAsync(version, context, ct);
+
+        return new ConditionEvaluationResult(EvaluateLegacy(version, context));
+    }
+
+    private async Task<IReadOnlyList<AiLegalEvaluationFinding>> TryAnalyzeWithAiAsync(
+        ProcurementRuleVersion version,
+        RuleEvaluationContext context,
+        ConditionEvaluationResult outcome,
+        CancellationToken ct)
+    {
+        try
+        {
+            var citations = await RetrieveCitationsAsync(version, context, ct);
+            return await ai.AnalyzeAsync(new AiLegalEvaluationRequest(context, version, outcome, citations), ct);
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private async Task<IReadOnlyList<AiLegalEvaluationCitation>> RetrieveCitationsAsync(
+        ProcurementRuleVersion version, RuleEvaluationContext context, CancellationToken ct)
+    {
+        var query = string.Join(' ', new[]
+        {
+            version.Title,
+            version.LegalReference,
+            version.ConditionDescription,
+            context.FileNumber,
+            context.TenderType
+        }.Where(x => !string.IsNullOrWhiteSpace(x)));
+
+        if (string.IsNullOrWhiteSpace(query)) return [];
+
+        var response = await rag.RetrieveAsync(new RagRetrieveRequest(
+                query,
+                RagRetrievalScope.LegalCorpus,
+                TopK: 3,
+                SourceTypes: [AiDocumentSourceType.LegalClause]),
+            new RagUserContext(currentUser.UserId, currentUser.IsSystemAdmin,
+                currentUser.Permissions, currentUser.DepartmentIds),
+            ct);
+
+        return response.Results
+            .Select(x => new AiLegalEvaluationCitation(x.CitationTitle, x.CitationReference, x.TextPreview))
+            .ToArray();
+    }
+
+    private static bool ShouldRequestAi(ProcurementRuleVersion version) =>
+        version.EvaluationMode != RuleEvaluationMode.Automatic
+        && (version.EvaluationMode is RuleEvaluationMode.SemiAutomatic or RuleEvaluationMode.ManualReview
+            || version.RuleType == RuleType.Evaluation);
+
+    private static RuleSeverity AdvisorySeverity(RuleSeverity severity) =>
+        severity == RuleSeverity.Blocking ? RuleSeverity.Critical : severity;
+
+    private static string? CitationReferences(IReadOnlyList<string>? references) =>
+        references is { Count: > 0 } ? string.Join(Environment.NewLine, references.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct()) : null;
+
+    private static RuleResult EvaluateLegacy(ProcurementRuleVersion rule, RuleEvaluationContext context) =>
+        rule.ConditionType.Trim().ToLowerInvariant() switch
+        {
+            "alwayspass" => RuleResult.Pass,
+            "alwaysfail" => RuleResult.Fail,
+            "requireddocumenttype" => context.DocumentTypes.Contains(rule.ConditionValue) ? RuleResult.Pass : RuleResult.Fail,
+            "minimumitems" => int.TryParse(rule.ConditionValue, out var min) && context.ItemCount >= min ? RuleResult.Pass : RuleResult.Warning,
+            "hastender" => context.HasTender ? RuleResult.Pass : RuleResult.Warning,
+            "purchasefilestatus" => string.Equals(context.Status, rule.ConditionValue, StringComparison.OrdinalIgnoreCase) ? RuleResult.Pass : RuleResult.NotApplicable,
+            _ => RuleResult.NotApplicable
+        };
 
     private static string Description(ProcurementRuleVersion rule, RuleResult result) => result switch
     {

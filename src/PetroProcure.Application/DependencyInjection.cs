@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PetroProcure.Application.Mesc;
 using PetroProcure.Application.Indents;
 using PetroProcure.Application.PurchaseFiles;
@@ -14,6 +15,8 @@ using PetroProcure.Application.Contracts;
 using PetroProcure.Application.PurchaseOrders;
 using PetroProcure.Application.Warehouse;
 using PetroProcure.Application.Legal;
+using PetroProcure.Application.Rag;
+using PetroProcure.Application.Ai;
 
 namespace PetroProcure.Application;
 
@@ -65,8 +68,31 @@ public static class DependencyInjection
         services.AddScoped<LegalRuleQueryHandler>();
         services.AddScoped<LegalRuleEvaluationHandler>();
         services.AddScoped<ILegalClauseSearchService, LegalClauseSearchService>();
-        services.AddScoped<PetroProcure.Application.Legal.IProcurementRuleEvaluator, DeterministicProcurementRuleEvaluator>();
+        services.AddScoped<PetroProcure.Application.Legal.IConditionEvaluator, PetroProcure.Application.Legal.JsonRuleConditionEvaluator>();
+        services.AddScoped<PetroProcure.Application.Legal.IProcurementRuleImportService, PetroProcure.Application.Legal.ProcurementRuleImportService>();
+        services.AddScoped<PetroProcure.Application.Legal.IProcurementRuleEvaluator, HybridProcurementRuleEvaluator>();
         services.AddScoped<IAiRuleExplanationService, MockAiRuleExplanationService>();
+        // Fallback only: AddPetroProcureAi replaces this with AiCoreLegalEvaluationService in production.
+        services.TryAddScoped<IAiLegalEvaluationService, NullAiLegalEvaluationService>();
+        services.AddScoped<IProcurementRuleGateService, ProcurementRuleGateService>();
+        services.AddScoped<IAiAuditService, LoggingAiAuditService>();
+        services.AddScoped<IAiJobNotifier, NullAiJobNotifier>();
+        services.AddScoped<IAiJobQueueService, AiJobQueueService>();
+        services.AddScoped<IAiCoreCallbackService, AiCoreCallbackService>();
+        services.AddScoped<IGroundedAiAnalysisService, GroundedAiAnalysisService>();
+        // Fallback only: AddPetroProcureAi replaces this with AiCoreGroundedAnswerGenerator in production.
+        services.TryAddScoped<IGroundedAiAnswerGenerator, NullGroundedAiAnswerGenerator>();
+        services.Configure<PurchaseFileAiContextOptions>(configuration.GetSection(PurchaseFileAiContextOptions.SectionName));
+        services.AddScoped<IPurchaseFileAiContextBuilder, PurchaseFileAiContextBuilder>();
+        services.Configure<RagOptions>(configuration.GetSection(RagOptions.SectionName));
+        services.AddScoped<IChunkingService, ChunkingService>();
+        services.AddScoped<IRagSearchService, RagSearchService>();
+        services.AddScoped<IRagRetriever, RagRetriever>();
+        services.AddScoped<IRagIngestionQueue, RagIngestionQueue>();
+        services.AddScoped<IRagIngestionService, RagIngestionService>();
+        services.AddScoped<IRagMaintenanceService, RagMaintenanceService>();
+        services.AddScoped<IRagQualityEvaluator, RagQualityEvaluator>();
+        services.AddMemoryCache();
         return services;
     }
 }

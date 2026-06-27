@@ -59,6 +59,8 @@ public interface IAiCoreSettingsProvider
 public interface IAiCoreClient
 {
     Task<AiCoreAnalysisResponse> SendAnalysisAsync(AiCoreAnalysisRequest request, CancellationToken ct = default);
+    // AI-RAG-11: raw text passthrough — sends messages and JsonMode unchanged (no analysis-JSON wrapping).
+    Task<AiCoreTextResponse> SendTextAsync(AiCoreTextRequest request, CancellationToken ct = default);
     Task<AiChatResponse> SendChatAsync(AiChatRequest request, CancellationToken ct = default);
     Task<AiProviderHealthDto> GetHealthAsync(CancellationToken ct = default);
 }
@@ -96,4 +98,17 @@ public interface IAiAnalysisService
     Task<AiAnalysisResultDto> AnalyzeLegalComplianceAsync(string entityType, Guid id, string? appliesTo, string? userQuestion, CancellationToken ct = default);
 }
 
-public sealed class AiCoreClientException(string message) : InvalidOperationException(message);
+//public sealed class AiCoreClientException(string message) : InvalidOperationException(message);
+
+public sealed class AiCoreClientException : InvalidOperationException
+{
+    public AiCoreClientException(string message)
+        : base(message)
+    {
+    }
+
+    public AiCoreClientException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}

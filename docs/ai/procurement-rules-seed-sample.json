@@ -1,0 +1,65 @@
+{
+  "ruleSetTitle": "قوانین پایه خرید پالایشگاه",
+  "rules": [
+    {
+      "code": "PR-DOC-INDENT",
+      "title": "وجود درخواست خرید (Indent) الزامی است",
+      "ruleType": "Document",
+      "severity": "Critical",
+      "evaluationMode": "Automatic",
+      "conditionType": "json",
+      "conditionValue": "{ \"op\": \"exists\", \"field\": \"DocumentTypes\", \"value\": \"Indent\" }",
+      "legalReference": "آیین‌نامه معاملات - ماده ۳",
+      "activate": true,
+      "version": 1
+    },
+    {
+      "code": "PR-DOC-TECHSPEC",
+      "title": "مشخصات فنی پیوست الزامی است",
+      "ruleType": "Document",
+      "severity": "Blocking",
+      "evaluationMode": "Automatic",
+      "conditionType": "json",
+      "conditionValue": "{ \"op\": \"exists\", \"field\": \"DocumentTypes\", \"value\": \"TechnicalSpecification\" }",
+      "legalReference": "آیین‌نامه معاملات - ماده ۴",
+      "activate": true,
+      "version": 1
+    },
+    {
+      "code": "PR-MIN-SUPPLIERS",
+      "title": "حداقل سه تأمین‌کننده در استعلام/مناقصه",
+      "ruleType": "Checklist",
+      "severity": "Critical",
+      "evaluationMode": "Automatic",
+      "conditionType": "json",
+      "conditionValue": "{ \"op\": \"count>=\", \"field\": \"SupplierCount\", \"value\": 3 }",
+      "legalReference": "آیین‌نامه معاملات - ماده ۱۱",
+      "activate": true,
+      "version": 1
+    },
+    {
+      "code": "PR-HIGH-VALUE-TENDER",
+      "title": "خریدهای با مبلغ بالا باید از طریق مناقصه انجام شوند",
+      "ruleType": "Threshold",
+      "severity": "Critical",
+      "evaluationMode": "Automatic",
+      "conditionType": "json",
+      "conditionValue": "{ \"none\": [ { \"all\": [ { \"op\": \">=\", \"field\": \"FinalAmount\", \"value\": 1000000000 }, { \"op\": \"=\", \"field\": \"HasTender\", \"value\": 0 } ] } ] }",
+      "legalReference": "آیین‌نامه معاملات - ماده ۱۲",
+      "activate": true,
+      "version": 1
+    },
+    {
+      "code": "PR-TENDER-OVERDUE",
+      "title": "مهلت مناقصه نباید گذشته باشد",
+      "ruleType": "Deadline",
+      "severity": "Warning",
+      "evaluationMode": "Automatic",
+      "conditionType": "json",
+      "conditionValue": "{ \"op\": \"overdue\", \"field\": \"TenderDeadline\" }",
+      "legalReference": "آیین‌نامه معاملات - ماده ۱۵",
+      "activate": true,
+      "version": 1
+    }
+  ]
+}

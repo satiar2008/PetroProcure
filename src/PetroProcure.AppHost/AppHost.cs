@@ -17,4 +17,11 @@ builder.AddProject<Projects.PetroProcure_Web>("web")
     .WithReference(api)
     .WaitFor(api);
 
+// The background worker processes AI evaluation jobs from the same database. It must receive the
+// PetroProcureDb connection string from Aspire; without this reference it throws on startup
+// ("Connection string 'PetroProcureDb' was not found.").
+builder.AddProject<Projects.PetroProcure_Worker>("worker")
+    .WithReference(sql)
+    .WaitFor(sql);
+
 builder.Build().Run();

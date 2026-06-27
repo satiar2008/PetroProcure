@@ -1,7 +1,9 @@
 using PetroProcure.Application.Legal;
+using PetroProcure.Application.Rag;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Legal;
 using PetroProcure.Domain.Enums;
+using PetroProcure.Domain.Modules.Ai;
 using PetroProcure.Domain.Modules.Legal;
 
 namespace PetroProcure.UnitTests.Domain;
@@ -118,6 +120,73 @@ public sealed class LegalRuleTests
     }
 
     [Fact]
+    public async Task HybridAutomaticRuleDoesNotCallAi()
+    {
+        var repo = new FakeLegalRuleRepository();
+        repo.ActiveVersions.Add(ApprovedVersion("auto", "alwayspass", "true", RuleEvaluationMode.Automatic));
+        var ai = new FakeAiLegalEvaluationService();
+        var evaluator = Hybrid(repo, ai);
+
+        var purchaseFileId = Guid.NewGuid();
+        var result = await evaluator.EvaluateAsync(new RuleEvaluationContext(
+            "PurchaseFile", purchaseFileId, purchaseFileId, null, "Open", false, 1, new HashSet<string>()));
+
+        Assert.Equal(0, ai.CallCount);
+        Assert.Single(result.Findings);
+        Assert.DoesNotContain(result.Findings, x => x.IsAiGenerated);
+    }
+
+    [Fact]
+    public async Task HybridSemiAutomaticRuleCallsAiAndStoresProposedFinding()
+    {
+        var repo = new FakeLegalRuleRepository();
+        repo.ActiveVersions.Add(ApprovedVersion("semi", "alwayspass", "true", RuleEvaluationMode.SemiAutomatic));
+        var ai = new FakeAiLegalEvaluationService();
+        var evaluator = Hybrid(repo, ai);
+
+        var purchaseFileId = Guid.NewGuid();
+        var result = await evaluator.EvaluateAsync(new RuleEvaluationContext(
+            "PurchaseFile", purchaseFileId, purchaseFileId, null, "Open", false, 1, new HashSet<string>()));
+
+        Assert.Equal(1, ai.CallCount);
+        var aiFinding = Assert.Single(result.Findings, x => x.IsAiGenerated);
+        Assert.Equal(RuleResult.NeedHumanReview, aiFinding.Result);
+        Assert.True(aiFinding.NeedHumanReview);
+        Assert.Equal(0.72m, aiFinding.Confidence);
+    }
+
+    [Fact]
+    public async Task HybridAiFindingIncludesLegalCitationWhenAvailable()
+    {
+        var repo = new FakeLegalRuleRepository();
+        repo.ActiveVersions.Add(ApprovedVersion("semi", "alwayspass", "true", RuleEvaluationMode.SemiAutomatic));
+        var evaluator = Hybrid(repo, new FakeAiLegalEvaluationService());
+
+        var purchaseFileId = Guid.NewGuid();
+        var result = await evaluator.EvaluateAsync(new RuleEvaluationContext(
+            "PurchaseFile", purchaseFileId, purchaseFileId, null, "Open", false, 1, new HashSet<string>()));
+
+        var aiFinding = Assert.Single(result.Findings, x => x.IsAiGenerated);
+        Assert.Contains("/api/legal/clauses/", aiFinding.CitationReferences);
+    }
+
+    [Fact]
+    public async Task HybridAiFailureDoesNotBreakDeterministicEvaluation()
+    {
+        var repo = new FakeLegalRuleRepository();
+        repo.ActiveVersions.Add(ApprovedVersion("semi", "alwaysfail", "true", RuleEvaluationMode.SemiAutomatic));
+        var evaluator = Hybrid(repo, new FakeAiLegalEvaluationService(throwOnAnalyze: true));
+
+        var purchaseFileId = Guid.NewGuid();
+        var result = await evaluator.EvaluateAsync(new RuleEvaluationContext(
+            "PurchaseFile", purchaseFileId, purchaseFileId, null, "Open", false, 1, new HashSet<string>()));
+
+        Assert.Single(result.Findings);
+        Assert.Equal(RuleResult.Fail, result.Findings[0].Result);
+        Assert.False(result.Findings[0].IsAiGenerated);
+    }
+
+    [Fact]
     public void OldEvaluationsKeepOriginalRuleVersion()
     {
         var ruleId = Guid.NewGuid();
@@ -146,10 +215,17 @@ public sealed class LegalRuleTests
 
     private static ProcurementRuleVersion Version(Guid? ruleId = null, int versionNo = 1, string title = "Rule",
         RuleEvaluationMode mode = RuleEvaluationMode.Automatic, Guid? legalClauseId = null,
-        string legalReference = "ماده ۱", string conditionType = "alwayspass", string conditionValue = "true") =>
-        new(Guid.NewGuid(), ruleId ?? Guid.NewGuid(), versionNo, title, RuleType.Checklist,
+        string legalReference = "ماده ۱", string conditionType = "alwayspass", string conditionValue = "true",
+        RuleType ruleType = RuleType.Checklist) =>
+        new(Guid.NewGuid(), ruleId ?? Guid.NewGuid(), versionNo, title, ruleType,
             RuleSeverity.Warning, mode, null, legalClauseId ?? Guid.NewGuid(), legalReference,
             conditionType, conditionValue, "test rule", Guid.NewGuid());
+
+    private static HybridProcurementRuleEvaluator Hybrid(
+        FakeLegalRuleRepository repo,
+        FakeAiLegalEvaluationService ai) =>
+        new(repo, new TestCurrentUser(Guid.NewGuid(), isSystemAdmin: true),
+            ai, new FakeRagRetriever());
 
     private sealed class FakeLegalRuleRepository : ILegalRuleRepository
     {
@@ -177,7 +253,8 @@ public sealed class LegalRuleTests
                 evaluation.TenderId, evaluation.Summary, evaluation.EvaluatedByUserId, evaluation.EvaluatedAt,
                 evaluation.Findings.Select(x => new ProcurementRuleFindingDto(x.Id, x.ProcurementRuleEvaluationId,
                     x.ProcurementRuleId, x.RuleVersionId, x.Result, x.Severity, x.Title, x.Description,
-                    x.LegalReference, x.LegalArticleId, x.LegalClauseId)).ToArray());
+                    x.LegalReference, x.LegalArticleId, x.LegalClauseId, x.IsAiGenerated,
+                    x.NeedHumanReview, x.Confidence, x.CitationReferences)).ToArray());
 
         public Task AddLegalDocumentAsync(LegalDocument document, CancellationToken ct) => throw new NotSupportedException();
         public Task<LegalDocument?> FindLegalDocumentAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
@@ -186,6 +263,8 @@ public sealed class LegalRuleTests
         public Task AddClauseAsync(LegalClause clause, CancellationToken ct) => throw new NotSupportedException();
         public Task AddRuleAsync(ProcurementRule rule, ProcurementRuleVersion version, CancellationToken ct) => throw new NotSupportedException();
         public Task<ProcurementRule?> FindRuleAsync(Guid id, bool includeVersions, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProcurementRule?> FindRuleByCodeAsync(string code, bool includeVersions, CancellationToken ct) => throw new NotSupportedException();
+        public Task<ProcurementRuleDto?> GetRuleAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<ProcurementRuleVersion?> FindRuleVersionAsync(Guid id, CancellationToken ct) => throw new NotSupportedException();
         public Task<ProcurementRuleVersion?> FindLatestDraftVersionAsync(Guid ruleId, CancellationToken ct) => throw new NotSupportedException();
         public Task<ProcurementRuleVersion?> FindPendingVersionAsync(Guid ruleId, CancellationToken ct) => throw new NotSupportedException();
@@ -199,5 +278,38 @@ public sealed class LegalRuleTests
         public Task<LegalClauseContextDto?> GetClauseContextAsync(Guid clauseId, CancellationToken ct) => throw new NotSupportedException();
         public Task<PagedResult<ProcurementRuleDto>> GetRulesAsync(ProcurementRuleListRequest request, CancellationToken ct) => throw new NotSupportedException();
         public Task<IReadOnlyList<ProcurementRuleVersionDto>> GetRuleVersionsAsync(Guid ruleId, CancellationToken ct) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeAiLegalEvaluationService(bool throwOnAnalyze = false) : IAiLegalEvaluationService
+    {
+        public int CallCount { get; private set; }
+
+        public Task<IReadOnlyList<AiLegalEvaluationFinding>> AnalyzeAsync(
+            AiLegalEvaluationRequest request, CancellationToken ct = default)
+        {
+            CallCount++;
+            if (throwOnAnalyze) throw new InvalidOperationException("AiCore failed.");
+            return Task.FromResult<IReadOnlyList<AiLegalEvaluationFinding>>([
+                new("پیشنهاد هوش مصنوعی", "این بند نیازمند بررسی کارشناس حقوقی است.",
+                    RuleSeverity.Critical, 0.72m, request.Rule.LegalReference,
+                    request.Citations.Select(x => x.Reference).ToArray())
+            ]);
+        }
+    }
+
+    private sealed class FakeRagRetriever : IRagRetriever
+    {
+        public Task<RagRetrieveResponse> RetrieveAsync(
+            string query, RagRetrievalScope scope, int topK, RagUserContext userContext, CancellationToken ct = default) =>
+            RetrieveAsync(new RagRetrieveRequest(query, scope, TopK: topK), userContext, ct);
+
+        public Task<RagRetrieveResponse> RetrieveAsync(
+            RagRetrieveRequest request, RagUserContext userContext, CancellationToken ct = default) =>
+            Task.FromResult(new RagRetrieveResponse(request.Query, [
+                new RagRetrieveResultDto(0.9, "متن بند قانونی", "متن کامل بند قانونی",
+                    AiDocumentSourceType.LegalClause, Guid.Parse("90000000-0000-0000-0000-000000000001"),
+                    "ماده ۱", "/api/legal/clauses/90000000-0000-0000-0000-000000000001/context",
+                    new Dictionary<string, object?>())
+            ]));
     }
 }

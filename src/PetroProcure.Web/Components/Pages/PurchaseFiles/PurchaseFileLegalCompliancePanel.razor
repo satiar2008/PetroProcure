@@ -1,0 +1,204 @@
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+@inject IUserAccessContext Access
+@inject IJSRuntime JS
+
+<MudPaper Class="form-panel mb-4" Elevation="0">
+    <div class="d-flex flex-wrap gap-2 justify-space-between align-center">
+        <div>
+            <MudText Typo="Typo.h6">بررسی حقوقی و قوانین</MudText>
+            <MudText Typo="Typo.body2" Color="Color.Secondary">آخرین ارزیابی قطعی و یافته‌های پیشنهادی هوش مصنوعی برای این پرونده.</MudText>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Refresh" Disabled="_busy" OnClick="LoadAsync">به‌روزرسانی</MudButton>
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Rule" Disabled="_busy" OnClick="EvaluateAsync">اجرای ارزیابی</MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.PictureAsPdf" Disabled="_busy" OnClick="OpenPdfAsync">خروجی PDF</MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.SaveAlt" Disabled="_busy" OnClick="SaveReportAsync">ذخیره گزارش</MudButton>
+        </div>
+    </div>
+</MudPaper>
+
+@if (_busy)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_evaluation is null)
+{
+    <EmptyState Title="ارزیابی حقوقی ثبت نشده" Description="برای مشاهده یافته‌ها، ارزیابی قوانین پرونده را اجرا کنید." />
+}
+else
+{
+    <MudPaper Class="form-panel mb-4" Elevation="0">
+        <MudText Typo="Typo.subtitle1">@_evaluation.Summary</MudText>
+        <MudText Typo="Typo.caption">زمان ارزیابی: <DateDisplay Value="@_evaluation.EvaluatedAt" IncludeTime="true" /></MudText>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+            <MudChip T="string" Color="Color.Success" Size="Size.Small">قبول: @_evaluation.Findings.Count(x => x.Result == RuleResult.Pass)</MudChip>
+            <MudChip T="string" Color="Color.Error" Size="Size.Small">رد: @_evaluation.Findings.Count(x => x.Result == RuleResult.Fail)</MudChip>
+            <MudChip T="string" Color="Color.Warning" Size="Size.Small">هشدار: @_evaluation.Findings.Count(x => x.Result == RuleResult.Warning)</MudChip>
+            <MudChip T="string" Color="Color.Info" Size="Size.Small">بازبینی انسانی: @_evaluation.Findings.Count(x => x.Result == RuleResult.NeedHumanReview || x.NeedHumanReview)</MudChip>
+        </div>
+    </MudPaper>
+
+    @if (CanOverride && _evaluation.Findings.Any(IsBlockingFail))
+    {
+        <MudPaper Class="form-panel mb-4" Elevation="0">
+            <MudText Typo="Typo.subtitle2">ثبت مجوز عبور از یافته‌های مسدودکننده</MudText>
+            <MudTextField @bind-Value="_overrideReason" Label="دلیل مجوز" Lines="2" Variant="Variant.Outlined" Class="mt-2" />
+            <MudButton Color="Color.Warning" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.LockOpen"
+                       Disabled="_busy || string.IsNullOrWhiteSpace(_overrideReason)" OnClick="OverrideAsync">
+                ثبت مجوز عبور
+            </MudButton>
+        </MudPaper>
+    }
+
+    @foreach (var finding in _evaluation.Findings.OrderByDescending(x => x.Severity).ThenBy(x => x.Title))
+    {
+        <MudPaper Class="form-panel mb-3" Elevation="0">
+            <div class="d-flex flex-wrap gap-2 justify-space-between align-start">
+                <div>
+                    <MudText Typo="Typo.subtitle1">@finding.Title</MudText>
+                    <MudText Typo="Typo.caption">مرجع حقوقی: @(string.IsNullOrWhiteSpace(finding.LegalReference) ? "—" : finding.LegalReference)</MudText>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <MudChip T="string" Color="@ResultColor(finding.Result)" Size="Size.Small">@ResultText(finding.Result)</MudChip>
+                    <MudChip T="string" Color="@SeverityColor(finding.Severity)" Size="Size.Small">@SeverityText(finding.Severity)</MudChip>
+                    @if (finding.IsAiGenerated)
+                    {
+                        <MudChip T="string" Color="Color.Info" Size="Size.Small">تولیدشده با هوش مصنوعی</MudChip>
+                    }
+                    @if (finding.NeedHumanReview)
+                    {
+                        <MudChip T="string" Color="Color.Warning" Size="Size.Small">نیازمند بازبینی انسانی</MudChip>
+                    }
+                </div>
+            </div>
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.body2">@finding.Description</MudText>
+            <MudText Typo="Typo.body2" Class="mt-2"><strong>پیشنهاد اصلاحی:</strong> @Recommendation(finding)</MudText>
+            @if (!string.IsNullOrWhiteSpace(finding.CitationReferences))
+            {
+                <MudText Typo="Typo.caption">ارجاعات: @finding.CitationReferences</MudText>
+            }
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter] public Guid PurchaseFileId { get; set; }
+
+    private bool _busy;
+    private string? _overrideReason;
+    private ProcurementRuleEvaluationDto? _evaluation;
+    private bool CanOverride => Access.HasPermission("LegalRule.OverrideBlockingFinding");
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _busy = true;
+        try
+        {
+            var evaluations = await Api.GetPurchaseFileLegalRuleEvaluationsAsync(PurchaseFileId);
+            _evaluation = evaluations.OrderByDescending(x => x.EvaluatedAt).FirstOrDefault();
+        }
+        catch (Exception ex) { Snackbar.Add("دریافت ارزیابی حقوقی ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task EvaluateAsync()
+    {
+        _busy = true;
+        try
+        {
+            _evaluation = await Api.EvaluatePurchaseFileLegalRulesAsync(PurchaseFileId);
+            Snackbar.Add("ارزیابی حقوقی اجرا شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add("اجرای ارزیابی ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task OverrideAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_overrideReason)) return;
+        _busy = true;
+        try
+        {
+            await Api.OverridePurchaseFileRuleGateAsync(PurchaseFileId,
+                new OverrideProcurementRuleGateRequest(_overrideReason.Trim()));
+            _overrideReason = null;
+            Snackbar.Add("مجوز عبور ثبت شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add("ثبت مجوز عبور ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task OpenPdfAsync()
+    {
+        _busy = true;
+        try
+        {
+            var bytes = await Api.GetLegalComplianceReportPdfAsync(PurchaseFileId);
+            await JS.InvokeVoidAsync("open", $"data:application/pdf;base64,{Convert.ToBase64String(bytes)}", "_blank");
+        }
+        catch (Exception ex) { Snackbar.Add("دریافت گزارش ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task SaveReportAsync()
+    {
+        _busy = true;
+        try
+        {
+            await Api.SaveLegalComplianceReportAsync(PurchaseFileId);
+            Snackbar.Add("گزارش انطباق حقوقی در اسناد پرونده ذخیره شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add("ذخیره گزارش ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private static bool IsBlockingFail(ProcurementRuleFindingDto finding) =>
+        finding.Severity == RuleSeverity.Blocking && finding.Result == RuleResult.Fail;
+
+    private static string Recommendation(ProcurementRuleFindingDto finding) => finding.Result switch
+    {
+        RuleResult.Fail => "علت عدم انطباق را رفع و ارزیابی حقوقی را دوباره اجرا کنید.",
+        RuleResult.Warning => "هشدار را بررسی و در صورت نیاز مستندات اصلاحی را تکمیل کنید.",
+        RuleResult.NeedHumanReview => "تصمیم نهایی باید توسط کاربر مجاز ثبت شود.",
+        _ => "اقدام اصلاحی فوری لازم نیست."
+    };
+
+    private static string ResultText(RuleResult result) => result switch
+    {
+        RuleResult.Pass => "قبول",
+        RuleResult.Fail => "رد",
+        RuleResult.Warning => "هشدار",
+        RuleResult.NotApplicable => "غیرقابل اعمال",
+        RuleResult.NeedHumanReview => "نیازمند بازبینی انسانی",
+        _ => result.ToString()
+    };
+
+    private static string SeverityText(RuleSeverity severity) => severity switch
+    {
+        RuleSeverity.Info => "اطلاعی",
+        RuleSeverity.Warning => "هشدار",
+        RuleSeverity.Critical => "بحرانی",
+        RuleSeverity.Blocking => "مسدودکننده",
+        _ => severity.ToString()
+    };
+
+    private static Color ResultColor(RuleResult result) => result switch
+    {
+        RuleResult.Pass => Color.Success,
+        RuleResult.Fail => Color.Error,
+        RuleResult.Warning => Color.Warning,
+        RuleResult.NeedHumanReview => Color.Info,
+        _ => Color.Default
+    };
+
+    private static Color SeverityColor(RuleSeverity severity) => severity switch
+    {
+        RuleSeverity.Blocking or RuleSeverity.Critical => Color.Error,
+        RuleSeverity.Warning => Color.Warning,
+        _ => Color.Default
+    };
+}

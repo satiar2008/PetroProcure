@@ -1,10 +1,13 @@
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using PetroProcure.Application.Rag;
+using PetroProcure.Application.Security;
+using PetroProcure.Contracts.V1.Ai;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Logging;
-using PetroProcure.Application.Security;
-using PetroProcure.Contracts.V1.Ai;
 
 namespace PetroProcure.AI;
 
@@ -17,8 +20,22 @@ public sealed class AiCoreClient(HttpClient http, IAiCoreSettingsProvider settin
         if (string.IsNullOrWhiteSpace(settings.BaseUrl)) throw new AiCoreClientException("AiCore BaseUrl is not configured.");
         using var message = new HttpRequestMessage(HttpMethod.Post, BuildUrl(settings.BaseUrl, settings.AnalysisPath, "/api/ai/text"));
         ApplyHeaders(message, settings);
-        message.Content = JsonContent.Create(ToTextRequest(request, settings));
-        var timeout = TimeSpan.FromSeconds(Math.Clamp(settings.TimeoutSeconds, 5, 300));
+        //message.Content = JsonContent.Create(ToTextRequest(request, settings));
+        var payload = ToTextRequest(request, settings);
+
+        var payloadJson = JsonSerializer.Serialize(
+            payload,
+            new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+
+        message.Content = new StringContent(
+            payloadJson,
+            Encoding.UTF8,
+            "application/json");
+
+        var timeout = TimeSpan.FromSeconds(Math.Clamp(settings.TimeoutSeconds, 10, 900));
         logger.LogInformation("Sending AiCore analysis request {RequestId} for {EntityType}/{EntityId}.",
             request.RequestId, request.EntityType, request.EntityId);
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -45,6 +62,9 @@ public sealed class AiCoreClient(HttpClient http, IAiCoreSettingsProvider settin
 
     public async Task<AiChatResponse> SendChatAsync(AiChatRequest request, CancellationToken ct = default)
     {
+        //var response = await SendAnalysisAsync(new AiCoreAnalysisRequest(Guid.NewGuid().ToString("N"),
+        //    "PetroProcure", "Chat", Guid.Empty, "Chat", null,
+        //    [new("system", request.SystemPrompt), new("user", request.UserPrompt)], new { }), ct);
         var response = await SendAnalysisAsync(new AiCoreAnalysisRequest(Guid.NewGuid().ToString("N"),
             "PetroProcure", "Chat", Guid.Empty, "Chat", null,
             [new("system", request.SystemPrompt), new("user", request.UserPrompt)], new { }), ct);
@@ -68,6 +88,43 @@ public sealed class AiCoreClient(HttpClient http, IAiCoreSettingsProvider settin
         {
             return new("AiCore", false, "Unavailable", DateTime.UtcNow, settings.DefaultModel,
                 "AiCore is not reachable. Check BaseUrl and network access.");
+        }
+    }
+
+    // AI-RAG-11: raw text/chat passthrough. Unlike SendAnalysisAsync, this sends the supplied
+    // system/user messages and JsonMode flag UNCHANGED (no analysis-JSON wrapping), so grounded
+    // prompts and their citation contract reach AiCore intact.
+    public async Task<AiCoreTextResponse> SendTextAsync(AiCoreTextRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var settings = await settingsProvider.GetAsync(ct);
+        if (!settings.IsEnabled) throw new AiCoreClientException("AiCore provider is disabled.");
+        if (string.IsNullOrWhiteSpace(settings.BaseUrl)) throw new AiCoreClientException("AiCore BaseUrl is not configured.");
+
+        var payload = string.IsNullOrWhiteSpace(request.Model) ? request with { Model = settings.DefaultModel } : request;
+        using var message = new HttpRequestMessage(HttpMethod.Post, BuildUrl(settings.BaseUrl, settings.AnalysisPath, "/api/ai/text"));
+        ApplyHeaders(message, settings);
+        var payloadJson = JsonSerializer.Serialize(payload, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        message.Content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+
+        var timeout = TimeSpan.FromSeconds(Math.Clamp(settings.TimeoutSeconds, 10, 900));
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(timeout);
+        try
+        {
+            using var response = await http.SendAsync(message, timeoutCts.Token);
+            if (!response.IsSuccessStatusCode)
+                throw Friendly(response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<AiCoreTextResponse>(cancellationToken: timeoutCts.Token);
+            return result ?? throw new AiCoreClientException("AiCore returned an unsupported response.");
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            throw new AiCoreClientException($"AiCore request timed out after {timeout.TotalSeconds:0} seconds. Increase PetroProcure:AI:AiCore:TimeoutSeconds or check AI Server Core response time.");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new AiCoreClientException($"AiCore request failed because AI Server Core is unreachable or closed the connection: {ex.Message}");
         }
     }
 
@@ -199,7 +256,8 @@ public sealed class AiAnalysisService(
     IAiCoreClient client,
     IAiAnalysisRepository repository,
     ICurrentUserService currentUser,
-    IAiCoreSettingsProvider settingsProvider) : IAiAnalysisService
+    IAiCoreSettingsProvider settingsProvider,
+    IOptions<RagOptions> ragOptions) : IAiAnalysisService
 {
     private const string Disclaimer = "تحلیل هوش مصنوعی صرفاً جنبه کمکی دارد و جایگزین تصمیم کارشناسی، حقوقی یا کمیسیون نیست.";
 
@@ -233,17 +291,18 @@ public sealed class AiAnalysisService(
             context, new { advisoryOnly = true });
         var stopwatch = Stopwatch.StartNew();
         var log = new AiProviderRequestLog(Guid.NewGuid(), "AiCore", entityType, entityId, analysisType);
+        var promptSummary = PromptSummary(entityType, analysisType, userQuestion);
         AiCoreAnalysisResponse response;
         try
         {
-            response = await client.SendAnalysisAsync(request, ct);
+            response = await client.SendAnalysisAsync(request, CancellationToken.None);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
             stopwatch.Stop();
             log.Fail(stopwatch.ElapsedMilliseconds, "AiCoreError", ex is AiCoreClientException ? ex.Message : "AiCore analysis failed.");
             var evaluation = new AiAnalysisEvaluation(Guid.NewGuid(), entityType, entityId, analysisType,
-                "AiCore", settings.DefaultModel, "Failed", $"{entityType}:{analysisType}", Disclaimer, "Unknown", currentUser.UserId);
+                "AiCore", settings.DefaultModel, "Failed", promptSummary, Disclaimer, "Unknown", currentUser.UserId);
             evaluation.Fail(ex is AiCoreClientException ? ex.Message : "AiCore analysis failed.");
             await repository.SaveAsync(evaluation, [], [], log, CancellationToken.None);
             throw;
@@ -251,7 +310,7 @@ public sealed class AiAnalysisService(
 
         stopwatch.Stop();
         var completedEvaluation = new AiAnalysisEvaluation(Guid.NewGuid(), entityType, entityId, analysisType,
-            "AiCore", settings.DefaultModel, "Completed", $"{entityType}:{analysisType}",
+            "AiCore", settings.DefaultModel, "Completed", promptSummary,
             $"{response.Summary}\n\n{Disclaimer}", string.IsNullOrWhiteSpace(response.RiskLevel) ? "Info" : response.RiskLevel,
             currentUser.UserId, JsonSerializer.Serialize(new { requestId }));
         completedEvaluation.Complete();
@@ -262,5 +321,12 @@ public sealed class AiAnalysisService(
         log.Complete(stopwatch.ElapsedMilliseconds, response.Usage?.InputTokens, response.Usage?.OutputTokens, response.Usage?.Cost);
         await repository.SaveAsync(completedEvaluation, findings, recommendations, log, CancellationToken.None);
         return (await repository.GetByIdAsync(completedEvaluation.Id, CancellationToken.None))!;
+    }
+
+    private string PromptSummary(string entityType, string analysisType, string? userQuestion)
+    {
+        if (ragOptions.Value.EnableSensitivePromptLogging)
+            return $"{entityType}:{analysisType}:{userQuestion}".TrimEnd(':');
+        return $"{entityType}:{analysisType}:prompt-redacted";
     }
 }

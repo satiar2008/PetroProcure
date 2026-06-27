@@ -107,9 +107,16 @@
         _running = true;
         try
         {
+            if (EntityType == "PurchaseFile")
+            {
+                var job = await Api.CreatePurchaseFileAiAnalysisJobAsync(EntityId, new AnalyzePurchaseFileRequest(analysisType));
+                Snackbar.Add($"درخواست تحلیل در صف ثبت شد. کد پیگیری: {job.JobId}", Severity.Success);
+                await LoadAsync();
+                return;
+            }
+
             _ = EntityType switch
             {
-                "PurchaseFile" => await Api.AnalyzePurchaseFileAsync(EntityId, new AnalyzePurchaseFileRequest(analysisType)),
                 "Tender" => await Api.AnalyzeTenderAsync(EntityId, new AnalyzeTenderRequest(analysisType)),
                 "Contract" => await Api.AnalyzeContractAsync(EntityId, new AnalyzeContractRequest(analysisType)),
                 "PurchaseOrder" => await Api.AnalyzePurchaseOrderAsync(EntityId, new AnalyzePurchaseOrderRequest(analysisType)),

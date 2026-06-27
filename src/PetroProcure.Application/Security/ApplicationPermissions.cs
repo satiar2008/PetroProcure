@@ -138,6 +138,7 @@ public static class ApplicationPermissions
 
     public const string AiAgentUse = "AiAgent.Use";
     public const string AiAgentEvaluatePurchaseRules = "AiAgent.EvaluatePurchaseRules";
+    public const string AiAgentAnalyzePurchaseFile = "AiAgent.AnalyzePurchaseFile";
     public const string AiAdmin = "Ai.Admin";
     public const string AiProviderManage = "Ai.ProviderManage";
     public const string AiProviderTest = "Ai.ProviderTest";
@@ -154,6 +155,7 @@ public static class ApplicationPermissions
     public const string ProcurementRuleManage = "ProcurementRule.Manage";
     public const string ProcurementRuleApprove = "ProcurementRule.Approve";
     public const string ProcurementRuleEvaluate = "ProcurementRule.Evaluate";
+    public const string LegalRuleOverrideBlockingFinding = "LegalRule.OverrideBlockingFinding";
 
     public const string AdminManageUsers = "Admin.ManageUsers";
     public const string AdminManageRoles = "Admin.ManageRoles";
@@ -299,6 +301,7 @@ public static class ApplicationPermissions
         ProcurementRuleManage,
         ProcurementRuleApprove,
         ProcurementRuleEvaluate,
+        LegalRuleOverrideBlockingFinding,
         AdminManageUsers,
         AdminManageRoles,
         AdminManageDepartments,

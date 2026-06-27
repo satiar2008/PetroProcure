@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-PetroProcure.Worker-04e193ad-5e74-4441-a633-f4e06d37ae10</UserSecretsId>
+    <NoWarn>$(NoWarn);DX1000</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,5 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\PetroProcure.ServiceDefaults\PetroProcure.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\PetroProcure.Application\PetroProcure.Application.csproj" />
+    <ProjectReference Include="..\PetroProcure.Infrastructure\PetroProcure.Infrastructure.csproj" />
+    <ProjectReference Include="..\PetroProcure.AI\PetroProcure.AI.csproj" />
   </ItemGroup>
 </Project>

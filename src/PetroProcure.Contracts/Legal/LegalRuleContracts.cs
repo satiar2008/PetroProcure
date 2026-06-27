@@ -34,7 +34,9 @@ public sealed record ProcurementRuleEvaluationDto(Guid Id, string EntityType, Gu
 
 public sealed record ProcurementRuleFindingDto(Guid Id, Guid ProcurementRuleEvaluationId,
     Guid ProcurementRuleId, Guid RuleVersionId, RuleResult Result, RuleSeverity Severity,
-    string Title, string Description, string LegalReference, Guid? LegalArticleId, Guid? LegalClauseId);
+    string Title, string Description, string LegalReference, Guid? LegalArticleId, Guid? LegalClauseId,
+    bool IsAiGenerated = false, bool NeedHumanReview = false, decimal? Confidence = null,
+    string? CitationReferences = null);
 
 public sealed record LegalDocumentListRequest(string? SearchTerm = null, LegalDocumentStatus? Status = null,
     bool IncludeDeleted = false, int PageNumber = 1, int PageSize = 20);
@@ -74,6 +76,7 @@ public sealed record SubmitRuleForApprovalRequest(string? Comment = null);
 public sealed record ApproveRuleVersionRequest(string? Comment = null);
 public sealed record DeprecateRuleRequest(string Reason);
 public sealed record EvaluateRulesRequest(string? Scope = null);
+public sealed record OverrideProcurementRuleGateRequest(string Reason, string TransitionName = "PurchaseFile.Complete");
 
 public sealed record LegalRuleEvaluationSummaryDto(Guid EvaluationId, int PassCount, int FailCount,
     int WarningCount, int NotApplicableCount, int NeedHumanReviewCount);

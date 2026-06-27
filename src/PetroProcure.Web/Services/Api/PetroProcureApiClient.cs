@@ -46,6 +46,8 @@ public interface IPetroProcureApiClient
     Task<PurchaseFileDto> CreateFromIndentAsync(Guid indentId, CreatePurchaseFileFromIndentRequest request, CancellationToken ct = default);
     Task<byte[]> GetPurchaseFileSummaryPdfAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task SavePurchaseFileSummaryAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<byte[]> GetLegalComplianceReportPdfAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task SaveLegalComplianceReportAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<CreateAiJobResponse> RunAiAsync(Guid purchaseFileId, string action, CancellationToken ct = default);
     Task<List<AiEvaluationResultDto>> GetAiEvaluationsAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<List<AiProviderDto>> GetAiProvidersAsync(CancellationToken ct = default);
@@ -60,8 +62,12 @@ public interface IPetroProcureApiClient
     Task<AiAnalysisResultDto> AnalyzeWarehouseReceiptAsync(Guid receiptId, AnalyzeWarehouseReceiptRequest request, CancellationToken ct = default);
     Task<AiAnalysisResultDto> AnalyzeLegalComplianceAsync(AnalyzeLegalComplianceRequest request, CancellationToken ct = default);
     Task<List<AiAnalysisResultDto>> GetAiAnalysisEvaluationsAsync(string? entityType = null, Guid? entityId = null, CancellationToken ct = default);
+    Task<RagRetrieveResponseDto> RetrieveRagAsync(RagRetrieveRequestDto request, CancellationToken ct = default);
+    Task<RagRetrieveResponseDto> RetrievePurchaseFileRagAsync(Guid purchaseFileId, RagRetrieveRequestDto request, CancellationToken ct = default);
+    Task<GroundedAiAnalysisResponse> AskPurchaseFileAsync(Guid purchaseFileId, GroundedAiQuestionRequest request, CancellationToken ct = default);
     Task<ProcurementRuleEvaluationDto> EvaluatePurchaseFileLegalRulesAsync(Guid purchaseFileId, CancellationToken ct = default);
     Task<List<ProcurementRuleEvaluationDto>> GetPurchaseFileLegalRuleEvaluationsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task OverridePurchaseFileRuleGateAsync(Guid purchaseFileId, OverrideProcurementRuleGateRequest request, CancellationToken ct = default);
     Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest request, CancellationToken ct = default);
     Task<LegalDocumentDto?> GetLegalDocumentAsync(Guid id, CancellationToken ct = default);
     Task<List<LegalArticleDto>> GetLegalDocumentArticlesAsync(Guid id, CancellationToken ct = default);
@@ -393,6 +399,15 @@ public sealed class PetroProcureApiClient(
         await Ensure(response, ct);
     }
 
+    public Task<byte[]> GetLegalComplianceReportPdfAsync(Guid id, CancellationToken ct = default) =>
+        GetBytesAsync($"/api/reports/legal-compliance/{id}/pdf", ct);
+
+    public async Task SaveLegalComplianceReportAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsync($"/api/reports/legal-compliance/{id}/save-to-file", null, ct);
+        await Ensure(response, ct);
+    }
+
     public async Task<CreateAiJobResponse> RunAiAsync(Guid id, string action, CancellationToken ct = default)
     {
         var response = await Client().PostAsync($"/api/ai/purchase-files/{id}/jobs/{action}", null, ct);
@@ -483,6 +498,27 @@ public sealed class PetroProcureApiClient(
         return await GetJsonAsync<List<AiAnalysisResultDto>>($"/api/ai/evaluations{(string.IsNullOrWhiteSpace(query) ? "" : "?" + query)}", ct) ?? [];
     }
 
+    public async Task<RagRetrieveResponseDto> RetrieveRagAsync(RagRetrieveRequestDto request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/rag/retrieve", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<RagRetrieveResponseDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<RagRetrieveResponseDto> RetrievePurchaseFileRagAsync(Guid id, RagRetrieveRequestDto request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/purchase-files/{id}/rag/retrieve", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<RagRetrieveResponseDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<GroundedAiAnalysisResponse> AskPurchaseFileAsync(Guid id, GroundedAiQuestionRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/ai/purchase-files/{id}/ask", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<GroundedAiAnalysisResponse>(cancellationToken: ct))!;
+    }
+
     public async Task<ProcurementRuleEvaluationDto> EvaluatePurchaseFileLegalRulesAsync(Guid id, CancellationToken ct = default)
     {
         var response = await Client().PostAsync($"/api/procurement-rules/evaluate/purchase-file/{id}", null, ct);
@@ -492,6 +528,12 @@ public sealed class PetroProcureApiClient(
 
     public async Task<List<ProcurementRuleEvaluationDto>> GetPurchaseFileLegalRuleEvaluationsAsync(Guid id, CancellationToken ct = default) =>
         await GetJsonAsync<List<ProcurementRuleEvaluationDto>>($"/api/procurement-rules/evaluations/purchase-file/{id}", ct) ?? [];
+
+    public async Task OverridePurchaseFileRuleGateAsync(Guid id, OverrideProcurementRuleGateRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/procurement-rules/gates/purchase-files/{id}/override", request, ct);
+        await Ensure(response, ct);
+    }
 
     public async Task<PagedResult<LegalDocumentDto>> GetLegalDocumentsAsync(LegalDocumentListRequest request, CancellationToken ct = default) =>
         await GetJsonAsync<PagedResult<LegalDocumentDto>>($"/api/legal/documents?{ToQuery(request)}", ct)

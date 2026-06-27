@@ -1,4 +1,5 @@
 using PetroProcure.Application.Documents;
+using PetroProcure.Application.Rag;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Documents;
 using PetroProcure.Domain.Modules.PurchaseFiles;
@@ -38,7 +39,8 @@ public sealed class ReportGeneratorTests : IDisposable
                 QuarantinePath = Path.Combine(_root, ".quarantine"),
                 AllowedExtensions = [".pdf"],
                 AllowedMimeTypes = ["application/pdf"]
-            }), new NoOpFileScanner());
+            }), new NoOpFileScanner(), new NullIngestionQueue(),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<FileStorageService>.Instance);
         var generator = new ReportGenerator(new FakeDataProvider(), storage,
             new TestCurrentUser(Guid.NewGuid()));
 
@@ -49,6 +51,44 @@ public sealed class ReportGeneratorTests : IDisposable
         Assert.False(Path.IsPathRooted(document.RelativePath));
         Assert.Contains("/10-Final/", document.RelativePath);
         Assert.True(File.Exists(Path.Combine(_root, document.RelativePath.Replace('/', Path.DirectorySeparatorChar))));
+    }
+
+    [Fact]
+    public async Task LegalComplianceReportCreatesPdfBytes()
+    {
+        var generator = new ReportGenerator(new FakeDataProvider(), new CapturingStorage(),
+            new TestCurrentUser(Guid.NewGuid()));
+
+        var bytes = await generator.GeneratePdfAsync(ReportNames.LegalCompliance,
+            new Dictionary<string, object?> { ["PurchaseFileId"] = FakeDataProvider.PurchaseFileId });
+
+        Assert.True(bytes.Length > 100);
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+    }
+
+    [Fact]
+    public async Task LegalComplianceReportDataIncludesBlockingFindings()
+    {
+        var data = await new FakeDataProvider().GetLegalComplianceAsync(FakeDataProvider.PurchaseFileId, default);
+
+        var finding = Assert.Single(data!.FailedBlockingFindings);
+        Assert.Equal("عدم وجود بند ضمانت", finding.RuleTitle);
+        Assert.Equal("مسدودکننده", finding.Severity);
+    }
+
+    [Fact]
+    public async Task LegalComplianceReportCanBeSavedIntoPurchaseFileRepository()
+    {
+        var storage = new CapturingStorage();
+        var generator = new ReportGenerator(new FakeDataProvider(), storage,
+            new TestCurrentUser(Guid.NewGuid()));
+
+        await generator.SaveGeneratedReportToPurchaseFileAsync(FakeDataProvider.PurchaseFileId,
+            ReportNames.LegalCompliance,
+            new Dictionary<string, object?> { ["PurchaseFileId"] = FakeDataProvider.PurchaseFileId });
+
+        Assert.Equal(DocumentType.FinalReport, storage.LastDocumentType);
+        Assert.StartsWith("LegalCompliance-", storage.LastOriginalFileName);
     }
 
     [Fact]
@@ -176,6 +216,21 @@ public sealed class ReportGeneratorTests : IDisposable
                 [new("123456", "لوله و اتصالات",
                     [new("1234560001","123456","لوله و اتصالات","لوله فولادی","متر",10),
                      new("1234560002","123456","لوله و اتصالات","زانو فولادی","عدد",4)])]));
+        public Task<LegalComplianceReportData?> GetLegalComplianceAsync(Guid purchaseFileId, CancellationToken cancellationToken) =>
+            Task.FromResult<LegalComplianceReportData?>(new(PurchaseFileId, "PF-2026-000001", "خرید لوله",
+                "در واحد خرید", DateTime.UtcNow, DateTime.UtcNow, "یک مورد مسدودکننده شناسایی شد.",
+                new LegalComplianceSummaryData(1, 1, 1, 0, 1),
+                [new("عدم وجود بند ضمانت", "رد", "مسدودکننده", "ماده 10",
+                    "سند پرونده بند ضمانت معتبر ندارد.", "رفع نقص و بارگذاری سند اصلاحی.",
+                    false, false, "LC-1")],
+                [new("تکمیل نبودن توضیح فنی", "هشدار", "هشدار", "ماده 12",
+                    "توضیح فنی نیازمند تکمیل است.", "توضیح تکمیلی ثبت شود.",
+                    false, false, "LC-2")],
+                [new("تحلیل تفسیری شرایط", "نیازمند بازبینی انسانی", "بحرانی", "ماده 15",
+                    "نتیجه نیازمند تصمیم کارشناس حقوقی است.", "بازبینی انسانی انجام شود.",
+                    true, true, "LC-3")],
+                [new("Override:PurchaseFile.Complete", "عدم وجود بند ضمانت", "Fail",
+                    "OverrideAllowed", "admin", "مجوز کمیته حقوقی", "1405/04/06")]));
         public Task<IndentReportData?> GetIndentAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<IndentReportData?>(new(id, "2630001", "دستی", "متقاضی", []));
         public Task<TenderReportData?> GetTenderAsync(Guid id, CancellationToken cancellationToken) =>
@@ -264,5 +319,13 @@ public sealed class ReportGeneratorTests : IDisposable
         public Task AddDocumentAsync(FileDocument document, CancellationToken cancellationToken) { Document = document; return Task.CompletedTask; }
         public Task<IReadOnlyList<FileDocumentDto>> GetDocumentsAsync(Guid purchaseFileId, bool includeDeleted, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<FileDocumentDto>>([]);
         public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class NullIngestionQueue : IRagIngestionQueue
+    {
+        public Task<PetroProcure.Contracts.V1.Ai.CreateAiJobResponse> EnqueueAsync(
+            EmbeddingIngestionPayload payload, Guid? createdByUserId, CancellationToken ct = default) =>
+            Task.FromResult(new PetroProcure.Contracts.V1.Ai.CreateAiJobResponse(
+                Guid.NewGuid(), "Queued", "queued", DateTime.UtcNow));
     }
 }

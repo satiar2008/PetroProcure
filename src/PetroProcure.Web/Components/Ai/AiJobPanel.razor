@@ -1,0 +1,305 @@
+@implements IDisposable
+@inject IPetroProcureAiApiClient AiApi
+@inject IAiJobSignalRClient AiJobSignalR
+@inject ISnackbar Snackbar
+
+<MudPaper Class="form-panel mb-4" Elevation="0">
+    <MudText Typo="Typo.subtitle1" Class="mb-1">دستیار هوشمند (پردازش ناهمگام)</MudText>
+    <MudText Typo="Typo.caption" Class="mb-3">
+        تحلیل در پس‌زمینه اجرا می‌شود؛ می‌توانید صفحه را ترک کنید و بعداً نتیجه را ببینید.
+    </MudText>
+    <div class="report-actions">
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Summarize"
+                   Disabled="_creating" OnClick="@(() => RunAsync(ct => AiApi.CreatePurchaseFileSummaryJobAsync(PurchaseFileId, ct), "خلاصه پرونده"))">
+            اجرای خلاصه پرونده
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.FactCheck"
+                   Disabled="_creating" OnClick="@(() => RunAsync(ct => AiApi.CreateMissingDocumentsJobAsync(PurchaseFileId, ct), "بررسی نقص مدارک"))">
+            بررسی نقص مدارک
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Gavel"
+                   Disabled="_creating" OnClick="@(() => RunAsync(ct => AiApi.CreateRulesEvaluationJobAsync(PurchaseFileId, ct), "بررسی قوانین خرید"))">
+            بررسی قوانین خرید
+        </MudButton>
+        <MudButton Variant="Variant.Outlined" Color="Color.Secondary" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                   Disabled="_creating" OnClick="@(() => RunAsync(ct => AiApi.CreateFullAnalysisJobAsync(PurchaseFileId, null, ct), "تحلیل کامل پرونده"))">
+            تحلیل کامل پرونده
+        </MudButton>
+    </div>
+    @if (_creating)
+    {
+        <MudProgressLinear Indeterminate="true" Class="mt-3" />
+    }
+</MudPaper>
+
+@if (_jobId is not null)
+{
+    <MudPaper Class="ai-result-card mb-3" Elevation="0">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+            <MudText Typo="Typo.subtitle1">@_analysisLabel</MudText>
+            <StatusChip Text="@StatusText(_statusText)" Color="@StatusColor(_statusText)" />
+        </div>
+
+        <MudProgressLinear Value="_progress" Color="@StatusColor(_statusText)" Class="my-3" Rounded="true" Size="Size.Medium" />
+        <MudText Typo="Typo.body2" Class="mb-2">@(_message ?? StatusText(_statusText)) — @_progress٪</MudText>
+
+        @if (IsRunning)
+        {
+            <div class="report-actions">
+                <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Outlined"
+                           StartIcon="@Icons.Material.Filled.Cancel" Disabled="_cancelling" OnClick="CancelJobAsync">
+                    لغو تحلیل
+                </MudButton>
+            </div>
+        }
+
+        @if (IsFailed)
+        {
+            <MudAlert Severity="Severity.Error" Variant="Variant.Outlined" Class="mt-2">
+                @(_message ?? "اجرای تحلیل ناموفق بود.")
+            </MudAlert>
+            <div class="report-actions mt-2">
+                <MudButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Filled"
+                           StartIcon="@Icons.Material.Filled.Refresh" Disabled="_creating" OnClick="RetryAsync">
+                    تلاش مجدد
+                </MudButton>
+            </div>
+        }
+
+        @if (IsCancelled)
+        {
+            <MudAlert Severity="Severity.Normal" Variant="Variant.Outlined" Class="mt-2">تحلیل لغو شد.</MudAlert>
+        }
+
+        @if (_result is not null)
+        {
+            <MudDivider Class="my-3" />
+            <MudText Typo="Typo.subtitle2">خلاصه</MudText>
+            <MudText Typo="Typo.body2" Class="mb-3">@_result.Summary</MudText>
+
+            @foreach (var finding in _result.Findings)
+            {
+                <MudAlert Severity="@SeverityFor(finding.Severity)" Variant="Variant.Outlined" Class="mb-2">
+                    <strong>@finding.Title</strong><br />@finding.Description
+                </MudAlert>
+            }
+            @foreach (var recommendation in _result.Recommendations)
+            {
+                <div class="ai-recommendation">
+                    <MudIcon Icon="@Icons.Material.Filled.Lightbulb" />
+                    <div><strong>@recommendation.Title</strong><span>@recommendation.Description</span></div>
+                </div>
+            }
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid PurchaseFileId { get; set; }
+    [Parameter] public TimeSpan? PollInterval { get; set; }
+
+    private AiJobPoller _poller = default!;
+    private CancellationTokenSource? _pollCts;
+    private Func<CancellationToken, Task<CreateAiJobResponse>>? _lastCreate;
+
+    private Guid? _jobId;
+    private string? _statusText;
+    private string? _message;
+    private string? _analysisLabel;
+    private int _progress;
+    private AiJobResultDto? _result;
+    private bool _creating;
+    private bool _cancelling;
+
+    private bool IsRunning => _jobId is not null && !AiJobPoller.IsTerminal(_statusText);
+    private bool IsFailed => string.Equals(_statusText, "Failed", StringComparison.OrdinalIgnoreCase);
+    private bool IsCancelled => string.Equals(_statusText, "Cancelled", StringComparison.OrdinalIgnoreCase);
+
+    protected override void OnInitialized()
+    {
+        _poller = new AiJobPoller(AiApi);
+        if (PollInterval is { } interval && interval > TimeSpan.Zero)
+            _poller.Interval = interval;
+        AiJobSignalR.NotificationReceived += OnRealtimeNotificationAsync;
+    }
+
+    private async Task RunAsync(Func<CancellationToken, Task<CreateAiJobResponse>> create, string label)
+    {
+        StopPolling(); // cancel any previous polling loop (never the server job)
+        _creating = true;
+        _result = null;
+        _analysisLabel = label;
+        _lastCreate = create;
+        StateHasChanged();
+
+        try
+        {
+            // Job creation is short; do not block on a long-running request.
+            var response = await create(CancellationToken.None);
+            _jobId = response.JobId;
+            _statusText = response.Status;
+            _message = response.Message;
+            _progress = 0;
+            _creating = false;
+            await TrySubscribeToJobAsync(response.JobId);
+            StartPolling(response.JobId);
+        }
+        catch (Exception ex)
+        {
+            _creating = false;
+            _statusText = "Failed";
+            _message = ex.Message;
+            Snackbar.Add("ایجاد تحلیل ناموفق بود: " + ex.Message, Severity.Error);
+        }
+    }
+
+    private Task RetryAsync() =>
+        _lastCreate is null ? Task.CompletedTask : RunAsync(_lastCreate, _analysisLabel ?? "تحلیل");
+
+    private void StartPolling(Guid jobId)
+    {
+        _pollCts = new CancellationTokenSource();
+        var token = _pollCts.Token;
+        _ = PollAsync(jobId, token);
+    }
+
+    private async Task TrySubscribeToJobAsync(Guid jobId)
+    {
+        try
+        {
+            await AiJobSignalR.SubscribeToJobAsync(jobId);
+        }
+        catch
+        {
+            // Realtime updates are an enhancement only; polling remains the source of truth.
+        }
+    }
+
+    private async Task OnRealtimeNotificationAsync(AiJobNotificationDto notification)
+    {
+        if (_jobId is not { } currentJobId || notification.JobId != currentJobId)
+            return;
+
+        await InvokeAsync(async () =>
+        {
+            _statusText = notification.Status;
+            _progress = notification.ProgressPercent;
+            _message = string.IsNullOrWhiteSpace(notification.Message)
+                ? StatusText(notification.Status)
+                : notification.Message;
+
+            if (string.Equals(notification.Status, "Completed", StringComparison.OrdinalIgnoreCase)
+                && notification.HasResult)
+            {
+                try
+                {
+                    _result = await AiApi.GetJobResultAsync(notification.JobId);
+                    StopPolling();
+                }
+                catch (Exception ex)
+                {
+                    Snackbar.Add("دریافت نتیجه تحلیل ناموفق بود: " + ex.Message, Severity.Warning);
+                }
+            }
+            else if (AiJobPoller.IsTerminal(notification.Status))
+            {
+                StopPolling();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task PollAsync(Guid jobId, CancellationToken token)
+    {
+        try
+        {
+            await _poller.PollAsync(jobId,
+                onStatus: async status =>
+                {
+                    _statusText = status.Status;
+                    _progress = status.ProgressPercent;
+                    _message = string.IsNullOrWhiteSpace(status.ErrorMessage)
+                        ? (string.IsNullOrWhiteSpace(status.Message) ? status.Status : status.Message)
+                        : status.ErrorMessage;
+                    await InvokeAsync(StateHasChanged);
+                },
+                onCompleted: async result =>
+                {
+                    _result = result;
+                    await InvokeAsync(StateHasChanged);
+                },
+                token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Component disposed or a new run started — polling only, server job continues.
+        }
+        catch (Exception ex)
+        {
+            await InvokeAsync(() => Snackbar.Add("به‌روزرسانی وضعیت تحلیل ناموفق بود: " + ex.Message, Severity.Warning));
+        }
+    }
+
+    private async Task CancelJobAsync()
+    {
+        if (_jobId is null) return;
+        _cancelling = true;
+        try
+        {
+            // Only an explicit user click cancels the server-side job.
+            await AiApi.CancelJobAsync(_jobId.Value);
+            Snackbar.Add("درخواست لغو تحلیل ارسال شد.", Severity.Info);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("لغو تحلیل ناموفق بود: " + ex.Message, Severity.Error);
+        }
+        finally
+        {
+            _cancelling = false;
+        }
+    }
+
+    private void StopPolling()
+    {
+        if (_pollCts is null) return;
+        try { _pollCts.Cancel(); } catch (ObjectDisposedException) { }
+        _pollCts.Dispose();
+        _pollCts = null;
+    }
+
+    public void Dispose()
+    {
+        AiJobSignalR.NotificationReceived -= OnRealtimeNotificationAsync;
+        StopPolling(); // stops polling only; the server job keeps running
+    }
+
+    private static string StatusText(string? status) => status switch
+    {
+        "Queued" => "در صف",
+        "Claimed" or "BuildingContext" or "SendingToAiCore" or "SubmittedToAiCore" => "در حال آماده‌سازی",
+        "Running" => "در حال پردازش",
+        "Completed" => "تکمیل‌شده",
+        "Failed" => "ناموفق",
+        "Cancelled" => "لغوشده",
+        "Expired" => "منقضی‌شده",
+        _ => status ?? "—"
+    };
+
+    private static Color StatusColor(string? status) => status switch
+    {
+        "Completed" => Color.Success,
+        "Failed" or "Expired" => Color.Error,
+        "Cancelled" => Color.Default,
+        "Running" => Color.Info,
+        _ => Color.Warning
+    };
+
+    private static Severity SeverityFor(AiSeverity severity) => severity switch
+    {
+        AiSeverity.Critical or AiSeverity.High => Severity.Error,
+        AiSeverity.Medium => Severity.Warning,
+        _ => Severity.Info
+    };
+}

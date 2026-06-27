@@ -141,6 +141,73 @@ public static class LegalRuleEndpoints
             await handler.Handle(new GetPurchaseFileRuleEvaluationsQuery(purchaseFileId), ct))
             .RequireAnyPermission(ApplicationPermissions.ProcurementRuleView, ApplicationPermissions.AiAgentUse);
 
+        rules.MapPost("/gates/purchase-files/{purchaseFileId:guid}/override", async (
+            Guid purchaseFileId,
+            OverrideProcurementRuleGateRequest request,
+            IProcurementRuleGateService gate,
+            ICurrentUserService currentUser,
+            CancellationToken ct) =>
+            Results.Ok(await gate.OverrideTransitionAsync(
+                purchaseFileId,
+                string.IsNullOrWhiteSpace(request.TransitionName)
+                    ? ProcurementRuleGateTransitions.PurchaseFileComplete
+                    : request.TransitionName,
+                request.Reason,
+                new ProcurementRuleGateUserContext(
+                    currentUser.UserId,
+                    currentUser.IsSystemAdmin,
+                    currentUser.Permissions),
+                ct)))
+            .RequirePermission(ApplicationPermissions.LegalRuleOverrideBlockingFinding);
+
+        // AI-RAG-03: admin import + management of versioned procurement rules.
+        var adminRules = app.MapGroup("/api/admin/procurement-rules").WithTags("Procurement Rules Admin");
+
+        adminRules.MapPost("/import/json", async (ProcurementRuleImportRequest request,
+            IProcurementRuleImportService import, CancellationToken ct) =>
+            Results.Ok(await import.ImportAsync(request, ct)))
+            .RequirePermission(ApplicationPermissions.ProcurementRuleManage);
+
+        adminRules.MapPost("/import/csv", async (IFormFile file,
+            IProcurementRuleImportService import, CancellationToken ct) =>
+        {
+            if (file.Length == 0) return Results.BadRequest("CSV file is empty.");
+            using var reader = new StreamReader(file.OpenReadStream());
+            var csv = await reader.ReadToEndAsync(ct);
+            return Results.Ok(await import.ImportCsvAsync(csv, ct));
+        }).DisableAntiforgery().RequirePermission(ApplicationPermissions.ProcurementRuleManage);
+
+        adminRules.MapGet("/", async ([AsParameters] ProcurementRuleListRequest request,
+            LegalRuleQueryHandler handler, CancellationToken ct) =>
+            await handler.Handle(new GetProcurementRulesQuery(request), ct))
+            .RequirePermission(ApplicationPermissions.ProcurementRuleView);
+
+        adminRules.MapGet("/{id:guid}", async (Guid id, LegalRuleQueryHandler handler, CancellationToken ct) =>
+            await handler.Handle(new GetProcurementRuleByIdQuery(id), ct) is { } dto ? Results.Ok(dto) : Results.NotFound())
+            .RequirePermission(ApplicationPermissions.ProcurementRuleView);
+
+        adminRules.MapPost("/{id:guid}/submit", async (Guid id, SubmitRuleForApprovalRequest? request,
+            LegalRuleCommandHandler handler, CancellationToken ct) =>
+        {
+            await handler.Handle(new SubmitRuleForApprovalCommand(id, request?.Comment), ct);
+            return Results.NoContent();
+        }).RequirePermission(ApplicationPermissions.ProcurementRuleManage);
+
+        adminRules.MapPost("/{id:guid}/approve", async (Guid id, ApproveRuleVersionRequest? request,
+            LegalRuleCommandHandler handler, CancellationToken ct) =>
+        {
+            await handler.Handle(new ApproveRuleVersionCommand(id, request?.Comment), ct);
+            return Results.NoContent();
+        }).RequirePermission(ApplicationPermissions.ProcurementRuleApprove);
+
+        // In this domain, approving a pending version sets it active, so "activate" aliases approve.
+        adminRules.MapPost("/{id:guid}/activate", async (Guid id,
+            LegalRuleCommandHandler handler, CancellationToken ct) =>
+        {
+            await handler.Handle(new ApproveRuleVersionCommand(id, "Activated"), ct);
+            return Results.NoContent();
+        }).RequirePermission(ApplicationPermissions.ProcurementRuleApprove);
+
         return app;
     }
 }

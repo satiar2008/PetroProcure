@@ -164,7 +164,8 @@ public sealed class ProcurementRuleFinding : Entity<Guid>
     private ProcurementRuleFinding() : base(Guid.Empty) { Title = Description = LegalReference = string.Empty; }
     public ProcurementRuleFinding(Guid id, Guid evaluationId, Guid procurementRuleId, Guid ruleVersionId,
         RuleResult result, RuleSeverity severity, string title, string description, string legalReference,
-        Guid? legalArticleId, Guid? legalClauseId) : base(id)
+        Guid? legalArticleId, Guid? legalClauseId, bool isAiGenerated = false, bool needHumanReview = false,
+        decimal? confidence = null, string? citationReferences = null) : base(id)
     {
         ProcurementRuleEvaluationId = evaluationId;
         ProcurementRuleId = procurementRuleId;
@@ -176,6 +177,10 @@ public sealed class ProcurementRuleFinding : Entity<Guid>
         LegalReference = LegalDocument.Required(legalReference, nameof(legalReference));
         LegalArticleId = legalArticleId;
         LegalClauseId = legalClauseId;
+        IsAiGenerated = isAiGenerated;
+        NeedHumanReview = needHumanReview;
+        Confidence = confidence;
+        CitationReferences = LegalDocument.Trim(citationReferences);
     }
     public Guid ProcurementRuleEvaluationId { get; private set; }
     public Guid ProcurementRuleId { get; private set; }
@@ -187,6 +192,10 @@ public sealed class ProcurementRuleFinding : Entity<Guid>
     public string LegalReference { get; private set; }
     public Guid? LegalArticleId { get; private set; }
     public Guid? LegalClauseId { get; private set; }
+    public bool IsAiGenerated { get; private set; }
+    public bool NeedHumanReview { get; private set; }
+    public decimal? Confidence { get; private set; }
+    public string? CitationReferences { get; private set; }
 }
 
 public sealed class LegalRuleAuditLog : Entity<Guid>
@@ -201,10 +210,32 @@ public sealed class LegalRuleAuditLog : Entity<Guid>
         UserId = userId;
         CreatedAt = DateTime.UtcNow;
     }
+    public LegalRuleAuditLog(Guid id, Guid purchaseFileId, Guid ruleId, Guid findingId, string action,
+        string previousResult, string newResult, Guid userId, string reason) : base(id)
+    {
+        EntityType = "ProcurementRuleGate";
+        EntityId = purchaseFileId;
+        PurchaseFileId = purchaseFileId;
+        RuleId = ruleId;
+        FindingId = findingId;
+        Action = LegalDocument.Required(action, nameof(action));
+        PreviousResult = LegalDocument.Required(previousResult, nameof(previousResult));
+        NewResult = LegalDocument.Required(newResult, nameof(newResult));
+        UserId = userId;
+        Reason = LegalDocument.Required(reason, nameof(reason));
+        Summary = Reason;
+        CreatedAt = DateTime.UtcNow;
+    }
     public string EntityType { get; private set; }
     public Guid EntityId { get; private set; }
+    public Guid? PurchaseFileId { get; private set; }
+    public Guid? RuleId { get; private set; }
+    public Guid? FindingId { get; private set; }
     public string Action { get; private set; }
+    public string? PreviousResult { get; private set; }
+    public string? NewResult { get; private set; }
     public string Summary { get; private set; }
     public Guid UserId { get; private set; }
+    public string? Reason { get; private set; }
     public DateTime CreatedAt { get; private set; }
 }

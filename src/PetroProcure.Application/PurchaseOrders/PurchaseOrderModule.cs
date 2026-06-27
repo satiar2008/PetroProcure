@@ -1,4 +1,5 @@
 using PetroProcure.Application.Security;
+using PetroProcure.Application.Legal;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.PurchaseOrders;
 using PetroProcure.Domain.Enums;
@@ -112,7 +113,8 @@ public sealed class PurchaseOrderCommandHandler(
     IPurchaseOrderRepository repository,
     IPurchaseOrderNumberService numberService,
     IPurchaseOrderEligibilityService eligibility,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    IProcurementRuleGateService? gateService = null)
 {
     public async Task<PurchaseOrderDetailDto> Handle(CreatePurchaseOrderCommand command, CancellationToken ct = default)
     {
@@ -225,6 +227,7 @@ public sealed class PurchaseOrderCommandHandler(
     public async Task Handle(IssuePurchaseOrderCommand command, CancellationToken ct = default)
     {
         var po = await RequiredPurchaseOrder(command.Id, true, ct);
+        await EnsureGateAllowsAsync(po.Id, ProcurementRuleGateTransitions.PurchaseOrderIssue, ct);
         po.Issue(currentUser.UserId);
         await repository.SaveChangesAsync(ct);
     }
@@ -276,6 +279,15 @@ public sealed class PurchaseOrderCommandHandler(
         new(Guid.NewGuid(), purchaseOrderId, s.PurchaseFileItemId, s.ContractItemId, s.TenderBidItemId,
             s.MescItemId, s.MescCode, s.MescGeneralGroupCode, s.GeneralDescription, s.SpecificDescription,
             s.UnitOfMeasureId, s.OrderedQuantity, s.UnitPrice, s.ExpectedDeliveryDate, s.TechnicalDescription, s.Notes);
+
+    private async Task EnsureGateAllowsAsync(Guid entityId, string transitionName, CancellationToken ct)
+    {
+        if (gateService is null) return;
+        var result = await gateService.CheckTransitionAsync(entityId, transitionName,
+            new ProcurementRuleGateUserContext(currentUser.UserId, currentUser.IsSystemAdmin, currentUser.Permissions), ct);
+        if (result.IsBlocked)
+            throw new LegalRuleValidationException("Sensitive transition is blocked by unresolved legal rule findings.");
+    }
 }
 
 public sealed class PurchaseOrderQueryHandler(IPurchaseOrderRepository repository)

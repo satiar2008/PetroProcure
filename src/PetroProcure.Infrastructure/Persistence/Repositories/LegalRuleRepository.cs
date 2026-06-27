@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PetroProcure.Application.Legal;
+using PetroProcure.Application.Security;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Legal;
 using PetroProcure.Domain.Enums;
@@ -7,7 +8,8 @@ using PetroProcure.Domain.Modules.Legal;
 
 namespace PetroProcure.Infrastructure.Persistence.Repositories;
 
-internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRuleRepository, IPurchaseFileRuleContextBuilder
+internal sealed class LegalRuleRepository(PetroProcureDbContext db, ICurrentUserService currentUser)
+    : ILegalRuleRepository, IPurchaseFileRuleContextBuilder
 {
     public async Task AddLegalDocumentAsync(LegalDocument document, CancellationToken ct) => await db.LegalDocuments.AddAsync(document, ct);
     public Task<LegalDocument?> FindLegalDocumentAsync(Guid id, CancellationToken ct) => db.LegalDocuments.SingleOrDefaultAsync(x => x.Id == id, ct);
@@ -26,6 +28,19 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
         if (includeVersions) query = query.Include(x => x.Versions);
         return query.SingleOrDefaultAsync(x => x.Id == id, ct);
     }
+    public Task<ProcurementRule?> FindRuleByCodeAsync(string code, bool includeVersions, CancellationToken ct)
+    {
+        IQueryable<ProcurementRule> query = db.LegalProcurementRules;
+        if (includeVersions) query = query.Include(x => x.Versions);
+        return query.SingleOrDefaultAsync(x => x.Code == code, ct);
+    }
+
+    public async Task<ProcurementRuleDto?> GetRuleAsync(Guid id, CancellationToken ct)
+    {
+        var row = await RuleQuery().SingleOrDefaultAsync(x => x.Id == id, ct);
+        return row is null ? null : ToDto(row);
+    }
+
     public Task<ProcurementRuleVersion?> FindRuleVersionAsync(Guid id, CancellationToken ct) =>
         db.LegalProcurementRuleVersions.SingleOrDefaultAsync(x => x.Id == id, ct);
     public Task<ProcurementRuleVersion?> FindLatestDraftVersionAsync(Guid ruleId, CancellationToken ct) =>
@@ -164,12 +179,69 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
     {
         var file = await db.PurchaseFiles.AsNoTracking().SingleOrDefaultAsync(x => x.Id == purchaseFileId, ct)
             ?? throw new LegalRuleNotFoundException("Purchase file was not found.");
-        var itemCount = await db.PurchaseFileItems.AsNoTracking().CountAsync(x => x.PurchaseFileId == purchaseFileId, ct);
+
+        var quantities = await db.PurchaseFileItems.AsNoTracking()
+            .Where(x => x.PurchaseFileId == purchaseFileId).Select(x => x.RequestedQuantity).ToListAsync(ct);
         var hasTender = await db.Tenders.AsNoTracking().AnyAsync(x => x.PurchaseFileId == purchaseFileId, ct);
-        var docs = await db.FileDocuments.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId && !x.IsDeleted)
+        var docTypes = await db.FileDocuments.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId && !x.IsDeleted)
             .Select(x => x.DocumentType.ToString()).ToListAsync(ct);
+        var supplierCount = await db.InquirySuppliers.AsNoTracking()
+            .CountAsync(s => db.Inquiries.Any(i => i.Id == s.InquiryId && i.PurchaseFileId == purchaseFileId), ct);
+        var offerCount = await db.SupplierQuotes.AsNoTracking()
+            .CountAsync(q => db.Inquiries.Any(i => i.Id == q.InquiryId && i.PurchaseFileId == purchaseFileId), ct);
+
+        Guid? requestingDepartmentId = null;
+        Guid? applicantDepartmentId = null;
+        if (file.SourceIndentId is { } indentId)
+        {
+            var indent = await db.Indents.AsNoTracking().Where(x => x.Id == indentId)
+                .Select(x => new { x.RequestingDepartmentId, x.ApplicantDepartmentId }).SingleOrDefaultAsync(ct);
+            if (indent is not null)
+            {
+                requestingDepartmentId = indent.RequestingDepartmentId;
+                applicantDepartmentId = indent.ApplicantDepartmentId;
+            }
+        }
+
+        var contract = await db.PurchaseContracts.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId)
+            .OrderByDescending(x => x.CreatedAt).Select(x => new { x.FinalAmount, x.Currency }).FirstOrDefaultAsync(ct);
+        var order = await db.PurchaseOrders.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId)
+            .OrderByDescending(x => x.CreatedAt).Select(x => new { x.FinalAmount, x.Currency }).FirstOrDefaultAsync(ct);
+        var tender = await db.Tenders.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId)
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new { x.TenderType, x.SubmissionDeadline }).FirstOrDefaultAsync(ct);
+        var inquiryDeadline = await db.Inquiries.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId)
+            .OrderByDescending(x => x.CreatedAt).Select(x => x.DeadlineDate).FirstOrDefaultAsync(ct);
+
+        var approvalStatuses = await db.PurchaseOrderApprovals.AsNoTracking()
+            .Where(a => db.PurchaseOrders.Any(p => p.Id == a.PurchaseOrderId && p.PurchaseFileId == purchaseFileId))
+            .Select(a => a.Status.ToString()).ToListAsync(ct);
+        var workflowStatuses = await db.WorkflowInstances.AsNoTracking()
+            .Where(w => w.EntityType == "PurchaseFile" && w.EntityId == purchaseFileId)
+            .Select(w => w.Status.ToString()).ToListAsync(ct);
+
         return new RuleEvaluationContext("PurchaseFile", purchaseFileId, purchaseFileId, null, file.Status.ToString(),
-            hasTender, itemCount, docs.ToHashSet(StringComparer.OrdinalIgnoreCase));
+            hasTender, quantities.Count, docTypes.ToHashSet(StringComparer.OrdinalIgnoreCase))
+        {
+            FileNumber = file.FileNumber,
+            CurrentDepartmentId = file.CurrentDepartmentId,
+            RequestingDepartmentId = requestingDepartmentId,
+            ApplicantDepartmentId = applicantDepartmentId,
+            FinalAmount = contract?.FinalAmount ?? order?.FinalAmount,
+            Currency = contract?.Currency ?? order?.Currency,
+            TotalRequestedQuantity = quantities.Sum(),
+            TenderType = tender?.TenderType.ToString(),
+            SupplierCount = supplierCount,
+            OfferCount = offerCount,
+            ExistingDocumentCount = docTypes.Count,
+            Priority = file.Priority.ToString(),
+            CreatedAt = file.CreatedAt,
+            InquiryDeadline = inquiryDeadline,
+            TenderDeadline = tender?.SubmissionDeadline,
+            ApprovalStatuses = approvalStatuses,
+            WorkflowStatuses = workflowStatuses,
+            UserDepartmentIds = currentUser.DepartmentIds.ToArray()
+        };
     }
 
     public async Task<RuleEvaluationContext> BuildTenderAsync(Guid tenderId, CancellationToken ct = default)
@@ -177,10 +249,26 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
         var tender = await db.Tenders.AsNoTracking().SingleOrDefaultAsync(x => x.Id == tenderId, ct)
             ?? throw new LegalRuleNotFoundException("Tender was not found.");
         var itemCount = await db.TenderItems.AsNoTracking().CountAsync(x => x.TenderId == tenderId, ct);
-        var docs = await db.TenderDocuments.AsNoTracking().Where(x => x.TenderId == tenderId)
+        var docTypes = await db.TenderDocuments.AsNoTracking().Where(x => x.TenderId == tenderId)
             .Select(x => x.DocumentType).ToListAsync(ct);
+        var participantCount = await db.TenderParticipants.AsNoTracking().CountAsync(x => x.TenderId == tenderId, ct);
+        var bidCount = await db.TenderBids.AsNoTracking().CountAsync(x => x.TenderId == tenderId, ct);
+        var workflowStatuses = await db.WorkflowInstances.AsNoTracking()
+            .Where(w => w.EntityType == "Tender" && w.EntityId == tenderId)
+            .Select(w => w.Status.ToString()).ToListAsync(ct);
+
         return new RuleEvaluationContext("Tender", tenderId, tender.PurchaseFileId, tenderId, tender.Status.ToString(),
-            true, itemCount, docs.ToHashSet(StringComparer.OrdinalIgnoreCase));
+            true, itemCount, docTypes.ToHashSet(StringComparer.OrdinalIgnoreCase))
+        {
+            TenderType = tender.TenderType.ToString(),
+            SupplierCount = participantCount,
+            OfferCount = bidCount,
+            ExistingDocumentCount = docTypes.Count,
+            CreatedAt = tender.CreatedAt,
+            TenderDeadline = tender.SubmissionDeadline,
+            WorkflowStatuses = workflowStatuses,
+            UserDepartmentIds = currentUser.DepartmentIds.ToArray()
+        };
     }
 
     private IQueryable<RuleProjection> RuleQuery() =>
@@ -250,7 +338,8 @@ internal sealed class LegalRuleRepository(PetroProcureDbContext db) : ILegalRule
 
     private static ProcurementRuleFindingDto ToFindingDto(ProcurementRuleFinding x) =>
         new(x.Id, x.ProcurementRuleEvaluationId, x.ProcurementRuleId, x.RuleVersionId, x.Result, x.Severity,
-            x.Title, x.Description, x.LegalReference, x.LegalArticleId, x.LegalClauseId);
+            x.Title, x.Description, x.LegalReference, x.LegalArticleId, x.LegalClauseId,
+            x.IsAiGenerated, x.NeedHumanReview, x.Confidence, x.CitationReferences);
 
     private sealed class RuleProjection
     {

@@ -1,0 +1,90 @@
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+
+<MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-4">
+    پاسخ هوش مصنوعی جنبه مشورتی دارد و جایگزین تصمیم کارشناسی، حقوقی یا کمیسیون نیست.
+</MudAlert>
+
+<MudPaper Class="form-panel mb-4" Elevation="0">
+    <MudTextField @bind-Value="_question" Label="پرسش درباره پرونده" Lines="3" Variant="Variant.Outlined" />
+    <div class="d-flex flex-wrap gap-2 align-center mt-3">
+        <MudNumericField T="int" @bind-Value="_topK" Label="تعداد منابع" Min="1" Max="10" Variant="Variant.Outlined" Style="max-width: 160px" />
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.AutoAwesome"
+                   Disabled="_busy || string.IsNullOrWhiteSpace(_question)" OnClick="AskAsync">
+            پرسش از پرونده
+        </MudButton>
+    </div>
+</MudPaper>
+
+@if (_busy)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_answer is not null)
+{
+    <MudPaper Class="form-panel mb-4" Elevation="0">
+        <div class="d-flex flex-wrap gap-2 justify-space-between align-start">
+            <MudText Typo="Typo.h6">پاسخ هوش مصنوعی</MudText>
+            @if (_answer.NeedHumanReview)
+            {
+                <MudChip T="string" Color="Color.Warning" Size="Size.Small">نیازمند بازبینی انسانی</MudChip>
+            }
+        </div>
+        <MudText Typo="Typo.body1" Class="mt-3" Style="white-space: pre-wrap">@_answer.Answer</MudText>
+    </MudPaper>
+
+    <MudPaper Class="form-panel mb-4" Elevation="0">
+        <MudText Typo="Typo.subtitle1">استنادها</MudText>
+        @if (_answer.Citations.Count == 0)
+        {
+            <MudText Typo="Typo.body2">استنادی ثبت نشده است.</MudText>
+        }
+        else
+        {
+            @foreach (var citation in _answer.Citations)
+            {
+                <div class="d-flex flex-wrap gap-2 justify-space-between align-center mt-2">
+                    <div>
+                        <MudText Typo="Typo.body2">@citation.CitationId — @citation.Title</MudText>
+                        <MudText Typo="Typo.caption">@citation.Reference</MudText>
+                    </div>
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">@($"{citation.Score:P1}")</MudChip>
+                </div>
+            }
+        }
+    </MudPaper>
+
+    <MudPaper Class="form-panel" Elevation="0">
+        <MudText Typo="Typo.subtitle1">بخش‌های مرتبط</MudText>
+        @foreach (var chunk in _answer.RelatedChunks)
+        {
+            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="my-2">
+                <strong>@chunk.CitationId</strong>
+                <br />
+                @chunk.TextPreview
+            </MudAlert>
+        }
+    </MudPaper>
+}
+
+@code {
+    [Parameter] public Guid PurchaseFileId { get; set; }
+
+    private string? _question;
+    private int _topK = 5;
+    private bool _busy;
+    private GroundedAiAnalysisResponse? _answer;
+
+    private async Task AskAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_question)) return;
+        _busy = true;
+        try
+        {
+            _answer = await Api.AskPurchaseFileAsync(PurchaseFileId,
+                new GroundedAiQuestionRequest(_question.Trim(), Math.Clamp(_topK, 1, 10)));
+        }
+        catch (Exception ex) { Snackbar.Add("پرسش از پرونده ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+}

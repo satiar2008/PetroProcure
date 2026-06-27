@@ -3,8 +3,9 @@
 @inject IUserAccessContext Access
 @inject NavigationManager Navigation
 @inject IAuthService Auth
+@inject IJSRuntime JS
 
-<MudThemeProvider Theme="_theme" />
+<MudThemeProvider Theme="_theme" @bind-IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
 <MudDialogProvider />
 <MudSnackbarProvider />
@@ -23,7 +24,7 @@
             <MudSpacer />
             @if (Access.Panels.Count > 1)
             {
-                <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight">
+                <MudMenu Dense="true" AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" PopoverClass="pp-menu-pop">
                     <ActivatorContent>
                         <MudButton Variant="Variant.Text" Color="Color.Inherit"
                                    StartIcon="@Icons.Material.Filled.Apartment"
@@ -41,11 +42,15 @@
                     </ChildContent>
                 </MudMenu>
             }
+            <MudTooltip Text="@(_isDarkMode ? "حالت روشن" : "حالت تاریک")">
+                <MudIconButton Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)"
+                               Color="Color.Inherit" Class="theme-toggle" OnClick="ToggleTheme" aria-label="تغییر حالت روشن و تاریک" />
+            </MudTooltip>
             <InboxNotificationBell />
-            <MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft">
+            <MudMenu Dense="true" AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" PopoverClass="pp-menu-pop">
                 <ActivatorContent>
                     <MudButton Variant="Variant.Text" Color="Color.Inherit" Class="profile-button">
-                        <MudAvatar Size="Size.Small" Class="profile-avatar">م‌ا</MudAvatar>
+                        <MudAvatar Size="Size.Small" Class="profile-avatar">@UserInitials</MudAvatar>
                         <span class="profile-copy">
                             <strong>@Access.DisplayName</strong>
                             <small>@Access.RoleTitle</small>
@@ -55,7 +60,10 @@
                 </ActivatorContent>
                 <ChildContent>
                     <MudMenuItem Href="/profile" Icon="@Icons.Material.Filled.PersonOutline">پروفایل کاربری</MudMenuItem>
-                    <MudMenuItem Icon="@Icons.Material.Filled.Settings">تنظیمات</MudMenuItem>
+                    <MudMenuItem OnClick="ToggleTheme" Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)">
+                        @(_isDarkMode ? "حالت روشن" : "حالت تاریک")
+                    </MudMenuItem>
+                    <MudMenuItem Href="/admin/settings" Icon="@Icons.Material.Filled.Settings">تنظیمات</MudMenuItem>
                     <MudDivider />
                     <MudMenuItem Href="/logout" Icon="@Icons.Material.Filled.Logout">خروج از سامانه</MudMenuItem>
                 </ChildContent>
@@ -78,6 +86,14 @@
                     <MudBreadcrumbs Items="_breadcrumbs" Separator="/" />
                 </div>
                 @Body
+
+                <footer class="app-footer">
+                    <div class="app-footer-credit">
+                        <span class="app-footer-label">طراحی و توسعه</span>
+                        <img class="app-footer-logo" src="/logo/Me_logo_noBack.png" alt="طراح و سازنده برنامه" />
+                    </div>
+                    <span class="app-footer-meta">پتروپروکیور · سامانه مدیریت خرید پالایشگاه · نسخه آزمایشی ۰.۱</span>
+                </footer>
             </MudContainer>
         </MudMainContent>
     </MudLayout>
@@ -90,6 +106,8 @@
 
 @code {
     private bool _drawerOpen = true;
+    private bool _isDarkMode;
+    private bool _themeLoaded;
     private readonly MudTheme _theme = new()
     {
         PaletteLight = new PaletteLight
@@ -104,16 +122,63 @@
             TextPrimary = "#19343A",
             TextSecondary = "#60777C"
         },
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#3FB6B0",
+            Secondary = "#E2B35A",
+            Background = "#0C1B1D",
+            Surface = "#142426",
+            AppbarBackground = "#06302C",
+            AppbarText = "#EAF4F3",
+            DrawerBackground = "#11201F",
+            DrawerText = "#D7E5E5",
+            TextPrimary = "#E7F0F0",
+            TextSecondary = "#9FB3B6",
+            ActionDefault = "#B6C9CB",
+            Divider = "#243A3D"
+        },
         Typography = new Typography { Default = new DefaultTypography { FontFamily = ["vazirmatn-regular", "Tahoma", "sans-serif"] } },
         LayoutProperties = new LayoutProperties { DefaultBorderRadius = "10px", DrawerWidthLeft = "292px" }
     };
     private List<BreadcrumbItem> _breadcrumbs = [new("خانه", href: null, disabled: true)];
+
+    private string UserInitials => BuildInitials(Access.DisplayName);
 
     protected override void OnInitialized()
     {
         Access.Changed += OnAccessChanged;
         Navigation.LocationChanged += OnLocationChanged;
         UpdateBreadcrumbs();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _themeLoaded) return;
+        _themeLoaded = true;
+        try
+        {
+            _isDarkMode = await JS.InvokeAsync<bool>("petroProcureTheme.get");
+            await JS.InvokeVoidAsync("petroProcureTheme.apply", _isDarkMode);
+            StateHasChanged();
+        }
+        catch { /* JS not ready (prerender) — defaults to light */ }
+    }
+
+    private async Task ToggleTheme()
+    {
+        _isDarkMode = !_isDarkMode;
+        try { await JS.InvokeVoidAsync("petroProcureTheme.apply", _isDarkMode); }
+        catch { /* ignore */ }
+    }
+
+    private static string BuildInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "؟";
+        var parts = name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "؟";
+        if (parts.Length == 1)
+            return parts[0].Length <= 2 ? parts[0] : parts[0][..2];
+        return $"{parts[0][0]}{parts[^1][0]}";
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;

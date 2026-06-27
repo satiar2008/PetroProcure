@@ -1,4 +1,5 @@
 using PetroProcure.Application.Security;
+using PetroProcure.Application.Legal;
 using PetroProcure.Contracts.V1.Commission;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Domain.Enums;
@@ -77,7 +78,7 @@ public interface ICommissionSessionEligibilityService;
 public sealed class CommissionSessionEligibilityService : ICommissionSessionEligibilityService;
 
 public sealed class CommissionCommandHandler(ICommissionSessionRepository repository, ICommissionSessionNumberService numbers,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser, IProcurementRuleGateService? gateService = null)
 {
     public async Task<TenderCommissionSessionDetailDto> Handle(CreateCommissionSessionCommand command, CancellationToken ct = default)
     {
@@ -242,6 +243,7 @@ public sealed class CommissionCommandHandler(ICommissionSessionRepository reposi
         var decision = session.ApproveDecision(command.DecisionId, currentUser.UserId);
         if (decision.DecisionType == TenderCommissionDecisionType.ApproveWinner && decision.SelectedTenderBidId.HasValue)
         {
+            await EnsureGateAllowsAsync(decision.TenderId, ProcurementRuleGateTransitions.TenderApproveWinner, ct);
             var tender = await repository.FindTenderAsync(decision.TenderId, true, ct)
                 ?? throw new CommissionValidationException("Tender was not found.");
             if (tender.Status != TenderStatus.WinnerSelected)
@@ -265,6 +267,14 @@ public sealed class CommissionCommandHandler(ICommissionSessionRepository reposi
     private async Task<TenderCommissionSessionDetailDto> Detail(Guid id, CancellationToken ct) =>
         await repository.GetDetailAsync(id, ct) ?? throw new CommissionNotFoundException("Commission session was not found.");
     private void EnsureUser() { if (!currentUser.IsAuthenticated || currentUser.UserId == Guid.Empty) throw new CurrentUserNotAuthenticatedException(); }
+    private async Task EnsureGateAllowsAsync(Guid entityId, string transitionName, CancellationToken ct)
+    {
+        if (gateService is null) return;
+        var result = await gateService.CheckTransitionAsync(entityId, transitionName,
+            new ProcurementRuleGateUserContext(currentUser.UserId, currentUser.IsSystemAdmin, currentUser.Permissions), ct);
+        if (result.IsBlocked)
+            throw new LegalRuleValidationException("Sensitive transition is blocked by unresolved legal rule findings.");
+    }
 }
 
 public sealed class CommissionQueryHandler(ICommissionSessionRepository repository)

@@ -121,15 +121,16 @@ internal sealed class WarehouseRepository(PetroProcureDbContext db) : IWarehouse
 
     public async Task<PagedResult<WarehouseReceiptSummaryDto>> GetReceiptsAsync(WarehouseReceiptListRequest r, CancellationToken ct)
     {
-        var query = ApplyReceiptFilters(SummaryQuery(), r);
+        var query = ApplyReceiptFilters(JoinReceipts(), r);
         var total = await query.LongCountAsync(ct);
-        var items = await (r.SortBy?.ToLowerInvariant() switch
+        var ordered = r.SortBy?.ToLowerInvariant() switch
         {
-            "receiptnumber" => r.SortDescending ? query.OrderByDescending(x => x.ReceiptNumber) : query.OrderBy(x => x.ReceiptNumber),
-            "receiptdate" => r.SortDescending ? query.OrderByDescending(x => x.ReceiptDate) : query.OrderBy(x => x.ReceiptDate),
-            "status" => r.SortDescending ? query.OrderByDescending(x => x.Status) : query.OrderBy(x => x.Status),
-            _ => r.SortDescending ? query.OrderByDescending(x => x.CreatedAt) : query.OrderBy(x => x.CreatedAt)
-        }).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize).ToListAsync(ct);
+            "receiptnumber" => r.SortDescending ? query.OrderByDescending(x => x.Receipt.ReceiptNumber) : query.OrderBy(x => x.Receipt.ReceiptNumber),
+            "receiptdate" => r.SortDescending ? query.OrderByDescending(x => x.Receipt.ReceiptDate) : query.OrderBy(x => x.Receipt.ReceiptDate),
+            "status" => r.SortDescending ? query.OrderByDescending(x => x.Receipt.Status) : query.OrderBy(x => x.Receipt.Status),
+            _ => r.SortDescending ? query.OrderByDescending(x => x.Receipt.CreatedAt) : query.OrderBy(x => x.Receipt.CreatedAt)
+        };
+        var items = await Project(ordered.Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize)).ToListAsync(ct);
         return new PagedResult<WarehouseReceiptSummaryDto>(items, r.PageNumber, r.PageSize, total);
     }
 
@@ -144,9 +145,9 @@ internal sealed class WarehouseRepository(PetroProcureDbContext db) : IWarehouse
         return receipt is null ? null : await Detail(receipt, ct);
     }
     public async Task<IReadOnlyList<WarehouseReceiptSummaryDto>> GetReceiptsByPurchaseOrderAsync(Guid purchaseOrderId, CancellationToken ct) =>
-        await SummaryQuery().Where(x => x.PurchaseOrderId == purchaseOrderId).OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        await Project(JoinReceipts().Where(x => x.Receipt.PurchaseOrderId == purchaseOrderId).OrderByDescending(x => x.Receipt.CreatedAt)).ToListAsync(ct);
     public async Task<IReadOnlyList<WarehouseReceiptSummaryDto>> GetReceiptsByPurchaseFileAsync(Guid purchaseFileId, CancellationToken ct) =>
-        await SummaryQuery().Where(x => x.PurchaseFileId == purchaseFileId).OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
+        await Project(JoinReceipts().Where(x => x.Receipt.PurchaseFileId == purchaseFileId).OrderByDescending(x => x.Receipt.CreatedAt)).ToListAsync(ct);
 
     public async Task<IReadOnlyList<WarehouseReceiptDocumentDto>> GetDocumentsAsync(Guid receiptId, CancellationToken ct) =>
         await db.WarehouseReceiptDocuments.AsNoTracking().Where(x => x.WarehouseReceiptId == receiptId)
@@ -156,39 +157,48 @@ internal sealed class WarehouseRepository(PetroProcureDbContext db) : IWarehouse
 
     public async Task<PagedResult<InventoryTransactionDto>> GetInventoryTransactionsAsync(InventoryTransactionListRequest r, CancellationToken ct)
     {
+        // Filter/order on entity columns first, then project to the DTO last so EF can
+        // translate the ORDER BY (ordering over a positional-record projection across joins fails).
         var query = from tx in db.InventoryTransactions.AsNoTracking()
                     join item in db.MescItems.AsNoTracking() on tx.MescItemId equals item.Id
                     join wh in db.Warehouses.AsNoTracking() on tx.WarehouseId equals wh.Id
-                    select new InventoryTransactionDto(tx.Id, tx.TransactionNumber, tx.MescItemId, item.Code,
-                        item.Description, tx.WarehouseId, wh.Name, tx.TransactionType, tx.ReferenceType,
-                        tx.ReferenceId, tx.Quantity, tx.UnitOfMeasureId, tx.TransactionDate, tx.CreatedAt,
-                        tx.CreatedByUserId, tx.Description);
-        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.TransactionNumber.Contains(r.SearchTerm) || x.MescCode.Contains(r.SearchTerm));
-        if (r.WarehouseId.HasValue) query = query.Where(x => x.WarehouseId == r.WarehouseId);
-        if (r.TransactionType.HasValue) query = query.Where(x => x.TransactionType == r.TransactionType);
-        if (r.DateFrom.HasValue) query = query.Where(x => x.TransactionDate >= r.DateFrom);
-        if (r.DateTo.HasValue) query = query.Where(x => x.TransactionDate <= r.DateTo);
+                    select new { tx, item, wh };
+        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.tx.TransactionNumber.Contains(r.SearchTerm) || x.item.Code.Contains(r.SearchTerm));
+        if (r.WarehouseId.HasValue) query = query.Where(x => x.tx.WarehouseId == r.WarehouseId);
+        if (r.TransactionType.HasValue) query = query.Where(x => x.tx.TransactionType == r.TransactionType);
+        if (r.DateFrom.HasValue) query = query.Where(x => x.tx.TransactionDate >= r.DateFrom);
+        if (r.DateTo.HasValue) query = query.Where(x => x.tx.TransactionDate <= r.DateTo);
         var total = await query.LongCountAsync(ct);
-        var items = await query.OrderByDescending(x => x.TransactionDate).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize).ToListAsync(ct);
+        var items = await query.OrderByDescending(x => x.tx.TransactionDate).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize)
+            .Select(x => new InventoryTransactionDto(x.tx.Id, x.tx.TransactionNumber, x.tx.MescItemId, x.item.Code,
+                x.item.Description, x.tx.WarehouseId, x.wh.Name, x.tx.TransactionType, x.tx.ReferenceType,
+                x.tx.ReferenceId, x.tx.Quantity, x.tx.UnitOfMeasureId, x.tx.TransactionDate, x.tx.CreatedAt,
+                x.tx.CreatedByUserId, x.tx.Description))
+            .ToListAsync(ct);
         return new PagedResult<InventoryTransactionDto>(items, r.PageNumber, r.PageSize, total);
     }
 
     public async Task<PagedResult<StockBalanceDto>> GetStockBalancesAsync(StockBalanceListRequest r, CancellationToken ct)
     {
+        // Keep the joined entities (no DTO projection yet) so filtering and ordering run on
+        // real columns; the StockBalanceDto projection is applied last. Ordering over a
+        // positional-record projection across these joins cannot be translated by EF Core.
         var query = from balance in db.StockBalances.AsNoTracking()
                     join item in db.MescItems.AsNoTracking() on balance.MescItemId equals item.Id
                     join groupItem in db.MescGeneralGroups.AsNoTracking() on item.GeneralGroupCode equals groupItem.Code
                     join wh in db.Warehouses.AsNoTracking() on balance.WarehouseId equals wh.Id into warehouses
                     from wh in warehouses.DefaultIfEmpty()
-                    select new StockBalanceDto(balance.Id, balance.MescItemId, balance.WarehouseId, item.Code,
-                        item.GeneralGroupCode, groupItem.Description, item.Description,
-                        wh == null ? null : wh.Name, balance.AvailableQuantity, balance.ReservedQuantity,
-                        balance.OnOrderQuantity, balance.LastUpdatedAt);
-        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.MescCode.Contains(r.SearchTerm) || x.SpecificDescription.Contains(r.SearchTerm));
-        if (r.WarehouseId.HasValue) query = query.Where(x => x.WarehouseId == r.WarehouseId);
-        if (!string.IsNullOrWhiteSpace(r.MescGeneralGroupCode)) query = query.Where(x => x.MescGeneralGroupCode == r.MescGeneralGroupCode);
+                    select new { balance, item, groupItem, wh };
+        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.item.Code.Contains(r.SearchTerm) || x.item.Description.Contains(r.SearchTerm));
+        if (r.WarehouseId.HasValue) query = query.Where(x => x.balance.WarehouseId == r.WarehouseId);
+        if (!string.IsNullOrWhiteSpace(r.MescGeneralGroupCode)) query = query.Where(x => x.item.GeneralGroupCode == r.MescGeneralGroupCode);
         var total = await query.LongCountAsync(ct);
-        var items = await query.OrderBy(x => x.MescCode).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize).ToListAsync(ct);
+        var items = await query.OrderBy(x => x.item.Code).Skip((r.PageNumber - 1) * r.PageSize).Take(r.PageSize)
+            .Select(x => new StockBalanceDto(x.balance.Id, x.balance.MescItemId, x.balance.WarehouseId, x.item.Code,
+                x.item.GeneralGroupCode, x.groupItem.Description, x.item.Description,
+                x.wh == null ? null : x.wh.Name, x.balance.AvailableQuantity, x.balance.ReservedQuantity,
+                x.balance.OnOrderQuantity, x.balance.LastUpdatedAt))
+            .ToListAsync(ct);
         return new PagedResult<StockBalanceDto>(items, r.PageNumber, r.PageSize, total);
     }
 
@@ -226,15 +236,39 @@ internal sealed class WarehouseRepository(PetroProcureDbContext db) : IWarehouse
 
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 
-    private IQueryable<WarehouseReceiptSummaryDto> SummaryQuery() =>
+    // Join receipts to their related entities WITHOUT projecting into the DTO yet.
+    // Filtering and ordering are done on the underlying entity columns (via ReceiptJoin.Receipt),
+    // and the DTO projection is applied last. Ordering directly over a positional-record
+    // projection across these joins cannot be translated by EF Core.
+    private IQueryable<ReceiptJoin> JoinReceipts() =>
         from r in db.WarehouseReceipts.AsNoTracking()
         join po in db.PurchaseOrders.AsNoTracking() on r.PurchaseOrderId equals po.Id
         join pf in db.PurchaseFiles.AsNoTracking() on r.PurchaseFileId equals pf.Id
         join wh in db.Warehouses.AsNoTracking() on r.WarehouseId equals wh.Id
         join supplier in db.Suppliers.AsNoTracking() on r.SupplierId equals supplier.Id
-        select new WarehouseReceiptSummaryDto(r.Id, r.ReceiptNumber, r.PurchaseOrderId, po.PurchaseOrderNumber,
-            r.PurchaseFileId, pf.FileNumber, r.WarehouseId, wh.Name, r.SupplierId, supplier.Name,
-            r.Status, r.ReceiptDate, r.CreatedAt);
+        select new ReceiptJoin
+        {
+            Receipt = r,
+            PurchaseOrderNumber = po.PurchaseOrderNumber,
+            PurchaseFileNumber = pf.FileNumber,
+            WarehouseName = wh.Name,
+            SupplierName = supplier.Name
+        };
+
+    private static IQueryable<WarehouseReceiptSummaryDto> Project(IQueryable<ReceiptJoin> query) =>
+        query.Select(j => new WarehouseReceiptSummaryDto(j.Receipt.Id, j.Receipt.ReceiptNumber,
+            j.Receipt.PurchaseOrderId, j.PurchaseOrderNumber, j.Receipt.PurchaseFileId, j.PurchaseFileNumber,
+            j.Receipt.WarehouseId, j.WarehouseName, j.Receipt.SupplierId, j.SupplierName,
+            j.Receipt.Status, j.Receipt.ReceiptDate, j.Receipt.CreatedAt));
+
+    private sealed class ReceiptJoin
+    {
+        public required WarehouseReceipt Receipt { get; init; }
+        public required string PurchaseOrderNumber { get; init; }
+        public required string PurchaseFileNumber { get; init; }
+        public required string WarehouseName { get; init; }
+        public required string SupplierName { get; init; }
+    }
 
     private IQueryable<WarehouseReceiptDto> DtoQuery(Guid? id = null, string? number = null)
     {
@@ -268,17 +302,17 @@ internal sealed class WarehouseRepository(PetroProcureDbContext db) : IWarehouse
         return new WarehouseReceiptDetailDto(receipt, items, documents, transactions);
     }
 
-    private static IQueryable<WarehouseReceiptSummaryDto> ApplyReceiptFilters(IQueryable<WarehouseReceiptSummaryDto> query, WarehouseReceiptListRequest r)
+    private static IQueryable<ReceiptJoin> ApplyReceiptFilters(IQueryable<ReceiptJoin> query, WarehouseReceiptListRequest r)
     {
-        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.ReceiptNumber.Contains(r.SearchTerm) || x.PurchaseOrderNumber.Contains(r.SearchTerm) || x.PurchaseFileNumber.Contains(r.SearchTerm) || x.SupplierName.Contains(r.SearchTerm));
-        if (r.Status.HasValue) query = query.Where(x => x.Status == r.Status);
-        if (!string.IsNullOrWhiteSpace(r.ReceiptNumber)) query = query.Where(x => x.ReceiptNumber.Contains(r.ReceiptNumber));
+        if (!string.IsNullOrWhiteSpace(r.SearchTerm)) query = query.Where(x => x.Receipt.ReceiptNumber.Contains(r.SearchTerm) || x.PurchaseOrderNumber.Contains(r.SearchTerm) || x.PurchaseFileNumber.Contains(r.SearchTerm) || x.SupplierName.Contains(r.SearchTerm));
+        if (r.Status.HasValue) query = query.Where(x => x.Receipt.Status == r.Status);
+        if (!string.IsNullOrWhiteSpace(r.ReceiptNumber)) query = query.Where(x => x.Receipt.ReceiptNumber.Contains(r.ReceiptNumber));
         if (!string.IsNullOrWhiteSpace(r.PurchaseOrderNumber)) query = query.Where(x => x.PurchaseOrderNumber.Contains(r.PurchaseOrderNumber));
         if (!string.IsNullOrWhiteSpace(r.PurchaseFileNumber)) query = query.Where(x => x.PurchaseFileNumber.Contains(r.PurchaseFileNumber));
-        if (r.SupplierId.HasValue) query = query.Where(x => x.SupplierId == r.SupplierId);
-        if (r.WarehouseId.HasValue) query = query.Where(x => x.WarehouseId == r.WarehouseId);
-        if (r.ReceiptDateFrom.HasValue) query = query.Where(x => x.ReceiptDate >= r.ReceiptDateFrom);
-        if (r.ReceiptDateTo.HasValue) query = query.Where(x => x.ReceiptDate <= r.ReceiptDateTo);
+        if (r.SupplierId.HasValue) query = query.Where(x => x.Receipt.SupplierId == r.SupplierId);
+        if (r.WarehouseId.HasValue) query = query.Where(x => x.Receipt.WarehouseId == r.WarehouseId);
+        if (r.ReceiptDateFrom.HasValue) query = query.Where(x => x.Receipt.ReceiptDate >= r.ReceiptDateFrom);
+        if (r.ReceiptDateTo.HasValue) query = query.Where(x => x.Receipt.ReceiptDate <= r.ReceiptDateTo);
         return query;
     }
 }

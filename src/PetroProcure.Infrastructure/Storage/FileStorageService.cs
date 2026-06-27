@@ -1,7 +1,10 @@
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using PetroProcure.Application.Documents;
+using PetroProcure.Application.Rag;
 using PetroProcure.Domain.Enums;
+using PetroProcure.Domain.Modules.Ai;
 using PetroProcure.Domain.Modules.Documents;
 using PetroProcure.Domain.Modules.PurchaseFiles;
 
@@ -10,7 +13,9 @@ namespace PetroProcure.Infrastructure.Storage;
 public sealed class FileStorageService(
     IFileDocumentRepository repository,
     IOptions<FileStorageOptions> options,
-    IFileScanner scanner) : IFileStorageService
+    IFileScanner scanner,
+    IRagIngestionQueue ingestionQueue,
+    ILogger<FileStorageService> logger) : IFileStorageService
 {
     public static readonly string[] StandardFolders =
     [
@@ -60,6 +65,7 @@ public sealed class FileStorageService(
                 uploadedByUserId, description);
             await repository.AddDocumentAsync(document, cancellationToken);
             await repository.SaveChangesAsync(cancellationToken);
+            await EnqueueDocumentIngestionAsync(document, forceRebuild: false, cancellationToken);
             return ToDto(document);
         }
         catch
@@ -110,6 +116,7 @@ public sealed class FileStorageService(
             document.AddVersion(new DocumentVersion(
                 Guid.NewGuid(), document.Id, nextVersion, storedName, relativePath, size, hash, createdByUserId));
             await repository.SaveChangesAsync(cancellationToken);
+            await EnqueueDocumentIngestionAsync(document, forceRebuild: true, cancellationToken);
             return ToDto(document);
         }
         catch
@@ -273,6 +280,23 @@ public sealed class FileStorageService(
         document.OriginalFileName, document.StoredFileName, document.RelativePath, document.Extension,
         document.MimeType, document.Size, document.Hash, document.VersionNo, document.UploadedByUserId,
         document.UploadedAt, document.IsDeleted, document.Description);
+
+    private async Task EnqueueDocumentIngestionAsync(FileDocument document, bool forceRebuild, CancellationToken ct)
+    {
+        try
+        {
+            await ingestionQueue.EnqueueAsync(new EmbeddingIngestionPayload(
+                AiDocumentSourceType.PurchaseFileDocument,
+                document.Id,
+                document.PurchaseFileId,
+                document.Id,
+                forceRebuild), document.UploadedByUserId, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            logger.LogError(ex, "Failed to enqueue RAG ingestion for document {DocumentId}.", document.Id);
+        }
+    }
 }
 
 public sealed class FileStorageNotFoundException(string message) : Exception(message);

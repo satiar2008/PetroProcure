@@ -32,6 +32,30 @@
             link.remove();
             URL.revokeObjectURL(url);
         };
+
+        window.petroProcureTheme = {
+            key: 'pp-theme',
+            get() {
+                try { return localStorage.getItem(this.key) === 'dark'; } catch { return false; }
+            },
+            apply(isDark) {
+                document.body.classList.toggle('pp-dark', !!isDark);
+                try { localStorage.setItem(this.key, isDark ? 'dark' : 'light'); } catch { }
+            }
+        };
+        // Apply persisted theme as early as possible to avoid a flash.
+        (function () {
+            try {
+                if (localStorage.getItem('pp-theme') === 'dark') {
+                    document.documentElement.classList.add('pp-dark-preload');
+                }
+            } catch { }
+            document.addEventListener('DOMContentLoaded', function () {
+                if (document.documentElement.classList.contains('pp-dark-preload')) {
+                    document.body.classList.add('pp-dark');
+                }
+            });
+        })();
     </script>
 </body>
 

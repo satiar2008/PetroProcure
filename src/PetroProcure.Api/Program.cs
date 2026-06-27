@@ -7,7 +7,10 @@ using PetroProcure.Application;
 using PetroProcure.Reporting;
 using PetroProcure.AI;
 using PetroProcure.Api.Security;
+using PetroProcure.Api.Hubs;
+using PetroProcure.Application.Ai;
 using PetroProcure.Application.Security;
+using PetroProcure.Api.Health;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -50,8 +53,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = audience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey))
         };
+
+        // SignalR sends the access token in the query string for the WebSocket/SSE handshake.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken)
+                    && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddHealthChecks()
+    .AddCheck<AiCoreConnectivityHealthCheck>("aicore");
+builder.Services.AddSignalR();
+// Override the no-op notifier registered by AddApplication with the SignalR transport.
+builder.Services.AddScoped<IAiJobNotifier, SignalRAiJobNotifier>();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -101,6 +124,7 @@ app.UseExceptionHandler(exceptionHandlerApp => exceptionHandlerApp.Run(async con
         PetroProcure.Application.Warehouse.WarehouseReceiptNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
         PetroProcure.Application.Legal.LegalRuleValidationException => (StatusCodes.Status400BadRequest, "Validation error"),
         PetroProcure.Application.Legal.LegalRuleNotFoundException => (StatusCodes.Status404NotFound, "Not found"),
+        PetroProcure.Application.Rag.RagEmbeddingUnavailableException => (StatusCodes.Status503ServiceUnavailable, "RAG embedding unavailable"),
         PetroProcure.Application.Security.CurrentUserNotAuthenticatedException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
         PetroProcure.Application.Security.CurrentUserForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden"),
         _ => (StatusCodes.Status500InternalServerError, "Unexpected error")
@@ -118,7 +142,13 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
+// In Development we run over plain HTTP (e.g. http://localhost:5073) without AppHost. HTTPS
+// redirection would 307 authenticated calls to https, and HttpClient drops the Authorization
+// header across the scheme/port change -> 401 -> forced logout right after login.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -139,6 +169,7 @@ app.MapDocumentEndpoints();
 app.MapWorkflowEndpoints();
 app.MapReportEndpoints();
 app.MapAiEndpoints();
+app.MapRagEndpoints();
 app.MapSupplierEndpoints();
 app.MapInquiryEndpoints();
 app.MapOrdersEndpoints();
@@ -149,6 +180,8 @@ app.MapContractEndpoints();
 app.MapPurchaseOrderEndpoints();
 app.MapWarehouseEndpoints();
 app.MapLegalRuleEndpoints();
+
+app.MapHub<AiJobHub>("/hubs/ai-jobs");
 
 app.MapDefaultEndpoints();
 

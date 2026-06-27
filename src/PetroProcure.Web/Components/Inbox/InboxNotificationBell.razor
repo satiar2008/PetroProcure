@@ -74,8 +74,12 @@
     protected override async Task OnInitializedAsync()
     {
         Access.Changed += OnAccessChanged;
+        // Capture the token before the first await: the component can be disposed during the await
+        // (navigation away / circuit teardown), after which _disposeCts.Token would throw.
+        var loopToken = _disposeCts.Token;
         await RefreshAsync(true);
-        _ = RunRefreshLoopAsync(_disposeCts.Token);
+        if (_disposed) return;
+        _ = RunRefreshLoopAsync(loopToken);
     }
 
     private async Task RunRefreshLoopAsync(CancellationToken cancellationToken)

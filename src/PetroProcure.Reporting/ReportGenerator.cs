@@ -24,6 +24,7 @@ public sealed class ReportGenerator(
         var (key, value) = parameters.First();
         var url = reportName switch
         {
+            ReportNames.LegalCompliance => $"/api/reports/legal-compliance/{value}/pdf",
             ReportNames.Indent => $"/api/reports/indent/{value}/pdf",
             ReportNames.TenderSummary => $"/api/tenders/{value}/reports/summary/pdf",
             ReportNames.TenderComparison => $"/api/tenders/{value}/reports/comparison/pdf",
@@ -52,6 +53,7 @@ public sealed class ReportGenerator(
         return name switch
         {
             ReportNames.PurchaseFileSummary => new PurchaseFileSummaryReport(await RequiredPurchaseFile(parameters, ct)),
+            ReportNames.LegalCompliance => new LegalComplianceReport(await RequiredLegalCompliance(parameters, ct)),
             ReportNames.PurchaseFileItemsGroupedByMesc => new PurchaseFileItemsGroupedByMescReport(await RequiredPurchaseFile(parameters, ct)),
             ReportNames.Indent => new IndentReport(await RequiredIndent(parameters, ct)),
             ReportNames.TenderSummary => new TenderSummaryReport(await RequiredTender(parameters, ct)),
@@ -70,6 +72,11 @@ public sealed class ReportGenerator(
     {
         var id = RequiredGuid(p, "PurchaseFileId");
         return await dataProvider.GetPurchaseFileAsync(id, ct) ?? throw new InvalidOperationException("Purchase file was not found.");
+    }
+    private async Task<LegalComplianceReportData> RequiredLegalCompliance(IReadOnlyDictionary<string, object?> p, CancellationToken ct)
+    {
+        var id = RequiredGuid(p, "PurchaseFileId");
+        return await dataProvider.GetLegalComplianceAsync(id, ct) ?? throw new InvalidOperationException("Purchase file was not found.");
     }
     private async Task<IndentReportData> RequiredIndent(IReadOnlyDictionary<string, object?> p, CancellationToken ct)
     {
@@ -122,6 +129,7 @@ public sealed class ReportGenerator(
     private static string PersianTitle(string name) => name switch
     {
         ReportNames.PurchaseFileSummary => "خلاصه پرونده خرید",
+        ReportNames.LegalCompliance => "گزارش انطباق حقوقی پرونده خرید",
         ReportNames.Indent => "گزارش درخواست خرید",
         ReportNames.PurchaseFileItemsGroupedByMesc => "اقلام پرونده به تفکیک گروه MESC",
         ReportNames.TenderSummary => "خلاصه مناقصه",
@@ -160,6 +168,7 @@ public sealed class ReportGenerator(
             ReportNames.Contract => $"Contract-{(parameters.TryGetValue("ContractNumber", out var contractNumber) ? contractNumber : suffix)}.pdf",
             ReportNames.PurchaseOrder => $"PurchaseOrder-{(parameters.TryGetValue("PurchaseOrderNumber", out var poNumber) ? poNumber : suffix)}.pdf",
             ReportNames.WarehouseReceipt => $"WarehouseReceipt-{(parameters.TryGetValue("ReceiptNumber", out var receiptNumber) ? receiptNumber : suffix)}.pdf",
+            ReportNames.LegalCompliance => $"LegalCompliance-{suffix}.pdf",
             _ => $"{reportName}-{DateTime.UtcNow:yyyyMMddHHmmss}.pdf"
         };
         return Safe(raw);

@@ -421,6 +421,37 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
     }
 
     [Fact]
+    public async Task ConfigureAiCoreProviderRejectsInvalidProductionSettings()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiProviderManage,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var response = await client.PutAsJsonAsync("/api/ai/providers/aicore/settings",
+            new ConfigureAiCoreProviderRequest(
+                "https://aicore.local",
+                "gemma3",
+                IsEnabled: true,
+                Mode: "AsyncAiCoreJob",
+                CallbackPublicUrl: "not-a-url",
+                MaxRetryCount: 0));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AiCoreDashboardReturnsHealthAndMetrics()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiProviderManage,
+            userId: IdentitySeedData.DefaultAdminUserId);
+
+        var response = await client.GetAsync("/api/ai/providers/aicore/dashboard");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("health", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("metrics", body, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UserWithoutAiPermissionCannotRunAnalysis()
     {
         var client = factory.CreateAuthenticatedClient(ApplicationPermissions.PurchaseFileView);
@@ -428,6 +459,115 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
             new AnalyzePurchaseFileRequest("Summary"));
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateAiJobReturnsAcceptedAndStoresQueuedJob()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiAgentUse,
+            userId: IdentitySeedData.DefaultAdminUserId);
+
+        var response = await client.PostAsJsonAsync("/api/ai/jobs", new CreateAiJobRequest(
+            "PurchaseFile", SeedDataIds.SamplePurchaseFileId, "Summary", Priority: 4,
+            Metadata: new Dictionary<string, string> { ["source"] = "integration-test" }));
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<CreateAiJobResponse>();
+        Assert.NotNull(created);
+        Assert.Equal("Queued", created!.Status);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PetroProcureDbContext>();
+        var job = await db.AiEvaluationJobs.SingleAsync(x => x.Id == created.JobId);
+        Assert.Equal(PetroProcure.Domain.Modules.Ai.AiJobStatus.Queued, job.Status);
+        Assert.Equal(IdentitySeedData.DefaultAdminUserId, job.CreatedByUserId);
+        Assert.Equal(4, job.Priority);
+        Assert.Contains("integration-test", job.RequestJson);
+    }
+
+    [Fact]
+    public async Task UserWithoutAiPermissionCannotCreateAiJob()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.PurchaseFileView);
+
+        var response = await client.PostAsJsonAsync("/api/ai/jobs", new CreateAiJobRequest(
+            "PurchaseFile", SeedDataIds.SamplePurchaseFileId, "Summary"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAiJobStatusReturnsCorrectData()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiAgentUse,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var created = await CreateAiJobAsync(client, "RiskReview");
+
+        var status = await client.GetFromJsonAsync<AiJobStatusDto>($"/api/ai/jobs/{created.JobId}");
+
+        Assert.NotNull(status);
+        Assert.Equal(created.JobId, status!.JobId);
+        Assert.Equal("PurchaseFile", status.EntityType);
+        Assert.Equal(SeedDataIds.SamplePurchaseFileId, status.EntityId);
+        Assert.Equal("RiskReview", status.AnalysisType);
+        Assert.Equal("Queued", status.Status);
+        Assert.False(status.HasResult);
+    }
+
+    [Fact]
+    public async Task PendingAiJobResultReturnsNotFound()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiAgentUse,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var created = await CreateAiJobAsync(client, "Summary");
+
+        var response = await client.GetAsync($"/api/ai/jobs/{created.JobId}/result");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CancelQueuedAiJobWorks()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiAgentUse,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var created = await CreateAiJobAsync(client, "Summary");
+
+        var cancel = await client.PostAsync($"/api/ai/jobs/{created.JobId}/cancel", null);
+        var status = await client.GetFromJsonAsync<AiJobStatusDto>($"/api/ai/jobs/{created.JobId}");
+
+        Assert.Equal(HttpStatusCode.NoContent, cancel.StatusCode);
+        Assert.Equal("Cancelled", status!.Status);
+    }
+
+    [Fact]
+    public async Task ListAiJobsForEntityReturnsQueuedJobs()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiAgentUse,
+            userId: IdentitySeedData.DefaultAdminUserId);
+        var created = await CreateAiJobAsync(client, "MissingDocuments");
+
+        var jobs = await client.GetFromJsonAsync<List<AiJobStatusDto>>(
+            $"/api/ai/entities/PurchaseFile/{SeedDataIds.SamplePurchaseFileId}/jobs");
+
+        Assert.NotNull(jobs);
+        Assert.Contains(jobs!, x => x.JobId == created.JobId);
+    }
+
+    [Fact]
+    public async Task PurchaseFileAiShortcutCreatesQueuedJob()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.AiAgentEvaluatePurchaseRules,
+            userId: IdentitySeedData.DefaultAdminUserId);
+
+        var response = await client.PostAsync(
+            $"/api/ai/purchase-files/{SeedDataIds.SamplePurchaseFileId}/jobs/evaluate-rules", null);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<CreateAiJobResponse>();
+        var status = await client.GetFromJsonAsync<AiJobStatusDto>($"/api/ai/jobs/{created!.JobId}");
+        Assert.Equal("LegalCompliance", status!.AnalysisType);
+        Assert.Equal("Queued", status.Status);
     }
 
     [Fact]
@@ -441,6 +581,14 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
 
     private sealed record IndentCreatedResponse(Guid Id, Guid CreatedByUserId);
     private sealed record IndentReferenceResponse(Guid IndentId);
+
+    private static async Task<CreateAiJobResponse> CreateAiJobAsync(HttpClient client, string analysisType)
+    {
+        var response = await client.PostAsJsonAsync("/api/ai/jobs", new CreateAiJobRequest(
+            "PurchaseFile", SeedDataIds.SamplePurchaseFileId, analysisType));
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        return (await response.Content.ReadFromJsonAsync<CreateAiJobResponse>())!;
+    }
 }
 
 public sealed class ApiAuthorizationFactory : WebApplicationFactory<Program>

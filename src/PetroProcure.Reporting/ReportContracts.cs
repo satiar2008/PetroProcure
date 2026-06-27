@@ -5,6 +5,7 @@ namespace PetroProcure.Reporting;
 public static class ReportNames
 {
     public const string PurchaseFileSummary = "PurchaseFileSummaryReport";
+    public const string LegalCompliance = "LegalComplianceReport";
     public const string Indent = "IndentReport";
     public const string PurchaseFileItemsGroupedByMesc = "PurchaseFileItemsGroupedByMescReport";
     public const string TenderSummary = "TenderSummaryReport";
@@ -30,6 +31,7 @@ public interface IReportGenerator
 public interface IReportDataProvider
 {
     Task<PurchaseFileReportData?> GetPurchaseFileAsync(Guid id, CancellationToken cancellationToken);
+    Task<LegalComplianceReportData?> GetLegalComplianceAsync(Guid purchaseFileId, CancellationToken cancellationToken);
     Task<IndentReportData?> GetIndentAsync(Guid id, CancellationToken cancellationToken);
     Task<TenderReportData?> GetTenderAsync(Guid id, CancellationToken cancellationToken);
     Task<TenderComparisonReportData?> GetTenderComparisonAsync(Guid id, CancellationToken cancellationToken);
@@ -46,6 +48,19 @@ public sealed record ReportItemData(string MescCode, string GeneralGroupCode, st
 public sealed record ReportItemGroupData(string GeneralGroupCode, string GeneralDescription, IReadOnlyList<ReportItemData> Items);
 public sealed record PurchaseFileReportData(Guid Id, string FileNumber, string Title, string Status,
     string CurrentDepartment, DateTime CreatedAt, string? IndentNumber, IReadOnlyList<ReportItemGroupData> Groups);
+public sealed record LegalComplianceReportData(Guid PurchaseFileId, string FileNumber, string Title, string Status,
+    DateTime CreatedAt, DateTime? EvaluatedAt, string EvaluationSummary, LegalComplianceSummaryData Summary,
+    IReadOnlyList<LegalComplianceFindingReportData> FailedBlockingFindings,
+    IReadOnlyList<LegalComplianceFindingReportData> Warnings,
+    IReadOnlyList<LegalComplianceFindingReportData> NeedHumanReviewItems,
+    IReadOnlyList<LegalComplianceAuditReportData> Overrides);
+public sealed record LegalComplianceSummaryData(int PassCount, int FailCount, int WarningCount,
+    int NotApplicableCount, int NeedHumanReviewCount);
+public sealed record LegalComplianceFindingReportData(string RuleTitle, string Result, string Severity,
+    string LegalReference, string Explanation, string Recommendation, bool IsAiGenerated,
+    bool NeedHumanReview, string Citations);
+public sealed record LegalComplianceAuditReportData(string Action, string RuleTitle, string PreviousResult,
+    string NewResult, string User, string Reason, string CreatedAt);
 public sealed record IndentReportData(Guid Id, string IndentNumber, string IndentType,
     string RequestingDepartment, IReadOnlyList<ReportItemGroupData> Groups);
 

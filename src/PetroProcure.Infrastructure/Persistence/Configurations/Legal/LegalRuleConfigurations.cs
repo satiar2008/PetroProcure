@@ -138,7 +138,10 @@ internal sealed class ProcurementRuleFindingConfiguration : IEntityTypeConfigura
         b.Property(x => x.Title).HasMaxLength(500);
         b.Property(x => x.Description).HasMaxLength(4000);
         b.Property(x => x.LegalReference).HasMaxLength(500);
+        b.Property(x => x.CitationReferences).HasMaxLength(4000);
+        b.Property(x => x.Confidence).HasPrecision(5, 4);
         b.HasIndex(x => x.RuleVersionId);
+        b.HasIndex(x => x.IsAiGenerated);
     }
 }
 
@@ -151,6 +154,11 @@ internal sealed class LegalRuleAuditLogConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.EntityType).HasMaxLength(100);
         b.Property(x => x.Action).HasMaxLength(100);
         b.Property(x => x.Summary).HasMaxLength(4000);
+        b.Property(x => x.PreviousResult).HasMaxLength(50);
+        b.Property(x => x.NewResult).HasMaxLength(50);
+        b.Property(x => x.Reason).HasMaxLength(4000);
         b.HasIndex(x => new { x.EntityType, x.EntityId });
+        b.HasIndex(x => x.PurchaseFileId);
+        b.HasIndex(x => x.FindingId);
     }
 }

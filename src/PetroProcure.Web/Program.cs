@@ -5,6 +5,8 @@ using PetroProcure.Web.Services;
 using PetroProcure.Web.Services.Api;
 using PetroProcure.Web.Services.Auth;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.Extensions.Http.Resilience;
+using Polly;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,8 +25,29 @@ builder.Services.AddScoped<ILookupCacheService, LookupCacheService>();
 builder.Services.AddSingleton<IPersianDateService, PersianDateService>();
 var apiBaseUrl = ResolveApiBaseUrl(builder.Configuration, builder.Environment);
 builder.Services.AddHttpClient("PetroProcure.Auth", client => client.BaseAddress = new Uri(apiBaseUrl));
+
+builder.Services.ConfigureHttpClientDefaults(http =>
+{
+    http.AddStandardResilienceHandler();
+    http.AddServiceDiscovery();
+});
 builder.Services.AddHttpClient<IPetroProcureApiClient, PetroProcureApiClient>(
-    client => client.BaseAddress = new Uri(apiBaseUrl));
+    client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+        client.Timeout = TimeSpan.FromMinutes(10);
+    });
+
+// Dedicated AI job client. AI calls (create job / poll status / cancel) are short; the UI polls
+// for results instead of waiting on a long request.
+builder.Services.AddHttpClient<IPetroProcureAiApiClient, PetroProcureAiApiClient>(
+    client =>
+    {
+        client.BaseAddress = new Uri(apiBaseUrl);
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+builder.Services.Configure<AiJobSignalROptions>(options => options.HubBaseUrl = apiBaseUrl);
+builder.Services.AddScoped<IAiJobSignalRClient, AiJobSignalRClient>();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 

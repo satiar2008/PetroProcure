@@ -1,0 +1,102 @@
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
+
+<MudPaper Class="form-panel mb-4" Elevation="0">
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudTextField @bind-Value="_query" Label="عبارت جستجو" Variant="Variant.Outlined" Immediate="true" />
+        </MudItem>
+        <MudItem xs="12" md="3">
+            <MudSelect T="int" @bind-Value="_scope" Label="دامنه جستجو" Variant="Variant.Outlined">
+                <MudSelectItem Value="@RagRetrievalScopes.PurchaseFile">همین پرونده</MudSelectItem>
+                <MudSelectItem Value="@RagRetrievalScopes.LegalCorpus">قوانین حقوقی</MudSelectItem>
+                <MudSelectItem Value="@RagRetrievalScopes.AllAllowed">همه منابع مجاز</MudSelectItem>
+            </MudSelect>
+        </MudItem>
+        <MudItem xs="12" md="1">
+            <MudNumericField @bind-Value="_topK" Label="تعداد" Min="1" Max="20" Variant="Variant.Outlined" />
+        </MudItem>
+        <MudItem xs="12" md="2" Class="d-flex align-center">
+            <MudButton FullWidth="true" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Search"
+                       Disabled="_busy || string.IsNullOrWhiteSpace(_query)" OnClick="SearchAsync">
+                جستجو
+            </MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_busy)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_searched && _results.Count == 0)
+{
+    <EmptyState Title="نتیجه‌ای پیدا نشد" Description="عبارت دیگری را امتحان کنید یا دامنه جستجو را تغییر دهید." />
+}
+else
+{
+    @foreach (var result in _results)
+    {
+        <MudPaper Class="form-panel mb-3" Elevation="0">
+            <div class="d-flex flex-wrap gap-2 justify-space-between align-start">
+                <div>
+                    <MudText Typo="Typo.subtitle1">@result.CitationTitle</MudText>
+                    <MudLink Href="@CitationHref(result)" Target="_blank">@result.CitationReference</MudLink>
+                </div>
+                <div class="d-flex flex-wrap gap-2">
+                    <MudChip T="string" Size="Size.Small" Color="Color.Primary">امتیاز @($"{result.Score:P1}")</MudChip>
+                    <MudChip T="string" Size="Size.Small">@SourceText(result.SourceType)</MudChip>
+                </div>
+            </div>
+            <MudText Typo="Typo.body2" Class="mt-3">@(string.IsNullOrWhiteSpace(result.TextPreview) ? result.Text : result.TextPreview)</MudText>
+        </MudPaper>
+    }
+}
+
+@code {
+    [Parameter] public Guid PurchaseFileId { get; set; }
+
+    private string? _query;
+    private int _scope = RagRetrievalScopes.PurchaseFile;
+    private int _topK = 5;
+    private bool _busy;
+    private bool _searched;
+    private List<RagClientRetrieveResultDto> _results = [];
+
+    private async Task SearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_query)) return;
+        _busy = true;
+        _searched = true;
+        try
+        {
+            var request = new RagRetrieveRequestDto(
+                _query.Trim(),
+                _scope,
+                _scope == RagRetrievalScopes.PurchaseFile ? PurchaseFileId : null,
+                Math.Clamp(_topK, 1, 20));
+            var response = _scope == RagRetrievalScopes.PurchaseFile
+                ? await Api.RetrievePurchaseFileRagAsync(PurchaseFileId, request)
+                : await Api.RetrieveRagAsync(request);
+            _results = response.Results.ToList();
+        }
+        catch (Exception ex) { Snackbar.Add("جستجوی هوشمند ناموفق بود: " + ex.Message, Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private static string SourceText(int sourceType) => sourceType switch
+    {
+        1 => "بند حقوقی",
+        2 => "سند پرونده خرید",
+        3 => "سند مناقصه",
+        4 => "سند قرارداد",
+        5 => "گزارش",
+        _ => "منبع"
+    };
+
+    private static string CitationHref(RagClientRetrieveResultDto result) => result.SourceType switch
+    {
+        2 => $"/api/documents/{result.SourceId}/download",
+        _ => "#"
+    };
+}

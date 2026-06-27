@@ -22,8 +22,11 @@ using PetroProcure.Application.Contracts;
 using PetroProcure.Application.PurchaseOrders;
 using PetroProcure.Application.Warehouse;
 using PetroProcure.Application.Legal;
+using PetroProcure.Application.Ai;
+using PetroProcure.Application.Rag;
 using PetroProcure.Reporting;
 using PetroProcure.AI;
+using LegacyPurchaseFileAiContextBuilder = PetroProcure.AI.IPurchaseFileAiContextBuilder;
 
 namespace PetroProcure.Infrastructure;
 
@@ -89,12 +92,25 @@ public static class DependencyInjection
         services.AddScoped<IReportDataProvider, ReportDataProvider>();
         services.AddScoped<AiRepository>();
         services.AddScoped<IAiEvaluationRepository>(sp => sp.GetRequiredService<AiRepository>());
-        services.AddScoped<IPurchaseFileAiContextBuilder>(sp => sp.GetRequiredService<AiRepository>());
+        services.AddScoped<LegacyPurchaseFileAiContextBuilder>(sp => sp.GetRequiredService<AiRepository>());
         services.AddScoped<AiCoreRepository>();
         services.AddScoped<IAiCoreSettingsProvider>(sp => sp.GetRequiredService<AiCoreRepository>());
         services.AddScoped<IAiContextBuilder>(sp => sp.GetRequiredService<AiCoreRepository>());
         services.AddScoped<IAiLegalRuleContextBuilder>(sp => sp.GetRequiredService<AiCoreRepository>());
         services.AddScoped<IAiAnalysisRepository>(sp => sp.GetRequiredService<AiCoreRepository>());
+        services.AddScoped<IPurchaseFileAiContextDataSource, PurchaseFileAiContextDataSource>();
+        services.AddScoped<AiJobRepository>();
+        services.AddScoped<IAiJobRepository>(sp => sp.GetRequiredService<AiJobRepository>());
+        services.AddScoped<IAiResultRepository>(sp => sp.GetRequiredService<AiJobRepository>());
+        services.AddScoped<BruteForceEmbeddingIndex>();
+        services.AddScoped<IEmbeddingIndex>(sp => sp.GetRequiredService<BruteForceEmbeddingIndex>());
+        services.AddScoped<IAiEmbeddingRepository>(sp => sp.GetRequiredService<BruteForceEmbeddingIndex>());
+        services.AddScoped<IAiDocumentChunkRepository, AiDocumentChunkRepository>();
+        services.AddScoped<ICorpusSourceTextProvider, CorpusSourceTextProvider>();
+        services.AddScoped<ITextExtractionService, TextExtractionService>();
+        services.AddScoped<IRagAccessDataSource, RagAccessDataSource>();
+        services.AddScoped<IProcurementRuleGateDataSource, ProcurementRuleGateDataSource>();
+        services.AddScoped<IGroundedAiAnalysisDataSource, GroundedAiAnalysisDataSource>();
         services.AddHostedService<AdminBootstrapService>();
 
         services.AddHealthChecks()

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using PetroProcure.AI;
+using PetroProcure.Application.Rag;
 using PetroProcure.Application.Security;
 using PetroProcure.Contracts.V1.Ai;
 
@@ -74,7 +75,7 @@ public sealed class AiFoundationTests
         var repository = new FakeAiAnalysisRepository();
         var client = new FakeAiCoreClient();
         var service = new AiAnalysisService(new FakeAiContextBuilder(entityId), legalBuilder, client, repository,
-            new FakeCurrentUser(Guid.NewGuid()), new FakeAiCoreSettingsProvider());
+            new FakeCurrentUser(Guid.NewGuid()), new FakeAiCoreSettingsProvider(), Options.Create(new RagOptions()));
 
         await service.AnalyzeLegalComplianceAsync("PurchaseFile", entityId, "PurchaseFile", null);
 
@@ -91,7 +92,8 @@ public sealed class AiFoundationTests
         var entityId = Guid.NewGuid();
         var repository = new FakeAiAnalysisRepository();
         var service = new AiAnalysisService(new FakeAiContextBuilder(entityId), new FakeLegalRuleContextBuilder([]),
-            new FakeAiCoreClient(), repository, new FakeCurrentUser(Guid.NewGuid()), new FakeAiCoreSettingsProvider());
+            new FakeAiCoreClient(), repository, new FakeCurrentUser(Guid.NewGuid()), new FakeAiCoreSettingsProvider(),
+            Options.Create(new RagOptions()));
 
         var result = await service.AnalyzePurchaseFileAsync(entityId, "Summary", null);
 
@@ -135,6 +137,9 @@ public sealed class AiFoundationTests
                 [new AiCoreRecommendation("پیشنهاد تست", "شرح پیشنهاد", "Info")],
                 new AiUsageDto(10, 20)));
         }
+
+        public Task<AiCoreTextResponse> SendTextAsync(AiCoreTextRequest request, CancellationToken ct = default) =>
+            Task.FromResult(new AiCoreTextResponse("model", "raw text"));
 
         public Task<AiChatResponse> SendChatAsync(AiChatRequest request, CancellationToken ct = default) =>
             Task.FromResult(new AiChatResponse("chat", "AiCore", "model"));

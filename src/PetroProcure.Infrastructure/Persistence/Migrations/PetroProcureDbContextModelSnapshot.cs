@@ -445,93 +445,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.ToTable("AiConversations", "ai");
                 });
 
-            modelBuilder.Entity("PetroProcure.AI.AiEvaluationJob", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("EvaluationType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("PurchaseFileId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PurchaseFileId");
-
-                    b.ToTable("AiEvaluationJobs", "ai");
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiEvaluationResult", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AiEvaluationJobId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("EvaluationType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("PurchaseFileId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Summary")
-                        .IsRequired()
-                        .HasMaxLength(8000)
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AiEvaluationResults", "ai");
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiFinding", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Code")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<Guid>("EvaluationResultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Severity")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EvaluationResultId");
-
-                    b.ToTable("AiFindings", "ai");
-                });
-
             modelBuilder.Entity("PetroProcure.AI.AiMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -701,34 +614,6 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.ToTable("AiProviderRequestLogs", "ai");
                 });
 
-            modelBuilder.Entity("PetroProcure.AI.AiRecommendation", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(4000)
-                        .HasColumnType("nvarchar(4000)");
-
-                    b.Property<Guid>("EvaluationResultId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("Severity")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EvaluationResultId");
-
-                    b.ToTable("AiRecommendations", "ai");
-                });
-
             modelBuilder.Entity("PetroProcure.AI.ProcurementRule", b =>
                 {
                     b.Property<Guid>("Id")
@@ -778,6 +663,357 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProcurementRuleId");
 
                     b.ToTable("ProcurementRuleClauses", "ai");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiDocumentChunk", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid?>("LegalClauseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Ordinal")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("PurchaseFileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TokenCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentHash");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("LegalClauseId");
+
+                    b.HasIndex("PurchaseFileId");
+
+                    b.HasIndex("SourceType", "SourceId", "Ordinal")
+                        .IsUnique();
+
+                    b.ToTable("AiDocumentChunks", "ai");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiEmbedding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ChunkId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Dimensions")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VectorJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChunkId")
+                        .IsUnique();
+
+                    b.HasIndex("Model", "Dimensions");
+
+                    b.ToTable("AiEmbeddings", "ai");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiEvaluationJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AnalysisType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("CancelledAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ContextJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ExternalJobId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("LockedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LockedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("MaxRetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("NextRetryAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProgressPercent")
+                        .HasColumnType("int");
+
+                    b.Property<string>("RequestJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ResultJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("RetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("StartedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime?>("SubmittedToAiCoreAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId")
+                        .IsUnique();
+
+                    b.HasIndex("ExternalJobId")
+                        .IsUnique()
+                        .HasFilter("[ExternalJobId] IS NOT NULL");
+
+                    b.HasIndex("EntityType", "EntityId");
+
+                    b.HasIndex("Status", "NextRetryAtUtc");
+
+                    b.ToTable("AiEvaluationJobs", "ai");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiEvaluationResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AnalysisType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long?>("DurationMs")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("InputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("JobId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Model")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("OutputTokens")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Provider")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("RawResultJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Summary")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int?>("TotalTokens")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobId")
+                        .IsUnique();
+
+                    b.ToTable("AiEvaluationResults", "ai");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiFinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("RelatedClauseCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("RelatedDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ResultId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResultId");
+
+                    b.ToTable("AiFindings", "ai");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiRecommendation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Priority")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("ResultId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SuggestedAction")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResultId");
+
+                    b.ToTable("AiRecommendations", "ai");
                 });
 
             modelBuilder.Entity("PetroProcure.Domain.Modules.Contracts.ContractApproval", b =>
@@ -2660,6 +2896,27 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<Guid?>("FindingId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("NewResult")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("PreviousResult")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid?>("PurchaseFileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<Guid?>("RuleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("Summary")
                         .IsRequired()
                         .HasMaxLength(4000)
@@ -2669,6 +2926,10 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FindingId");
+
+                    b.HasIndex("PurchaseFileId");
 
                     b.HasIndex("EntityType", "EntityId");
 
@@ -2754,10 +3015,21 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("CitationReferences")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<decimal?>("Confidence")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(4000)
                         .HasColumnType("nvarchar(4000)");
+
+                    b.Property<bool>("IsAiGenerated")
+                        .HasColumnType("bit");
 
                     b.Property<Guid?>("LegalArticleId")
                         .HasColumnType("uniqueidentifier");
@@ -2769,6 +3041,9 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<bool>("NeedHumanReview")
+                        .HasColumnType("bit");
 
                     b.Property<Guid>("ProcurementRuleEvaluationId")
                         .HasColumnType("uniqueidentifier");
@@ -2795,6 +3070,8 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(500)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("IsAiGenerated");
 
                     b.HasIndex("ProcurementRuleEvaluationId");
 
@@ -5410,6 +5687,14 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         },
                         new
                         {
+                            Id = new Guid("631aaa03-aba3-7e16-1f46-1a4ae62ebfc1"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            Description = "LegalRule.OverrideBlockingFinding",
+                            IsActive = true,
+                            Name = "LegalRule.OverrideBlockingFinding"
+                        },
+                        new
+                        {
                             Id = new Guid("cce440c9-4fd8-147a-57f3-3c35c901317c"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             Description = "Admin.ManageUsers",
@@ -6434,6 +6719,13 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("80ea3b40-d3f0-e2a5-e538-e811873c1e28"),
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
                             PermissionId = new Guid("d68c140f-3ce3-317b-ee21-72e345b730a4"),
+                            RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
+                        },
+                        new
+                        {
+                            Id = new Guid("bdb80f1a-bfa7-92a8-49d8-f6312b3c1af2"),
+                            CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            PermissionId = new Guid("631aaa03-aba3-7e16-1f46-1a4ae62ebfc1"),
                             RoleId = new Guid("7d43902b-c8bb-ce7d-e803-3ee387198dea")
                         },
                         new
@@ -10700,29 +10992,47 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("PetroProcure.AI.AiFinding", b =>
-                {
-                    b.HasOne("PetroProcure.AI.AiEvaluationResult", null)
-                        .WithMany("Findings")
-                        .HasForeignKey("EvaluationResultId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.AiRecommendation", b =>
-                {
-                    b.HasOne("PetroProcure.AI.AiEvaluationResult", null)
-                        .WithMany("Recommendations")
-                        .HasForeignKey("EvaluationResultId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("PetroProcure.AI.ProcurementRuleClause", b =>
                 {
                     b.HasOne("PetroProcure.AI.ProcurementRule", null)
                         .WithMany("Clauses")
                         .HasForeignKey("ProcurementRuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiEmbedding", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Ai.AiDocumentChunk", null)
+                        .WithMany()
+                        .HasForeignKey("ChunkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiEvaluationResult", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Ai.AiEvaluationJob", null)
+                        .WithMany()
+                        .HasForeignKey("JobId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiFinding", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Ai.AiEvaluationResult", null)
+                        .WithMany("Findings")
+                        .HasForeignKey("ResultId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiRecommendation", b =>
+                {
+                    b.HasOne("PetroProcure.Domain.Modules.Ai.AiEvaluationResult", null)
+                        .WithMany("Recommendations")
+                        .HasForeignKey("ResultId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -11601,16 +11911,16 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("PetroProcure.AI.AiEvaluationResult", b =>
+            modelBuilder.Entity("PetroProcure.AI.ProcurementRule", b =>
+                {
+                    b.Navigation("Clauses");
+                });
+
+            modelBuilder.Entity("PetroProcure.Domain.Modules.Ai.AiEvaluationResult", b =>
                 {
                     b.Navigation("Findings");
 
                     b.Navigation("Recommendations");
-                });
-
-            modelBuilder.Entity("PetroProcure.AI.ProcurementRule", b =>
-                {
-                    b.Navigation("Clauses");
                 });
 
             modelBuilder.Entity("PetroProcure.Domain.Modules.Contracts.ContractTemplate", b =>

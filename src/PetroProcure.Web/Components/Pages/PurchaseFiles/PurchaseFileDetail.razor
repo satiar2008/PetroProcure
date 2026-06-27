@@ -100,6 +100,18 @@ else if (_summary.Data is { } file)
             </MudPaper>
         </MudTabPanel>
 
+        <MudTabPanel Text="بررسی حقوقی و قوانین" Icon="@Icons.Material.Filled.Policy">
+            <PurchaseFileLegalCompliancePanel PurchaseFileId="Id" />
+        </MudTabPanel>
+
+        <MudTabPanel Text="جستجوی هوشمند اسناد" Icon="@Icons.Material.Filled.ManageSearch">
+            <PurchaseFileRagSearchPanel PurchaseFileId="Id" />
+        </MudTabPanel>
+
+        <MudTabPanel Text="پرسش از پرونده" Icon="@Icons.Material.Filled.QuestionAnswer">
+            <PurchaseFileAskPanel PurchaseFileId="Id" />
+        </MudTabPanel>
+
         <MudTabPanel Text="قراردادها" Icon="@Icons.Material.Filled.AssignmentTurnedIn">
             @TabBody(_contracts, LoadContracts, ContractsContent)
         </MudTabPanel>
@@ -159,9 +171,9 @@ else if (_summary.Data is { } file)
             3 => LoadWorkflow(),
             4 => LoadLifecycle(),
             5 => LoadNotes(),
-            7 => LoadContracts(),
-            8 => LoadPurchaseOrders(),
-            _ => Task.CompletedTask // 0 = summary (eager), 6 = reports, 9 = AI (self-managed components)
+            10 => LoadContracts(),
+            11 => LoadPurchaseOrders(),
+            _ => Task.CompletedTask // 0 = summary (eager), 6 = reports, 7-9 = legal/RAG/ask, 12 = AI
         };
         await load;
     }
