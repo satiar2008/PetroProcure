@@ -1,0 +1,175 @@
+@page "/applicant/technical-reviews/{Id:guid}"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+@inject IDialogService Dialog
+
+<PageTitle>@(_review?.PurchaseFileNumber ?? "بررسی فنی")</PageTitle>
+
+@if (_loading)
+{
+    <LoadingOverlay Visible="true" Text="در حال دریافت بررسی فنی..." />
+}
+else if (_error is not null)
+{
+    <RetryPanel Message="@_error" OnRetry="Load" />
+}
+else if (_review is not null)
+{
+    <PageHeader Title="@_review.PurchaseFileNumber" Subtitle="@_review.PurchaseFileTitle">
+        <Actions>
+            <StatusChip Text="@ApplicantUiPolicy.StatusText(_review.Status)" Color="@ApplicantUiPolicy.StatusColor(_review.Status)" />
+            <MudButton Variant="Variant.Outlined" Href="/applicant/technical-reviews">بازگشت</MudButton>
+        </Actions>
+    </PageHeader>
+
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="data-panel" Elevation="0">
+                <MudText Typo="Typo.h6" Class="mb-3">اقلام فنی پرونده</MudText>
+                <MudTable Items="_review.Items" Dense="true" Hover="true">
+                    <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>مقدار</MudTh><MudTh>شرح فنی</MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.MescCode</MudTd>
+                        <MudTd>@context.SpecificDescription</MudTd>
+                        <MudTd>@context.RequestedQuantity.ToString("N2")</MudTd>
+                        <MudTd>@(context.TechnicalDescription ?? "—")</MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent><EmptyState Title="قلمی برای بررسی وجود ندارد" Description="پرونده بدون اقلام فنی به متقاضی ارجاع شده است." /></NoRecordsContent>
+                </MudTable>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="form-panel" Elevation="0">
+                <MudText Typo="Typo.h6">ثبت نظر فنی</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">اطلاعات مالی و تجاری در این صفحه نمایش داده نمی‌شود.</MudText>
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="my-3">
+                    درخواست اولیه: @(_review.RequestComment ?? "بدون توضیح")
+                </MudAlert>
+                @if (_review.CompletedAt is not null)
+                {
+                    <MudAlert Severity="@(_review.Status == PurchaseFileTechnicalReviewStatus.Rejected ? Severity.Error : Severity.Success)" Variant="Variant.Outlined">
+                        @ApplicantUiPolicy.DecisionText(_review.Decision)
+                        <br />
+                        @(_review.Comments ?? "بدون توضیح")
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudTextField @bind-Value="_comments" Label="نظر فنی" Required="true" RequiredError="ثبت نظر فنی الزامی است" Lines="4" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="_recommendation" Label="یادداشت پیشنهادی" Lines="3" Variant="Variant.Outlined" Class="mt-3" />
+                    <div class="form-actions">
+                        @if (CanSubmit && _review.Status == PurchaseFileTechnicalReviewStatus.Requested)
+                        {
+                            <MudButton Variant="Variant.Outlined" Disabled="_busy" OnClick="Start">شروع بررسی</MudButton>
+                        }
+                        @if (CanSubmit)
+                        {
+                            <MudButton Color="Color.Success" Variant="Variant.Filled" Disabled="_busy" OnClick="@(() => Submit(PurchaseFileTechnicalReviewDecision.TechnicallyAccepted))">تأیید</MudButton>
+                            <MudButton Color="Color.Warning" Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => Submit(PurchaseFileTechnicalReviewDecision.ConditionalAcceptance))">تأیید مشروط</MudButton>
+                            <MudButton Color="Color.Error" Variant="Variant.Outlined" Disabled="_busy" OnClick="@(() => Submit(PurchaseFileTechnicalReviewDecision.TechnicallyRejected))">رد</MudButton>
+                        }
+                        @if (CanClarify)
+                        {
+                            <MudButton Variant="Variant.Text" Disabled="_busy" OnClick="Clarification">درخواست شفاف‌سازی</MudButton>
+                        }
+                        @if (!CanSubmit && !CanClarify)
+                        {
+                            <MudAlert Severity="Severity.Info" Variant="Variant.Outlined">برای ثبت نظر فنی مجوز لازم را ندارید.</MudAlert>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PurchaseFileTechnicalReviewDto? _review;
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+    private string _comments = "";
+    private string? _recommendation;
+    private bool CanSubmit => Access.HasPermission(ApplicantUiPolicy.SubmitTechnicalReview);
+    private bool CanClarify => Access.HasPermission(ApplicantUiPolicy.RequestClarification);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Access.HasPermission(ApplicantUiPolicy.ViewTechnicalReviews))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _review = await Api.GetApplicantTechnicalReviewAsync(Id);
+            if (_review is null) _error = "بررسی فنی یافت نشد.";
+        }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
+        finally { _loading = false; }
+    }
+
+    private async Task Start()
+    {
+        await Execute(async () => _review = await Api.StartTechnicalReviewAsync(Id), "بررسی فنی شروع شد.");
+    }
+
+    private async Task Submit(PurchaseFileTechnicalReviewDecision decision)
+    {
+        if (string.IsNullOrWhiteSpace(_comments))
+        {
+            Snackbar.Add("ثبت نظر فنی الزامی است.", Severity.Warning);
+            return;
+        }
+        if (!await Confirm("ثبت نظر فنی", "نظر فنی برای واحد خرید ارسال شود؟", Color.Primary)) return;
+        await Execute(async () => _review = await Api.SubmitTechnicalReviewAsync(Id,
+            new SubmitTechnicalReviewRequest(decision, _comments, _recommendation)), "نظر فنی ارسال شد.");
+    }
+
+    private async Task Clarification()
+    {
+        if (string.IsNullOrWhiteSpace(_comments))
+        {
+            Snackbar.Add("برای درخواست شفاف‌سازی، توضیح الزامی است.", Severity.Warning);
+            return;
+        }
+        if (!await Confirm("درخواست شفاف‌سازی", "درخواست شفاف‌سازی برای واحد خرید ارسال شود؟", Color.Warning)) return;
+        await Execute(async () => _review = await Api.RequestTechnicalReviewClarificationAsync(Id,
+            new TechnicalReviewClarificationRequest(_comments, _recommendation)), "درخواست شفاف‌سازی ارسال شد.");
+    }
+
+    private async Task Execute(Func<Task> action, string success)
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            await action();
+            Snackbar.Add(success, Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+        finally { _busy = false; }
+    }
+
+    private async Task<bool> Confirm(string title, string message, Color color)
+    {
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>(title, new DialogParameters
+        {
+            ["Message"] = message,
+            ["ConfirmColor"] = color
+        });
+        var result = await dialog.Result;
+        return result is not null && !result.Canceled;
+    }
+}

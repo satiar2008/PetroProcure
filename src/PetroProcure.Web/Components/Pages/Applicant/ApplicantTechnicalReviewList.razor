@@ -1,0 +1,49 @@
+@page "/applicant/technical-reviews"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+
+<PageTitle>بررسی‌های فنی متقاضی</PageTitle>
+<PageHeader Title="بررسی‌های فنی متقاضی" Subtitle="پرونده‌های خرید ارجاع‌شده برای بررسی فنی" />
+
+<DataStateView TItem="PurchaseFileTechnicalReviewDto" Loading="_loading" Error="_error" Items="_reviews"
+               EmptyTitle="بررسی فنی فعالی وجود ندارد" EmptyDescription="هر زمان واحد خرید پرونده‌ای را برای بررسی فنی ارسال کند، اینجا نمایش داده می‌شود." Retry="Load">
+    <MudTable Items="_reviews" Dense="true" Hover="true">
+        <HeaderContent><MudTh>پرونده</MudTh><MudTh>واحد</MudTh><MudTh>وضعیت</MudTh><MudTh>تصمیم</MudTh><MudTh>درخواست</MudTh><MudTh>تکمیل</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+        <RowTemplate>
+            <MudTd>@context.PurchaseFileNumber — @context.PurchaseFileTitle</MudTd>
+            <MudTd>@context.DepartmentName</MudTd>
+            <MudTd><StatusChip Text="@ApplicantUiPolicy.StatusText(context.Status)" Color="@ApplicantUiPolicy.StatusColor(context.Status)" /></MudTd>
+            <MudTd>@ApplicantUiPolicy.DecisionText(context.Decision)</MudTd>
+            <MudTd><DateDisplay Value="@context.RequestedAt" IncludeTime="true" /></MudTd>
+            <MudTd><DateDisplay Value="@context.CompletedAt" IncludeTime="true" /></MudTd>
+            <MudTd><MudButton Size="Size.Small" Href="@($"/applicant/technical-reviews/{context.Id}")">مشاهده</MudButton></MudTd>
+        </RowTemplate>
+    </MudTable>
+</DataStateView>
+
+@code {
+    private List<PurchaseFileTechnicalReviewDto> _reviews = [];
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(ApplicantUiPolicy.ViewTechnicalReviews))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try { _reviews = await Api.GetApplicantTechnicalReviewsAsync(); }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
+        finally { _loading = false; }
+    }
+}

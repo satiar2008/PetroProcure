@@ -11,6 +11,12 @@
         {
             <MudButton Href="/orders/material-needs/create" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add">ثبت نیاز جدید</MudButton>
         }
+        @if (Access.HasPermission(OrdersUiPolicy.ConvertNeedToIndent) && _selectedNeedIds.Count > 0)
+        {
+            <MudButton Color="Color.Secondary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.MergeType" OnClick="ConvertSelected">
+                تجمیع انتخاب‌ها در Indent
+            </MudButton>
+        }
     </Actions>
 </PageHeader>
 
@@ -23,12 +29,39 @@
     </MudGrid>
 </MudPaper>
 
+@if (!_loading && Access.HasPermission(OrdersUiPolicy.ConvertNeedToIndent) && _suggestedGroups.Count > 0)
+{
+    <MudPaper Class="pa-4 mb-4">
+        <MudText Typo="Typo.h6" Class="mb-3">پیشنهاد خودکار تجمیع نیازها</MudText>
+        <MudGrid>
+            @foreach (var group in _suggestedGroups)
+            {
+                <MudItem xs="12" md="4">
+                    <MudPaper Class="pa-3" Elevation="0">
+                        <MudText Typo="Typo.subtitle2">@group.MescGeneralGroupCode - @group.GeneralDescription</MudText>
+                        <MudText Typo="Typo.body2">@group.Items.Count نیاز تأییدشده، مجموع مقدار @group.Items.Sum(x => x.RequestedQuantity).ToString("N2")</MudText>
+                        <MudText Typo="Typo.caption">@string.Join("، ", group.Items.Select(x => x.NeedNumber))</MudText>
+                        <MudButton Class="mt-2" Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined"
+                                   OnClick="@(()=>ConvertGroup(group))">ایجاد Indent تجمیعی</MudButton>
+                    </MudPaper>
+                </MudItem>
+            }
+        </MudGrid>
+    </MudPaper>
+}
+
 @if (_loading) { <LoadingOverlay Text="در حال دریافت نیازها..." /> }
 else
 {
     <MudTable Items="_needs" Dense="true" Hover="true">
-        <HeaderContent><MudTh>شماره نیاز</MudTh><MudTh>کد MESC</MudTh><MudTh>شرح کالا</MudTh><MudTh>مقدار</MudTh><MudTh>اولویت</MudTh><MudTh>وضعیت</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+        <HeaderContent><MudTh></MudTh><MudTh>شماره نیاز</MudTh><MudTh>کد MESC</MudTh><MudTh>شرح کالا</MudTh><MudTh>مقدار</MudTh><MudTh>اولویت</MudTh><MudTh>وضعیت</MudTh><MudTh>عملیات</MudTh></HeaderContent>
         <RowTemplate>
+            <MudTd>
+                @if (Access.HasPermission(OrdersUiPolicy.ConvertNeedToIndent) && context.Status == MaterialNeedStatus.Approved)
+                {
+                    <MudCheckBox T="bool" Value="@IsSelected(context.Id)" ValueChanged="@((bool value)=>ToggleSelected(context, value))" />
+                }
+            </MudTd>
             <MudTd><MudLink Href="@($"/orders/material-needs/{context.Id}")">@context.NeedNumber</MudLink></MudTd>
             <MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.RequestedQuantity</MudTd>
             <MudTd>@OrdersUiPolicy.PriorityText(context.Priority)</MudTd><MudTd>@OrdersUiPolicy.StatusText(context.Status)</MudTd>
@@ -55,6 +88,8 @@ else
 
 @code {
     private List<MaterialNeedDto> _needs = [];
+    private List<MaterialNeedsGroupedByMescDto> _suggestedGroups = [];
+    private readonly HashSet<Guid> _selectedNeedIds = [];
     private bool _loading = true;
     private MaterialNeedStatus? _status;
     private MaterialNeedPriority? _priority;
@@ -64,7 +99,15 @@ else
     private async Task Load()
     {
         _loading = true;
-        try { _needs = (await Api.GetMaterialNeedsAsync(new MaterialNeedListRequest(_status, _priority, _mescCode, null, null, null, 1, 100))).Items.ToList(); }
+        try
+        {
+            var request = new MaterialNeedListRequest(_status, _priority, _mescCode, null, null, null, 1, 100);
+            _needs = (await Api.GetMaterialNeedsAsync(request)).Items.ToList();
+            _suggestedGroups = (await Api.GetMaterialNeedsGroupedByMescAsync(new MaterialNeedListRequest(MaterialNeedStatus.Approved, null, _mescCode, null, null, null, 1, 100)))
+                .Where(x => x.Items.Count > 1)
+                .ToList();
+            _selectedNeedIds.RemoveWhere(id => _needs.All(x => x.Id != id || x.Status != MaterialNeedStatus.Approved));
+        }
         catch (Exception ex) { Snackbar.Add($"دریافت نیازها ناموفق بود: {ex.Message}", Severity.Error); }
         finally { _loading = false; }
     }
@@ -76,6 +119,46 @@ else
         var indentId = await Api.ConvertMaterialNeedToIndentAsync(id, new ConvertMaterialNeedToIndentRequest(DateTime.UtcNow.Year % 100, 3));
         Snackbar.Add("نیاز به تقاضای خرید تبدیل شد.", Severity.Success);
         Nav.NavigateTo($"/orders/indents/{indentId}");
+    }
+    private bool IsSelected(Guid id) => _selectedNeedIds.Contains(id);
+    private void ToggleSelected(MaterialNeedDto need, bool selected)
+    {
+        if (selected)
+        {
+            var selectedGroups = _needs.Where(x => _selectedNeedIds.Contains(x.Id)).Select(x => x.MescGeneralGroupCode)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (selectedGroups.Length > 0 && selectedGroups.All(x => !string.Equals(x, need.MescGeneralGroupCode, StringComparison.OrdinalIgnoreCase)))
+            {
+                Snackbar.Add("برای تجمیع، همه نیازهای انتخابی باید از یک گروه کالا باشند.", Severity.Warning);
+                return;
+            }
+            _selectedNeedIds.Add(need.Id);
+        }
+        else _selectedNeedIds.Remove(need.Id);
+    }
+    private async Task ConvertSelected()
+    {
+        var selected = _needs.Where(x => _selectedNeedIds.Contains(x.Id)).ToArray();
+        if (selected.Length == 0) return;
+        if (selected.Select(x => x.MescGeneralGroupCode).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+        {
+            Snackbar.Add("نیازهای انتخاب‌شده از یک گروه کالا نیستند.", Severity.Warning);
+            return;
+        }
+        await ConvertMany(selected.Select(x => x.Id).ToArray(), $"تقاضای تجمیعی گروه {selected[0].MescGeneralGroupCode}");
+    }
+    private async Task ConvertGroup(MaterialNeedsGroupedByMescDto group) =>
+        await ConvertMany(group.Items.Select(x => x.Id).ToArray(), $"تقاضای تجمیعی گروه {group.MescGeneralGroupCode}");
+    private async Task ConvertMany(IReadOnlyList<Guid> ids, string title)
+    {
+        try
+        {
+            var indentId = await Api.ConvertMaterialNeedsToIndentAsync(new ConvertMaterialNeedsToIndentRequest(ids, DateTime.UtcNow.Year % 100, 3, title));
+            Snackbar.Add("نیازهای کالا در یک Indent تجمیع شدند.", Severity.Success);
+            _selectedNeedIds.Clear();
+            Nav.NavigateTo($"/orders/indents/{indentId}");
+        }
+        catch (Exception ex) { Snackbar.Add($"تجمیع ناموفق بود: {ex.Message}", Severity.Error); }
     }
     private async Task Run(Func<Task> action, string success)
     {

@@ -4,7 +4,16 @@
 @inject ISnackbar Snackbar
 @inject IUserAccessContext Access
 
-<PageHeader Title="کنترل موجودی" Subtitle="تنظیمات برنامه‌ریزی و کنترل موجودی برای اقلام MESC" />
+<PageHeader Title="کنترل موجودی" Subtitle="تنظیمات برنامه‌ریزی و کنترل موجودی برای اقلام MESC">
+    <Actions>
+        @if (Access.HasPermission(OrdersUiPolicy.ManageInventoryControl))
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" OnClick="OpenNewItem">
+                افزودن کالای جدید به موجودی
+            </MudButton>
+        }
+    </Actions>
+</PageHeader>
 
 <MudPaper Class="pa-4 mb-4">
     <MudTextField @bind-Value="_search" Label="جستجو در کد یا شرح کالا" Variant="Variant.Outlined" Immediate="true" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" />
@@ -24,6 +33,7 @@ else
                 @if (Access.HasPermission(OrdersUiPolicy.ManageInventoryControl))
                 {
                     <MudButton Size="Size.Small" OnClick="@(()=>OpenEdit(context))">ویرایش</MudButton>
+                    <MudButton Size="Size.Small" Color="Color.Success" OnClick="@(()=>OpenStock(context))">ثبت موجودی</MudButton>
                 }
             </MudTd>
         </RowTemplate>
@@ -48,16 +58,102 @@ else
     </DialogActions>
 </MudDialog>
 
+<MudDialog @bind-Visible="_newOpen">
+    <DialogContent>
+        <MudText Typo="Typo.h6">افزودن کالای جدید به موجودی</MudText>
+        <MudTextField @bind-Value="_mescSearch" Label="جستجوی کد یا شرح MESC" Variant="Variant.Outlined" Class="mt-3" />
+        <MudButton OnClick="SearchMesc" Disabled="_searchingMesc || string.IsNullOrWhiteSpace(_mescSearch)" StartIcon="@Icons.Material.Filled.Search" Class="mt-2">جستجو</MudButton>
+        @if (_mescResults.Count > 0)
+        {
+            <MudTable Items="_mescResults" Dense="true" Hover="true" Class="mt-3">
+                <HeaderContent><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh></MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Code</MudTd>
+                    <MudTd>@context.SpecificDescription</MudTd>
+                    <MudTd><MudButton Size="Size.Small" OnClick="@(()=>SelectMesc(context))">انتخاب</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+        @if (_selectedMesc is not null)
+        {
+            <MudAlert Severity="Severity.Success" Variant="Variant.Outlined" Class="my-3">
+                کالای انتخاب‌شده: @_selectedMesc.Code - @_selectedMesc.SpecificDescription
+            </MudAlert>
+        }
+        <MudSelect T="Guid" @bind-Value="_newWarehouseId" Label="انبار" Required="true" Variant="Variant.Outlined">
+            @foreach (var warehouse in _warehouses)
+            {
+                <MudSelectItem Value="@warehouse.Id">@warehouse.Code - @warehouse.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudGrid Class="mt-2">
+            <MudItem xs="12" md="4"><MudNumericField @bind-Value="_newQuantity" Label="موجودی اولیه" Min="0.01m" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudNumericField @bind-Value="_newMin" Label="حداقل موجودی" Min="0m" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudNumericField @bind-Value="_newReorder" Label="نقطه سفارش" Min="0m" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudNumericField @bind-Value="_newMax" Label="حداکثر موجودی" Min="0m" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudNumericField @bind-Value="_newSafety" Label="موجودی اطمینان" Min="0m" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4" Class="d-flex align-center"><MudSwitch @bind-Value="_newControlled" Label="مشمول کنترل" Color="Color.Primary" /></MudItem>
+        </MudGrid>
+        <MudTextField @bind-Value="_newNotes" Label="توضیحات" Lines="3" Variant="Variant.Outlined" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(()=>_newOpen=false)">انصراف</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="!CanSaveNewItem" OnClick="SaveNewItem">ثبت کالا و موجودی</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_stockOpen">
+    <DialogContent>
+        <MudText Typo="Typo.h6">ثبت موجودی جدید</MudText>
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="my-3">
+            کالا: @_stockItem?.MescCode - @_stockItem?.SpecificDescription
+        </MudAlert>
+        <MudSelect T="Guid" @bind-Value="_warehouseId" Label="انبار" Required="true" Variant="Variant.Outlined">
+            @foreach (var warehouse in _warehouses)
+            {
+                <MudSelectItem Value="@warehouse.Id">@warehouse.Code - @warehouse.Name</MudSelectItem>
+            }
+        </MudSelect>
+        <MudNumericField @bind-Value="_stockQuantity" Label="مقدار افزایشی موجودی" Min="0.01m" Variant="Variant.Outlined" Class="mt-3" />
+        <MudTextField @bind-Value="_stockDescription" Label="توضیحات ثبت موجودی" Lines="3" Variant="Variant.Outlined" Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(()=>_stockOpen=false)">انصراف</MudButton>
+        <MudButton Color="Color.Success" Variant="Variant.Filled" Disabled="_savingStock || _warehouseId == Guid.Empty || _stockQuantity <= 0" OnClick="SaveStock">ثبت موجودی</MudButton>
+    </DialogActions>
+</MudDialog>
+
 @code {
     private List<InventoryControlItemDto> _items = [];
+    private List<WarehouseDto> _warehouses = [];
+    private List<MescItemDto> _mescResults = [];
     private string? _search;
-    private bool _loading = true, _editOpen, _controlled, _active;
+    private bool _loading = true, _editOpen, _controlled, _active, _stockOpen, _savingStock, _newOpen, _searchingMesc, _savingNew, _newControlled = true;
     private Guid _editId;
-    private decimal _min, _reorder;
-    private decimal? _max, _safety;
-    private string? _notes;
+    private Guid _warehouseId, _newWarehouseId;
+    private decimal _min, _reorder, _newMin, _newReorder;
+    private decimal _stockQuantity, _newQuantity;
+    private decimal? _max, _safety, _newMax, _newSafety;
+    private string? _notes, _stockDescription, _mescSearch, _newNotes;
+    private InventoryControlItemDto? _stockItem;
+    private MescItemDto? _selectedMesc;
+    private bool CanSaveNewItem => !_savingNew && _selectedMesc is not null && _newWarehouseId != Guid.Empty && _newQuantity > 0 && _newMin >= 0 && _newReorder >= 0;
 
-    protected override async Task OnInitializedAsync() => await Load();
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadWarehouses();
+        await Load();
+    }
+    private async Task LoadWarehouses()
+    {
+        try
+        {
+            _warehouses = (await Api.GetWarehousesAsync(new WarehouseListRequest(PageSize: 100))).Items.ToList();
+            _warehouseId = _warehouses.FirstOrDefault()?.Id ?? Guid.Empty;
+            _newWarehouseId = _warehouseId;
+        }
+        catch (Exception ex) { Snackbar.Add($"دریافت انبارها ناموفق بود: {ex.Message}", Severity.Error); }
+    }
     private async Task Load()
     {
         _loading = true;
@@ -70,6 +166,42 @@ else
         _editId = item.Id; _min = item.MinimumStockLevel; _reorder = item.ReorderPoint; _max = item.MaximumStockLevel;
         _safety = item.SafetyStock; _controlled = item.IsStockControlled; _active = item.IsActive; _notes = item.Notes; _editOpen = true;
     }
+    private void OpenStock(InventoryControlItemDto item)
+    {
+        _stockItem = item;
+        _stockQuantity = 0;
+        _stockDescription = null;
+        _stockOpen = true;
+    }
+    private void OpenNewItem()
+    {
+        _selectedMesc = null;
+        _mescResults = [];
+        _mescSearch = null;
+        _newQuantity = 0;
+        _newMin = 0;
+        _newReorder = 0;
+        _newMax = null;
+        _newSafety = null;
+        _newControlled = true;
+        _newNotes = null;
+        _newWarehouseId = _warehouses.FirstOrDefault()?.Id ?? Guid.Empty;
+        _newOpen = true;
+    }
+    private async Task SearchMesc()
+    {
+        if (string.IsNullOrWhiteSpace(_mescSearch)) return;
+        _searchingMesc = true;
+        try { _mescResults = await Api.SearchMescItemsAsync(_mescSearch); }
+        catch (Exception ex) { Snackbar.Add($"جستجوی کالا ناموفق بود: {ex.Message}", Severity.Error); }
+        finally { _searchingMesc = false; }
+    }
+    private void SelectMesc(MescItemDto item)
+    {
+        _selectedMesc = item;
+        _newMin = 0;
+        _newReorder = 0;
+    }
     private async Task SaveEdit()
     {
         try
@@ -78,5 +210,35 @@ else
             Snackbar.Add("تنظیمات کنترل موجودی ذخیره شد.", Severity.Success); _editOpen = false; await Load();
         }
         catch (Exception ex) { Snackbar.Add($"ذخیره ناموفق بود: {ex.Message}", Severity.Error); }
+    }
+    private async Task SaveStock()
+    {
+        if (_stockItem is null || _warehouseId == Guid.Empty || _stockQuantity <= 0) return;
+        _savingStock = true;
+        try
+        {
+            await Api.CreateStockAdjustmentAsync(_stockItem.Id, new CreateStockAdjustmentRequest(_warehouseId, _stockQuantity, _stockDescription));
+            Snackbar.Add("موجودی کالا ثبت شد.", Severity.Success);
+            _stockOpen = false;
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add($"ثبت موجودی ناموفق بود: {ex.Message}", Severity.Error); }
+        finally { _savingStock = false; }
+    }
+    private async Task SaveNewItem()
+    {
+        if (!CanSaveNewItem || _selectedMesc is null) return;
+        _savingNew = true;
+        try
+        {
+            await Api.CreateInventoryControlItemAsync(new CreateInventoryControlItemRequest(
+                _selectedMesc.Id, _newWarehouseId, _newQuantity, _newMin, _newReorder, _newMax, _newSafety, _newControlled, _newNotes));
+            Snackbar.Add("کالای جدید به موجودی اضافه شد.", Severity.Success);
+            _newOpen = false;
+            _search = _selectedMesc.Code;
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add($"ثبت کالای جدید ناموفق بود: {ex.Message}", Severity.Error); }
+        finally { _savingNew = false; }
     }
 }

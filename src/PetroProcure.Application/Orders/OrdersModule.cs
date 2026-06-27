@@ -11,6 +11,10 @@ namespace PetroProcure.Application.Orders;
 
 public sealed record UpdateInventoryControlItemCommand(Guid Id, decimal MinimumStockLevel, decimal ReorderPoint,
     decimal? MaximumStockLevel, decimal? SafetyStock, bool IsStockControlled, bool IsActive, string? Notes);
+public sealed record CreateInventoryControlItemCommand(Guid MescItemId, Guid WarehouseId, decimal InitialQuantity,
+    decimal MinimumStockLevel, decimal ReorderPoint, decimal? MaximumStockLevel, decimal? SafetyStock,
+    bool IsStockControlled, string? Notes);
+public sealed record CreateStockAdjustmentCommand(Guid InventoryControlItemId, Guid WarehouseId, decimal Quantity, string? Description);
 public sealed record CreateMaterialNeedCommand(Guid MescItemId, decimal RequestedQuantity, DateOnly? NeededByDate,
     Guid SourceDepartmentId, Guid? ApplicantDepartmentId, MaterialNeedPriority Priority, string? Description);
 public sealed record SubmitMaterialNeedCommand(Guid Id);
@@ -18,6 +22,7 @@ public sealed record ReviewMaterialNeedCommand(Guid Id, string? Comment);
 public sealed record ApproveMaterialNeedCommand(Guid Id, string? Comment);
 public sealed record RejectMaterialNeedCommand(Guid Id, string Reason);
 public sealed record ConvertMaterialNeedToIndentCommand(Guid Id, int YearPart, int TypeDigit, string? Title);
+public sealed record ConvertMaterialNeedsToIndentCommand(IReadOnlyList<Guid> MaterialNeedIds, int YearPart, int TypeDigit, string? Title);
 public sealed record DetectShortageAlertsCommand(bool IncludeExistingOpen);
 public sealed record ConvertShortageAlertToIndentCommand(Guid Id, int YearPart, int TypeDigit, Guid RequestingDepartmentId, string? Title);
 public sealed record ResolveShortageAlertCommand(Guid Id, string? ResolutionNote);
@@ -36,11 +41,16 @@ public interface IOrdersRepository
     Task<MescOrderSnapshot?> GetMescSnapshotAsync(Guid mescItemId, CancellationToken ct);
     Task<Guid> ResolveUnitOfMeasureIdAsync(string unitOfMeasure, CancellationToken ct);
     Task<InventoryControlItem?> FindInventoryControlItemAsync(Guid id, CancellationToken ct);
+    Task<InventoryControlItem?> FindInventoryControlItemByMescItemAsync(Guid mescItemId, CancellationToken ct);
     Task<MaterialNeed?> FindMaterialNeedAsync(Guid id, CancellationToken ct);
+    Task<IReadOnlyList<MaterialNeed>> FindMaterialNeedsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
     Task<ShortageAlert?> FindShortageAlertAsync(Guid id, CancellationToken ct);
     Task AddMaterialNeedAsync(MaterialNeed need, CancellationToken ct);
+    Task AddInventoryControlItemAsync(InventoryControlItem item, CancellationToken ct);
     Task AddShortageAlertAsync(ShortageAlert alert, CancellationToken ct);
     Task AddIndentAsync(Indent indent, CancellationToken ct);
+    Task ApplyStockAdjustmentAsync(InventoryControlItem item, Guid warehouseId, decimal quantity,
+        Func<Task<string>> transactionNumberFactory, Guid userId, string? description, CancellationToken ct);
     Task SaveChangesAsync(CancellationToken ct);
     Task<PagedResult<InventoryControlItemDto>> GetInventoryControlItemsAsync(InventoryControlListRequest request, CancellationToken ct);
     Task<PagedResult<StockBalanceDto>> GetStockBalancesAsync(StockBalanceListRequest request, CancellationToken ct);
@@ -58,7 +68,8 @@ public sealed record MescOrderSnapshot(Guid Id, string Code, string GeneralGroup
 public sealed class OrdersCommandHandler(
     IOrdersRepository repository,
     IIndentNumberService indentNumberService,
-    ICurrentUserService currentUser)
+    ICurrentUserService currentUser,
+    PetroProcure.Application.Warehouse.IInventoryTransactionNumberService? transactionNumberService = null)
 {
     public async Task<InventoryControlItemDto> Handle(UpdateInventoryControlItemCommand command, CancellationToken ct = default)
     {
@@ -66,6 +77,43 @@ public sealed class OrdersCommandHandler(
             ?? throw new OrdersNotFoundException("Inventory control item was not found.");
         item.Update(command.MinimumStockLevel, command.ReorderPoint, command.MaximumStockLevel,
             command.SafetyStock, command.IsStockControlled, command.IsActive, command.Notes);
+        await repository.SaveChangesAsync(ct);
+        return (await repository.GetInventoryControlItemsAsync(new InventoryControlListRequest(item.MescCode, true, 1, 1), ct)).Items[0];
+    }
+
+    public async Task<InventoryControlItemDto> Handle(CreateInventoryControlItemCommand command, CancellationToken ct = default)
+    {
+        if (command.InitialQuantity <= 0) throw new OrdersValidationException("مقدار اولیه موجودی باید بزرگ‌تر از صفر باشد.");
+        if (transactionNumberService is null)
+            throw new OrdersValidationException("Inventory transaction number service is not configured.");
+        var snapshot = await ActiveMesc(command.MescItemId, ct);
+        var item = await repository.FindInventoryControlItemByMescItemAsync(command.MescItemId, ct);
+        if (item is null)
+        {
+            item = new InventoryControlItem(Guid.NewGuid(), snapshot.Id, snapshot.Code, snapshot.GeneralGroupCode,
+                snapshot.GeneralDescription, snapshot.SpecificDescription, snapshot.UnitOfMeasureId,
+                command.MinimumStockLevel, command.ReorderPoint, command.MaximumStockLevel, command.SafetyStock,
+                command.IsStockControlled, command.Notes);
+            await repository.AddInventoryControlItemAsync(item, ct);
+        }
+
+        await repository.ApplyStockAdjustmentAsync(item, command.WarehouseId, command.InitialQuantity,
+            () => transactionNumberService.GenerateNextTransactionNumber(DateTime.UtcNow.Year, ct),
+            currentUser.UserId, command.Notes, ct);
+        await repository.SaveChangesAsync(ct);
+        return (await repository.GetInventoryControlItemsAsync(new InventoryControlListRequest(snapshot.Code, true, 1, 1), ct)).Items[0];
+    }
+
+    public async Task<InventoryControlItemDto> Handle(CreateStockAdjustmentCommand command, CancellationToken ct = default)
+    {
+        if (command.Quantity <= 0) throw new OrdersValidationException("مقدار موجودی باید بزرگ‌تر از صفر باشد.");
+        if (transactionNumberService is null)
+            throw new OrdersValidationException("Inventory transaction number service is not configured.");
+        var item = await repository.FindInventoryControlItemAsync(command.InventoryControlItemId, ct)
+            ?? throw new OrdersNotFoundException("Inventory control item was not found.");
+        await repository.ApplyStockAdjustmentAsync(item, command.WarehouseId, command.Quantity,
+            () => transactionNumberService.GenerateNextTransactionNumber(DateTime.UtcNow.Year, ct),
+            currentUser.UserId, command.Description, ct);
         await repository.SaveChangesAsync(ct);
         return (await repository.GetInventoryControlItemsAsync(new InventoryControlListRequest(item.MescCode, true, 1, 1), ct)).Items[0];
     }
@@ -105,6 +153,46 @@ public sealed class OrdersCommandHandler(
             need.MescGeneralGroupCode, need.GeneralDescription, need.SpecificDescription, need.UnitOfMeasureId,
             need.RequestedQuantity, need.Description, need.NeededByDate, IndentSourceType.MaterialNeed, need.Id, null, need.NeedNumber, ct);
         need.MarkConvertedToIndent(indent.Id);
+        await repository.SaveChangesAsync(ct);
+        return indent.Id;
+    }
+
+    public async Task<Guid> Handle(ConvertMaterialNeedsToIndentCommand command, CancellationToken ct = default)
+    {
+        var ids = command.MaterialNeedIds.Distinct().ToArray();
+        if (ids.Length == 0) throw new OrdersValidationException("حداقل یک نیاز کالا باید انتخاب شود.");
+        var needs = await repository.FindMaterialNeedsAsync(ids, ct);
+        if (needs.Count != ids.Length) throw new OrdersValidationException("برخی از نیازهای انتخاب‌شده یافت نشدند.");
+        if (needs.Any(x => x.Status != MaterialNeedStatus.Approved))
+            throw new OrdersValidationException("فقط نیازهای تأییدشده قابل تبدیل به Indent هستند.");
+        if (needs.Select(x => x.MescGeneralGroupCode).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+            throw new OrdersValidationException("برای تجمیع، همه نیازها باید از یک گروه کالا باشند.");
+        if (needs.Select(x => x.SourceDepartmentId).Distinct().Count() > 1)
+            throw new OrdersValidationException("برای تجمیع، واحد درخواست‌کننده نیازها باید یکسان باشد.");
+
+        var ordered = needs.OrderBy(x => x.NeedNumber).ToArray();
+        var first = ordered[0];
+        var number = await indentNumberService.GenerateNextIndentNumber(command.YearPart, command.TypeDigit, ct);
+        var parts = indentNumberService.ParseIndentNumber(number);
+        var sourceNumbers = string.Join("، ", ordered.Select(x => x.NeedNumber));
+        var indent = new Indent(Guid.NewGuid(), number, parts.YearPart, parts.TypeDigit, parts.Sequence,
+            command.Title ?? $"تقاضای تجمیعی گروه {first.MescGeneralGroupCode}",
+            first.SourceDepartmentId,
+            first.ApplicantDepartmentId,
+            currentUser.UserId,
+            $"تجمیع نیازهای کالا: {sourceNumbers}",
+            IndentSourceType.MaterialNeed,
+            first.Id,
+            null,
+            sourceNumbers);
+        foreach (var need in ordered)
+        {
+            indent.AddItem(new IndentItem(Guid.NewGuid(), indent.Id, need.MescItemId, need.MescCode,
+                need.MescGeneralGroupCode, need.GeneralDescription, need.SpecificDescription, need.UnitOfMeasureId,
+                need.RequestedQuantity, need.Description, need.NeededByDate));
+            need.MarkConvertedToIndent(indent.Id);
+        }
+        await repository.AddIndentAsync(indent, ct);
         await repository.SaveChangesAsync(ct);
         return indent.Id;
     }

@@ -27,6 +27,7 @@ using PetroProcure.Contracts.V1.Commission;
 using PetroProcure.Contracts.V1.Common;
 using PetroProcure.Contracts.V1.Tenders;
 using PetroProcure.Contracts.V1.Ai;
+using PetroProcure.Contracts.V1.PurchaseFiles;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Orders;
 
@@ -571,6 +572,33 @@ public sealed class ApiAuthorizationTests(ApiAuthorizationFactory factory)
     }
 
     [Fact]
+    public async Task ApplicantDashboardRequiresApplicantPermission()
+    {
+        var forbidden = await factory.CreateAuthenticatedClient(ApplicationPermissions.PurchaseFileView)
+            .GetAsync("/api/applicant/dashboard");
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        var client = factory.CreateAuthenticatedClient(
+            ApplicationPermissions.ApplicantViewDashboard,
+            departmentId: SeedDataIds.ApplicantId);
+        var response = await client.GetAsync("/api/applicant/dashboard");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TechnicalReviewRequestRequiresDedicatedPermission()
+    {
+        var client = factory.CreateAuthenticatedClient(ApplicationPermissions.PurchaseFileView,
+            departmentId: SeedDataIds.PurchaseDepartmentId);
+        var response = await client.PostAsJsonAsync(
+            $"/api/purchase-files/{SeedDataIds.SamplePurchaseFileId}/technical-reviews/request",
+            new RequestTechnicalReviewRequest(SeedDataIds.ApplicantId, "Integration authorization check", null));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task UserWithoutCommissionReportExportCannotExportCommissionReport()
     {
         var client = factory.CreateAuthenticatedClient(ApplicationPermissions.CommissionView);
@@ -597,7 +625,7 @@ public sealed class ApiAuthorizationFactory : WebApplicationFactory<Program>
     private readonly object _migrationLock = new();
     private bool _migrated;
     private readonly string _connectionString =
-        $"Server=localhost;Database=PetroProcureApiSecurity_{Guid.NewGuid():N};Trusted_Connection=True;TrustServerCertificate=True";
+        $"Server=(localdb)\\mssqllocaldb;Database=PetroProcureApiSecurity_{Guid.NewGuid():N};Trusted_Connection=True;MultipleActiveResultSets=true;Encrypt=False;TrustServerCertificate=True";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

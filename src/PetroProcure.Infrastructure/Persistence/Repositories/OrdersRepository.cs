@@ -6,6 +6,7 @@ using PetroProcure.Contracts.V1.Orders;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Indents;
 using PetroProcure.Domain.Modules.Orders;
+using PetroProcure.Domain.Modules.Warehouse;
 
 namespace PetroProcure.Infrastructure.Persistence.Repositories;
 
@@ -48,13 +49,39 @@ internal sealed class OrdersRepository(PetroProcureDbContext db) : IOrdersReposi
 
     public Task<InventoryControlItem?> FindInventoryControlItemAsync(Guid id, CancellationToken ct) =>
         db.InventoryControlItems.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<InventoryControlItem?> FindInventoryControlItemByMescItemAsync(Guid mescItemId, CancellationToken ct) =>
+        db.InventoryControlItems.SingleOrDefaultAsync(x => x.MescItemId == mescItemId, ct);
     public Task<MaterialNeed?> FindMaterialNeedAsync(Guid id, CancellationToken ct) =>
         db.MaterialNeeds.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public async Task<IReadOnlyList<MaterialNeed>> FindMaterialNeedsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
+        await db.MaterialNeeds.Where(x => ids.Contains(x.Id)).ToListAsync(ct);
     public Task<ShortageAlert?> FindShortageAlertAsync(Guid id, CancellationToken ct) =>
         db.ShortageAlerts.SingleOrDefaultAsync(x => x.Id == id, ct);
     public async Task AddMaterialNeedAsync(MaterialNeed need, CancellationToken ct) => await db.MaterialNeeds.AddAsync(need, ct);
+    public async Task AddInventoryControlItemAsync(InventoryControlItem item, CancellationToken ct) => await db.InventoryControlItems.AddAsync(item, ct);
     public async Task AddShortageAlertAsync(ShortageAlert alert, CancellationToken ct) => await db.ShortageAlerts.AddAsync(alert, ct);
     public async Task AddIndentAsync(Indent indent, CancellationToken ct) => await db.Indents.AddAsync(indent, ct);
+    public async Task ApplyStockAdjustmentAsync(InventoryControlItem item, Guid warehouseId, decimal quantity,
+        Func<Task<string>> transactionNumberFactory, Guid userId, string? description, CancellationToken ct)
+    {
+        var warehouseExists = await db.Warehouses.AnyAsync(x => x.Id == warehouseId && x.IsActive, ct);
+        if (!warehouseExists) throw new OrdersValidationException("انبار انتخاب‌شده معتبر نیست.");
+        var balance = await db.StockBalances.SingleOrDefaultAsync(x => x.MescItemId == item.MescItemId && x.WarehouseId == warehouseId, ct);
+        if (balance is null)
+        {
+            balance = new StockBalance(Guid.NewGuid(), item.MescItemId, warehouseId, quantity, 0, 0);
+            db.StockBalances.Add(balance);
+        }
+        else
+        {
+            balance.SetQuantities(balance.AvailableQuantity + quantity, balance.ReservedQuantity, balance.OnOrderQuantity);
+        }
+        var transactionId = Guid.NewGuid();
+        db.InventoryTransactions.Add(new InventoryTransaction(transactionId, await transactionNumberFactory(),
+            item.MescItemId, warehouseId, InventoryTransactionType.Adjustment, InventoryTransactionReferenceType.ManualAdjustment,
+            transactionId, quantity, item.UnitOfMeasureId, DateTime.UtcNow, userId,
+            string.IsNullOrWhiteSpace(description) ? "ثبت دستی موجودی از کنترل موجودی" : description.Trim()));
+    }
     public Task SaveChangesAsync(CancellationToken ct) => db.SaveChangesAsync(ct);
 
     public async Task<PagedResult<InventoryControlItemDto>> GetInventoryControlItemsAsync(InventoryControlListRequest r, CancellationToken ct)

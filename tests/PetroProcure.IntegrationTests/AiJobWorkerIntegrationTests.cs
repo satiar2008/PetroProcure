@@ -67,6 +67,29 @@ public sealed class AiJobWorkerIntegrationTests(SqlServerFixture fixture)
     }
 
     [Fact]
+    public async Task WorkerDefaultsMissingRequestAnalysisTypeToSummary()
+    {
+        await using var scope = fixture.Services.CreateAsyncScope();
+        await CancelOpenAiJobsAsync(scope.ServiceProvider);
+        var queue = scope.ServiceProvider.GetRequiredService<IAiJobQueueService>();
+        var db = scope.ServiceProvider.GetRequiredService<PetroProcureDbContext>();
+        var client = new FakeAiCoreJobClient("aicore-job-default-analysis");
+        var processor = CreateProcessor(scope.ServiceProvider, client);
+        var created = await queue.CreateJobAsync(new CreateAiJobRequest(
+            "PurchaseFile", SeedDataIds.SamplePurchaseFileId, "Summary"), Guid.NewGuid(), CancellationToken.None);
+        await db.AiEvaluationJobs
+            .Where(x => x.Id == created.JobId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.RequestJson,
+                $$"""{"entityType":"PurchaseFile","entityId":"{{SeedDataIds.SamplePurchaseFileId}}"}"""));
+
+        var processed = await processor.ProcessBatchAsync("worker-test", 1, CancellationToken.None);
+
+        Assert.Equal(1, processed);
+        Assert.NotNull(client.LastRequest);
+        Assert.Equal("Summary", client.LastRequest!.AnalysisType);
+    }
+
+    [Fact]
     public async Task WorkerSubmitRetryStopsAtConfiguredLimit()
     {
         await using var scope = fixture.Services.CreateAsyncScope();

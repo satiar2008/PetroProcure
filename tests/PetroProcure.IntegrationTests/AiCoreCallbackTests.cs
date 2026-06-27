@@ -251,7 +251,7 @@ public sealed class AiCoreCallbackFactory : WebApplicationFactory<Program>
     private readonly object _migrationLock = new();
     private bool _migrated;
     private readonly string _connectionString =
-        $"Server=(localdb)\\mssqllocaldb;Database=PetroProcureAiCallback_{Guid.NewGuid():N};Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
+        $"Server=(localdb)\\mssqllocaldb;Database=PetroProcureAiCallback_{Guid.NewGuid():N};Trusted_Connection=True;MultipleActiveResultSets=true;Encrypt=False;TrustServerCertificate=True";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

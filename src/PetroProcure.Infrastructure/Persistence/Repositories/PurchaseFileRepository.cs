@@ -4,8 +4,9 @@ using PetroProcure.Application.PurchaseFiles;
 using PetroProcure.Domain.Enums;
 using PetroProcure.Domain.Modules.Indents;
 using PetroProcure.Domain.Modules.PurchaseFiles;
+using PetroProcure.Domain.Modules.Workflow;
 using PetroProcure.Contracts.V1.Common;
-using PetroProcure.Contracts.V1.PurchaseFiles;
+using PurchaseFileListRequest = PetroProcure.Contracts.V1.PurchaseFiles.PurchaseFileListRequest;
 
 namespace PetroProcure.Infrastructure.Persistence.Repositories;
 
@@ -45,11 +46,99 @@ internal sealed class PurchaseFileRepository(PetroProcureDbContext dbContext) : 
     public Task<PurchaseFile?> FindByNumberAsync(string fileNumber, CancellationToken ct) =>
         dbContext.PurchaseFiles.Include(file => file.Items).Include(file => file.StatusHistory).Include(file => file.Notes)
             .SingleOrDefaultAsync(file => file.FileNumber == fileNumber, ct);
+    public Task<PurchaseFile?> FindBySourceIndentAsync(Guid indentId, bool includeDetails, CancellationToken ct)
+    {
+        IQueryable<PurchaseFile> query = dbContext.PurchaseFiles;
+        if (includeDetails)
+            query = query.Include(file => file.Items).Include(file => file.StatusHistory).Include(file => file.Notes);
+        return query.SingleOrDefaultAsync(file => file.SourceIndentId == indentId, ct);
+    }
     public Task<Indent?> FindApprovedIndentAsync(Guid id, CancellationToken ct) =>
         dbContext.Indents.Include(indent => indent.Items)
             .SingleOrDefaultAsync(indent => indent.Id == id
                 && (indent.Status == IndentStatus.Approved
                     || indent.Status == IndentStatus.SentToPurchaseDepartment), ct);
+    public Task<string?> GetDepartmentNameAsync(Guid id, CancellationToken ct) =>
+        dbContext.Departments.AsNoTracking().Where(x => x.Id == id).Select(x => x.Name).SingleOrDefaultAsync(ct);
+    public Task<Guid?> GetDepartmentIdByTypeAsync(DepartmentType type, CancellationToken ct) =>
+        dbContext.Departments.AsNoTracking().Where(x => x.Type == type && x.IsActive)
+            .Select(x => (Guid?)x.Id).FirstOrDefaultAsync(ct);
+    public Task<WorkflowInstance?> FindPurchaseFileWorkflowAsync(Guid purchaseFileId, CancellationToken ct) =>
+        dbContext.WorkflowInstances.Include(x => x.Steps)
+            .SingleOrDefaultAsync(x => x.EntityType == "PurchaseFile" && x.EntityId == purchaseFileId, ct);
+    public async Task AddWorkflowAsync(WorkflowInstance workflow, CancellationToken ct) =>
+        await dbContext.WorkflowInstances.AddAsync(workflow, ct);
+    public async Task AddInboxTaskAsync(InboxTask task, CancellationToken ct) =>
+        await dbContext.InboxTasks.AddAsync(task, ct);
+    public Task<InboxTask?> FindInboxTaskAsync(Guid id, CancellationToken ct) =>
+        dbContext.InboxTasks.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<bool> HasActiveTechnicalReviewAsync(Guid purchaseFileId, Guid departmentId, CancellationToken ct) =>
+        dbContext.PurchaseFileTechnicalReviews.AnyAsync(x => x.PurchaseFileId == purchaseFileId
+            && x.DepartmentId == departmentId
+            && x.Status != PurchaseFileTechnicalReviewStatus.Approved
+            && x.Status != PurchaseFileTechnicalReviewStatus.Rejected
+            && x.Status != PurchaseFileTechnicalReviewStatus.Cancelled, ct);
+    public async Task AddTechnicalReviewAsync(PurchaseFileTechnicalReview review, CancellationToken ct) =>
+        await dbContext.PurchaseFileTechnicalReviews.AddAsync(review, ct);
+    public Task<PurchaseFileTechnicalReview?> FindTechnicalReviewAsync(Guid id, bool includeFile, CancellationToken ct) =>
+        dbContext.PurchaseFileTechnicalReviews.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public async Task<IReadOnlyList<PurchaseFileTechnicalReviewDto>> GetTechnicalReviewsByPurchaseFileAsync(Guid purchaseFileId, CancellationToken ct) =>
+        await ProjectTechnicalReviews(dbContext.PurchaseFileTechnicalReviews.AsNoTracking()
+            .Where(x => x.PurchaseFileId == purchaseFileId)).ToListAsync(ct);
+    public async Task<IReadOnlyList<PurchaseFileTechnicalReviewDto>> GetTechnicalReviewsByDepartmentsAsync(IReadOnlyCollection<Guid> departmentIds, CancellationToken ct)
+    {
+        var query = dbContext.PurchaseFileTechnicalReviews.AsNoTracking();
+        if (departmentIds.Count > 0) query = query.Where(x => departmentIds.Contains(x.DepartmentId));
+        return await ProjectTechnicalReviews(query.OrderByDescending(x => x.RequestedAt)).ToListAsync(ct);
+    }
+    public Task<PurchaseFileTechnicalReviewDto?> GetTechnicalReviewDtoAsync(Guid id, CancellationToken ct) =>
+        ProjectTechnicalReviews(dbContext.PurchaseFileTechnicalReviews.AsNoTracking().Where(x => x.Id == id))
+            .SingleOrDefaultAsync(ct);
+    public async Task<ApplicantDashboardDto> GetApplicantDashboardAsync(IReadOnlyCollection<Guid> departmentIds, CancellationToken ct)
+    {
+        var query = dbContext.PurchaseFileTechnicalReviews.AsNoTracking();
+        if (departmentIds.Count > 0) query = query.Where(x => departmentIds.Contains(x.DepartmentId));
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var completed = query.Where(x => x.CompletedAt.HasValue);
+        var completedDurations = await completed
+            .Where(x => x.CompletedAt >= monthStart)
+            .Select(x => new { x.RequestedAt, x.CompletedAt })
+            .ToListAsync(ct);
+        var recent = await ProjectTechnicalReviews(query.OrderByDescending(x => x.RequestedAt).Take(5)).ToListAsync(ct);
+        return new(
+            await query.CountAsync(x => x.Status == PurchaseFileTechnicalReviewStatus.Requested, ct),
+            await query.CountAsync(x => x.Status == PurchaseFileTechnicalReviewStatus.InReview, ct),
+            await query.CountAsync(x => x.Status == PurchaseFileTechnicalReviewStatus.ClarificationRequested, ct),
+            completedDurations.Count,
+            completedDurations.Count == 0 ? null : completedDurations.Average(x => (x.CompletedAt!.Value - x.RequestedAt).TotalHours),
+            recent);
+    }
+    public async Task<DepartmentDashboardDto> GetDepartmentDashboardAsync(string departmentKey, IReadOnlyCollection<Guid> departmentIds, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var inbox = dbContext.InboxTasks.AsNoTracking()
+            .Where(x => x.Status != WorkflowStatus.Completed);
+        var files = dbContext.PurchaseFiles.AsNoTracking().AsQueryable();
+        if (departmentIds.Count > 0)
+        {
+            inbox = inbox.Where(x => departmentIds.Contains(x.AssignedDepartmentId));
+            files = files.Where(x => departmentIds.Contains(x.CurrentDepartmentId));
+        }
+        var statusCounts = await files.GroupBy(x => x.Status.ToString()).Select(x => new { x.Key, Count = x.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var recent = await files.OrderByDescending(x => x.CreatedAt).Take(5)
+            .Select(file => new PurchaseFileListDto(file.Id, file.FileNumber, file.Title, file.Status, file.Priority,
+                file.CurrentDepartmentId, file.ResponsibleUserId, file.CreatedAt, file.Items.Count, null))
+            .ToListAsync(ct);
+        return new(
+            departmentKey,
+            DepartmentTitle(departmentKey),
+            await inbox.CountAsync(ct),
+            await inbox.CountAsync(ct),
+            await inbox.CountAsync(x => x.DueDate.HasValue && x.DueDate < today, ct),
+            statusCounts,
+            recent);
+    }
     public Task<PurchaseFileMescSnapshot?> GetMescSnapshotAsync(Guid id, CancellationToken ct) =>
         dbContext.MescItems.AsNoTracking().Where(item => item.Id == id)
             .Select(item => new PurchaseFileMescSnapshot(
@@ -108,4 +197,40 @@ internal sealed class PurchaseFileRepository(PetroProcureDbContext dbContext) : 
         catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) == true)
         { throw new PurchaseFileConflictException("Duplicate purchase file number or source indent."); }
     }
+
+    private IQueryable<PurchaseFileTechnicalReviewDto> ProjectTechnicalReviews(IQueryable<PurchaseFileTechnicalReview> query) =>
+        query.Select(review => new PurchaseFileTechnicalReviewDto(
+            review.Id,
+            review.PurchaseFileId,
+            dbContext.PurchaseFiles.Where(file => file.Id == review.PurchaseFileId).Select(file => file.FileNumber).FirstOrDefault() ?? "—",
+            dbContext.PurchaseFiles.Where(file => file.Id == review.PurchaseFileId).Select(file => file.Title).FirstOrDefault() ?? "—",
+            review.DepartmentId,
+            dbContext.Departments.Where(department => department.Id == review.DepartmentId).Select(department => department.Name).FirstOrDefault() ?? "—",
+            review.RequestedByUserId,
+            review.ReviewedByUserId,
+            review.Status,
+            review.Decision,
+            review.RequestComment,
+            review.Comments,
+            review.RecommendationNotes,
+            review.RequestedAt,
+            review.StartedAt,
+            review.CompletedAt,
+            dbContext.PurchaseFileItems.Where(item => item.PurchaseFileId == review.PurchaseFileId)
+                .OrderBy(item => item.MescCode)
+                .Select(item => new PurchaseFileItemDto(item.Id, item.MescItemId, item.MescCode, item.MescGeneralGroupCode,
+                    item.GeneralDescription, item.SpecificDescription, item.UnitOfMeasureId, item.RequestedQuantity,
+                    item.ApprovedQuantity, item.TechnicalDescription, item.SourceIndentItemId))
+                .ToArray()));
+
+    private static string DepartmentTitle(string key) => key.ToLowerInvariant() switch
+    {
+        "purchase" => "داشبورد واحد خرید",
+        "orders" => "سفارشات و کنترل موجودی",
+        "warehouse" => "داشبورد انبار",
+        "applicant" => "داشبورد متقاضی",
+        "tender-commission" => "کمیسیون مناقصه",
+        "contracts" => "قراردادها و تدارکات",
+        _ => "داشبورد واحد"
+    };
 }

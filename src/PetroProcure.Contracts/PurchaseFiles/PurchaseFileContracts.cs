@@ -50,3 +50,44 @@ public sealed record PurchaseFileListRequest(
     Guid? CurrentDepartmentId = null, DateTime? CreatedDateFrom = null, DateTime? CreatedDateTo = null,
     string? SourceIndentNumber = null, string SortBy = "CreatedAt", bool SortDescending = true,
     int PageNumber = 1, int PageSize = 25);
+
+public sealed record RequestTechnicalReviewRequest(Guid? DepartmentId, string? Comment, DateOnly? DueDate);
+public sealed record SubmitTechnicalReviewRequest(
+    PurchaseFileTechnicalReviewDecision Decision,
+    string Comments,
+    string? RecommendationNotes);
+public sealed record TechnicalReviewClarificationRequest(string Comments, string? RecommendationNotes);
+public sealed record CancelTechnicalReviewRequest(string? Comments);
+public sealed record PurchaseFileTechnicalReviewDto(
+    Guid Id,
+    Guid PurchaseFileId,
+    string PurchaseFileNumber,
+    string PurchaseFileTitle,
+    Guid DepartmentId,
+    string DepartmentName,
+    Guid RequestedByUserId,
+    Guid? ReviewedByUserId,
+    PurchaseFileTechnicalReviewStatus Status,
+    PurchaseFileTechnicalReviewDecision? Decision,
+    string? RequestComment,
+    string? Comments,
+    string? RecommendationNotes,
+    DateTime RequestedAt,
+    DateTime? StartedAt,
+    DateTime? CompletedAt,
+    IReadOnlyList<PurchaseFileItemDto> Items);
+public sealed record ApplicantDashboardDto(
+    int PendingTechnicalReviews,
+    int InProgressTechnicalReviews,
+    int ClarificationRequests,
+    int CompletedThisMonth,
+    double? AverageResponseHours,
+    IReadOnlyList<PurchaseFileTechnicalReviewDto> RecentReviews);
+public sealed record DepartmentDashboardDto(
+    string DepartmentKey,
+    string Title,
+    int InboxTasks,
+    int PendingActions,
+    int OverdueTasks,
+    IReadOnlyDictionary<string, int> StatusCounts,
+    IReadOnlyList<PurchaseFileSummaryDto> RecentPurchaseFiles);

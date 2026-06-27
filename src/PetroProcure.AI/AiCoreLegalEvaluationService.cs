@@ -64,9 +64,11 @@ public sealed class AiCoreLegalEvaluationService(IAiCoreClient client, IAiCoreSe
 
     private static string SystemPrompt() => """
         You are a legal procurement analysis assistant for PetroProcure.
+        Always write all textual output in fluent Persian (Farsi), not English.
         Return advisory findings only. Never make final blocking decisions.
         Every finding must require human review and should cite supplied legal references when relevant.
         Keep the analysis grounded in the deterministic rule outcome and supplied citations.
+        همهٔ مقادیر متنی (title، description و ...) باید به زبان فارسی روان باشند.
         """;
 
     private static string UserPrompt(AiLegalEvaluationRequest request) =>

@@ -49,53 +49,56 @@ public static class PurchaseOrderEndpoints
             .RequirePermission(ApplicationPermissions.PurchaseOrderView);
 
         orders.MapPost("/", async (CreatePurchaseOrderRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        {
-            var result = await handler.Handle(new CreatePurchaseOrderCommand(request), ct);
-            return Results.Created($"/api/purchase-orders/{result.PurchaseOrder.Id}", result);
-        }).RequirePermission(ApplicationPermissions.PurchaseOrderCreate);
+            await Execute(async () =>
+            {
+                var result = await handler.Handle(new CreatePurchaseOrderCommand(request), ct);
+                return Results.Created($"/api/purchase-orders/{result.PurchaseOrder.Id}", result);
+            })).RequirePermission(ApplicationPermissions.PurchaseOrderCreate);
 
         orders.MapPost("/from-contract/{contractId:guid}", async (
             Guid contractId, CreatePurchaseOrderFromContractRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        {
-            var result = await handler.Handle(new CreatePurchaseOrderFromContractCommand(contractId, request), ct);
-            return Results.Created($"/api/purchase-orders/{result.PurchaseOrder.Id}", result);
-        }).RequirePermission(ApplicationPermissions.PurchaseOrderCreate);
+            await Execute(async () =>
+            {
+                var result = await handler.Handle(new CreatePurchaseOrderFromContractCommand(contractId, request), ct);
+                return Results.Created($"/api/purchase-orders/{result.PurchaseOrder.Id}", result);
+            })).RequirePermission(ApplicationPermissions.PurchaseOrderCreate);
 
         orders.MapPost("/from-purchase-file/{purchaseFileId:guid}", async (
             Guid purchaseFileId, CreatePurchaseOrderFromPurchaseFileRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        {
-            var result = await handler.Handle(new CreatePurchaseOrderFromPurchaseFileCommand(purchaseFileId, request), ct);
-            return Results.Created($"/api/purchase-orders/{result.PurchaseOrder.Id}", result);
-        }).RequirePermission(ApplicationPermissions.PurchaseOrderCreate);
+            await Execute(async () =>
+            {
+                var result = await handler.Handle(new CreatePurchaseOrderFromPurchaseFileCommand(purchaseFileId, request), ct);
+                return Results.Created($"/api/purchase-orders/{result.PurchaseOrder.Id}", result);
+            })).RequirePermission(ApplicationPermissions.PurchaseOrderCreate);
 
         orders.MapPut("/{id:guid}", async (Guid id, UpdatePurchaseOrderRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-            Results.Ok(await handler.Handle(new UpdatePurchaseOrderCommand(id, request), ct)))
+            await Execute(async () => Results.Ok(await handler.Handle(new UpdatePurchaseOrderCommand(id, request), ct))))
             .RequirePermission(ApplicationPermissions.PurchaseOrderEdit);
 
         orders.MapPost("/{id:guid}/submit", async (Guid id, SubmitPurchaseOrderRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        { await handler.Handle(new SubmitPurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); })
+            await Execute(async () => { await handler.Handle(new SubmitPurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); }))
             .RequirePermission(ApplicationPermissions.PurchaseOrderSubmit);
         orders.MapPost("/{id:guid}/approve", async (Guid id, ApprovePurchaseOrderRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        { await handler.Handle(new ApprovePurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); })
+            await Execute(async () => { await handler.Handle(new ApprovePurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); }))
             .RequirePermission(ApplicationPermissions.PurchaseOrderApprove);
         orders.MapPost("/{id:guid}/reject", async (Guid id, RejectPurchaseOrderRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        { await handler.Handle(new RejectPurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); })
+            await Execute(async () => { await handler.Handle(new RejectPurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); }))
             .RequirePermission(ApplicationPermissions.PurchaseOrderReject);
         orders.MapPost("/{id:guid}/issue", async (Guid id, IssuePurchaseOrderRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        { await handler.Handle(new IssuePurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); })
+            await Execute(async () => { await handler.Handle(new IssuePurchaseOrderCommand(id, request.Comment), ct); return Results.NoContent(); }))
             .RequirePermission(ApplicationPermissions.PurchaseOrderIssue);
         orders.MapPost("/{id:guid}/cancel", async (Guid id, CancelPurchaseOrderRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        { await handler.Handle(new CancelPurchaseOrderCommand(id, request.Reason), ct); return Results.NoContent(); })
+            await Execute(async () => { await handler.Handle(new CancelPurchaseOrderCommand(id, request.Reason), ct); return Results.NoContent(); }))
             .RequirePermission(ApplicationPermissions.PurchaseOrderCancel);
 
         orders.MapGet("/{id:guid}/items", async (Guid id, PurchaseOrderQueryHandler handler, CancellationToken ct) =>
             await handler.Handle(new GetPurchaseOrderByIdQuery(id), ct) is { } po ? Results.Ok(po.Items) : Results.NotFound())
             .RequirePermission(ApplicationPermissions.PurchaseOrderView);
         orders.MapPost("/{id:guid}/items", async (Guid id, AddPurchaseOrderItemRequest request, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-            Results.Created($"/api/purchase-orders/{id}/items", await handler.Handle(new AddPurchaseOrderItemCommand(id, request), ct)))
+            await Execute(async () => Results.Created($"/api/purchase-orders/{id}/items", await handler.Handle(new AddPurchaseOrderItemCommand(id, request), ct))))
             .RequirePermission(ApplicationPermissions.PurchaseOrderManageItems);
         orders.MapDelete("/{id:guid}/items/{itemId:guid}", async (Guid id, Guid itemId, PurchaseOrderCommandHandler handler, CancellationToken ct) =>
-        { await handler.Handle(new RemovePurchaseOrderItemCommand(id, itemId), ct); return Results.NoContent(); })
+            await Execute(async () => { await handler.Handle(new RemovePurchaseOrderItemCommand(id, itemId), ct); return Results.NoContent(); }))
             .RequirePermission(ApplicationPermissions.PurchaseOrderManageItems);
 
         orders.MapPost("/{id:guid}/documents/upload", async (
@@ -161,5 +164,21 @@ public static class PurchaseOrderEndpoints
         }).RequirePermission(ApplicationPermissions.PurchaseOrderReportExport);
 
         return app;
+    }
+
+    private static async Task<IResult> Execute(Func<Task<IResult>> action)
+    {
+        try
+        {
+            return await action();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
     }
 }

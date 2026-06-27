@@ -18,7 +18,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        var connection = $"Server=(localdb)\\mssqllocaldb;Database={_database};Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True";
+        var connection = $"Server=(localdb)\\mssqllocaldb;Database={_database};Trusted_Connection=True;MultipleActiveResultSets=true;Encrypt=False;TrustServerCertificate=True";
         var values = new Dictionary<string, string?>
         {
             ["ConnectionStrings:PetroProcureDb"] = connection,

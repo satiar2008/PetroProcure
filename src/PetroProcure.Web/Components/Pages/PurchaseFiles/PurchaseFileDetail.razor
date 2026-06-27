@@ -5,6 +5,7 @@
 @inject IUserAccessContext Access
 @inject IDialogService Dialog
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <PageTitle>@(_summary.Data?.FileNumber ?? "پرونده خرید")</PageTitle>
 @if (_summary.Loading) { <LoadingOverlay Visible="true" Text="در حال دریافت پرونده..." /> }
@@ -12,14 +13,14 @@ else if (_summary.Error is not null) { @ErrorState(_summary.Error, LoadSummary) 
 else if (_summary.Data is { } file)
 {
     <PageHeader Title="@file.Title" Subtitle="@file.FileNumber">
-        <Actions><StatusChip Text="@PurchaseFileList.StatusText(file.Status)" Color="@PurchaseFileList.StatusColor(file.Status)" /></Actions>
+        <Actions><StatusChip Text="@PurchaseFileUiPolicy.StatusText(file.Status)" Color="@PurchaseFileUiPolicy.StatusColor(file.Status)" /></Actions>
     </PageHeader>
     <MudTabs Rounded="true" ApplyEffectsToContainer="true" PanelClass="detail-tab-panel" Elevation="0"
              ActivePanelIndexChanged="OnTabChanged">
         <MudTabPanel Text="خلاصه" Icon="@Icons.Material.Filled.Dashboard">
             <MudPaper Class="form-panel" Elevation="0"><div class="summary-grid">
                 <SummaryItem Label="شماره پرونده" Value="@file.FileNumber" />
-                <SummaryItem Label="وضعیت" Value="@PurchaseFileList.StatusText(file.Status)" />
+                <SummaryItem Label="وضعیت" Value="@PurchaseFileUiPolicy.StatusText(file.Status)" />
                 <SummaryItem Label="اولویت" Value="@PurchaseFileList.PriorityText(file.Priority)" />
                 <SummaryItem Label="واحد جاری" Value="@DepartmentName(file.CurrentDepartmentId)" />
                 <div class="summary-item"><span>تاریخ ایجاد</span><strong><DateDisplay Value="@file.CreatedAt" /></strong></div>
@@ -29,8 +30,9 @@ else if (_summary.Data is { } file)
             <PermissionView Permission="@InquiryUiPolicy.Create">
                 <MudButton Class="mt-4" Variant="Variant.Outlined" Color="Color.Primary"
                            StartIcon="@Icons.Material.Filled.RequestQuote"
-                           Href="@($"/purchase/inquiries/from-purchase-file/{file.Id}")">
-                    ایجاد استعلام از پرونده خرید
+                           Disabled="_creatingInquiry"
+                           OnClick="@(() => CreateInquiryFromFile(file))">
+                    @(_creatingInquiry ? "در حال ایجاد استعلام..." : "ایجاد استعلام از پرونده خرید")
                 </MudButton>
             </PermissionView>
             <PermissionView Permission="@TenderUiPolicy.Create">
@@ -66,6 +68,10 @@ else if (_summary.Data is { } file)
 
         <MudTabPanel Text="گردش کار" Icon="@Icons.Material.Filled.AccountTree">
             @TabBody(_workflow, LoadWorkflow, WorkflowContent)
+        </MudTabPanel>
+
+        <MudTabPanel Text="بررسی فنی متقاضی" Icon="@Icons.Material.Filled.Engineering">
+            @TabBody(_technicalReviews, LoadTechnicalReviews, TechnicalReviewContent)
         </MudTabPanel>
 
         <MudTabPanel Text="گردش کامل خرید" Icon="@Icons.Material.Filled.Timeline">
@@ -135,18 +141,21 @@ else if (_summary.Data is { } file)
     private readonly TabLoadState<List<PurchaseFileGroupedItemsDto>> _items = new();
     private readonly TabLoadState<List<FileDocumentDto>> _documents = new();
     private readonly TabLoadState<PurchaseFileWorkflowStateDto> _workflow = new();
+    private readonly TabLoadState<List<PurchaseFileTechnicalReviewDto>> _technicalReviews = new();
     private readonly TabLoadState<PurchaseFileLifecycleDto> _lifecycle = new();
     private readonly TabLoadState<List<WorkflowActionDto>> _workflowActions = new();
     private readonly TabLoadState<List<PurchaseFileNoteDto>> _notes = new();
     private readonly TabLoadState<List<PurchaseContractSummaryDto>> _contracts = new();
     private readonly TabLoadState<List<PurchaseOrderSummaryDto>> _purchaseOrders = new();
-    private bool _showPreview, _savingReport, _noteBusy, _internalNote, _reportLoading;
+    private bool _showPreview, _savingReport, _noteBusy, _internalNote, _reportLoading, _reviewBusy, _creatingInquiry;
     private bool _documentsExplorerView;
     private string? _noteText, _mescSearch, _documentDescription; private List<MescItemDto> _mescResults = [];
     private string? _purchaseFilePdfDataUrl;
     private DocumentType _documentType = DocumentType.TechnicalSpecification;
     private DocumentUploadLimitsDto? _uploadLimits; private bool _uploadBusy;
     private string? _workflowComment;
+    private string? _technicalReviewComment;
+    private DateTime? _technicalReviewDueDate;
     private bool Editable => _summary.Data?.Status is not PurchaseFileStatus.Completed and not PurchaseFileStatus.Archived;
     private bool CanEdit => _summary.Data is { } value && PurchaseFileUiPolicy.CanEdit(value.Status, Access.HasPermission);
 
@@ -169,11 +178,12 @@ else if (_summary.Data is { } file)
             1 => LoadItems(),
             2 => LoadDocuments(),
             3 => LoadWorkflow(),
-            4 => LoadLifecycle(),
-            5 => LoadNotes(),
-            10 => LoadContracts(),
-            11 => LoadPurchaseOrders(),
-            _ => Task.CompletedTask // 0 = summary (eager), 6 = reports, 7-9 = legal/RAG/ask, 12 = AI
+            4 => LoadTechnicalReviews(),
+            5 => LoadLifecycle(),
+            6 => LoadNotes(),
+            11 => LoadContracts(),
+            12 => LoadPurchaseOrders(),
+            _ => Task.CompletedTask // 0 = summary (eager), 7 = reports, 8-10 = legal/RAG/ask, 13 = AI
         };
         await load;
     }
@@ -196,8 +206,40 @@ else if (_summary.Data is { } file)
     }
     private async Task LoadLifecycle() => await Load(_lifecycle, async () =>
         await Api.GetPurchaseFileLifecycleAsync(Id) ?? throw new HttpRequestException("گردش کامل خرید یافت نشد."), "گردش کامل خرید دریافت نشد.");
+    private async Task LoadTechnicalReviews() => await Load(_technicalReviews, () => Api.GetPurchaseFileTechnicalReviewsAsync(Id), "بررسی‌های فنی دریافت نشد.");
     private async Task LoadContracts() => await Load(_contracts, () => Api.GetPurchaseFileContractsAsync(Id), "قراردادهای پرونده دریافت نشد.");
     private async Task LoadPurchaseOrders() => await Load(_purchaseOrders, () => Api.GetPurchaseFilePurchaseOrdersAsync(Id), "سفارش‌های خرید پرونده دریافت نشد.");
+    private async Task CreateInquiryFromFile(PurchaseFileDto file)
+    {
+        if (_creatingInquiry) return;
+        if (file.Items.Count == 0)
+        {
+            Snackbar.Add("برای ایجاد استعلام، پرونده خرید باید حداقل یک قلم کالا داشته باشد.", Severity.Warning);
+            return;
+        }
+
+        _creatingInquiry = true;
+        try
+        {
+            var result = await Api.CreateInquiryFromPurchaseFileAsync(file.Id, new(
+                $"استعلام {file.FileNumber}",
+                InquiryType.PriceInquiry,
+                null,
+                file.Description,
+                file.Items.Select(x => x.Id).ToArray(),
+                []));
+            Snackbar.Add("استعلام از پرونده خرید ایجاد شد.", Severity.Success);
+            Navigation.NavigateTo($"/purchase/inquiries/{result.Inquiry.Id}");
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add("ایجاد استعلام ناموفق بود: " + UiErrorText.From(ex), Severity.Error);
+        }
+        finally
+        {
+            _creatingInquiry = false;
+        }
+    }
     private async Task Load<T>(TabLoadState<T> state, Func<Task<T>> loader, string message)
     {
         state.Loading = true; state.Error = null; StateHasChanged();
@@ -331,6 +373,51 @@ else if (_summary.Data is { } file)
             </MudTable>
         }
     </div>;
+    private RenderFragment<List<PurchaseFileTechnicalReviewDto>> TechnicalReviewContent => reviews => @<div>
+        <PermissionView Permission="PurchaseFile.RequestTechnicalReview">
+            <MudPaper Class="form-panel mb-4" Elevation="0">
+                <MudGrid>
+                    <MudItem xs="12" md="6">
+                        <MudTextField @bind-Value="_technicalReviewComment" Label="توضیح درخواست بررسی فنی" Lines="3" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3">
+                        <MudDatePicker @bind-Date="_technicalReviewDueDate" Label="مهلت پاسخ" Variant="Variant.Outlined" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" md="3" Class="d-flex align-end">
+                        <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Send"
+                                   Disabled="_reviewBusy" OnClick="RequestTechnicalReview">
+                            ارسال برای بررسی فنی
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </PermissionView>
+        @if (reviews.Count == 0)
+        {
+            <EmptyState Title="بررسی فنی ثبت نشده" Description="در صورت نیاز، پرونده را برای بررسی فنی متقاضی ارسال کنید." />
+        }
+        else
+        {
+            <MudTable Items="reviews" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>واحد بررسی‌کننده</MudTh><MudTh>وضعیت</MudTh><MudTh>تصمیم</MudTh><MudTh>درخواست</MudTh><MudTh>تکمیل</MudTh><MudTh>نظر</MudTh><MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.DepartmentName</MudTd>
+                    <MudTd><StatusChip Text="@ApplicantUiPolicy.StatusText(context.Status)" Color="@ApplicantUiPolicy.StatusColor(context.Status)" /></MudTd>
+                    <MudTd>@ApplicantUiPolicy.DecisionText(context.Decision)</MudTd>
+                    <MudTd><DateDisplay Value="@context.RequestedAt" IncludeTime="true" /></MudTd>
+                    <MudTd><DateDisplay Value="@context.CompletedAt" IncludeTime="true" /></MudTd>
+                    <MudTd>@(context.Comments ?? context.RequestComment ?? "—")</MudTd>
+                    <MudTd>
+                        <PermissionView Permission="@ApplicantUiPolicy.ViewTechnicalReviews">
+                            <MudButton Size="Size.Small" Href="@($"/applicant/technical-reviews/{context.Id}")">مشاهده</MudButton>
+                        </PermissionView>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </div>;
     private RenderFragment<PurchaseFileLifecycleDto> LifecycleContent => lifecycle => @<div>
         <MudPaper Class="form-panel mb-4" Elevation="0">
             <div class="summary-grid">
@@ -368,7 +455,7 @@ else if (_summary.Data is { } file)
         }
     </div>;
     private RenderFragment<PurchaseFileWorkflowStateDto> WorkflowContent => state => @<div>
-        <MudPaper Class="form-panel mb-4" Elevation="0"><MudText>واحد جاری: <DepartmentDisplay DepartmentId="@state.CurrentDepartmentId" /></MudText><MudText>وضعیت: @PurchaseFileList.StatusText(Enum.Parse<PurchaseFileStatus>(state.Status))</MudText>
+        <MudPaper Class="form-panel mb-4" Elevation="0"><MudText>واحد جاری: <DepartmentDisplay DepartmentId="@state.CurrentDepartmentId" /></MudText><MudText>وضعیت: @PurchaseFileUiPolicy.StatusText(Enum.Parse<PurchaseFileStatus>(state.Status))</MudText>
         @if(_workflowActions.Loading){<MudProgressLinear Indeterminate="true" />}
         else if(_workflowActions.Error is not null){@ErrorState(_workflowActions.Error,LoadWorkflow)}
         else if(_workflowActions.Data is null||_workflowActions.Data.Count==0){<MudAlert Severity="Severity.Info" Class="mt-3">در وضعیت فعلی اقدامی برای شما مجاز نیست.</MudAlert>}
@@ -391,6 +478,29 @@ else if (_summary.Data is { } file)
     private async Task SearchMesc(){if(string.IsNullOrWhiteSpace(_mescSearch))return;_mescResults=await Api.SearchMescItemsAsync(_mescSearch);}
     private async Task AddItem(MescItemDto item){try{await Api.AddPurchaseFileItemAsync(Id,new(item.Id,FakeDirectory.UnitId(item.UnitOfMeasure),1,1,null));await LoadItems();Snackbar.Add("قلم اضافه شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
     private async Task RemoveItem(Guid itemId){var dialog=await Dialog.ShowAsync<ConfirmDialog>("حذف قلم",new DialogParameters{{"Message","قلم از پرونده حذف شود؟"},{"ConfirmColor",Color.Error}});var result=await dialog.Result;if(result is null||result.Canceled)return;try{await Api.RemovePurchaseFileItemAsync(Id,itemId);await LoadItems();Snackbar.Add("قلم حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task RequestTechnicalReview()
+    {
+        if (_reviewBusy) return;
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>("ارسال برای بررسی فنی", new DialogParameters
+        {
+            ["Message"] = "پرونده برای بررسی فنی متقاضی ارسال شود؟",
+            ["ConfirmColor"] = Color.Primary
+        });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+        _reviewBusy = true;
+        try
+        {
+            DateOnly? dueDate = _technicalReviewDueDate.HasValue ? DateOnly.FromDateTime(_technicalReviewDueDate.Value) : null;
+            await Api.RequestTechnicalReviewAsync(Id, new(null, _technicalReviewComment, dueDate));
+            _technicalReviewComment = null;
+            _technicalReviewDueDate = null;
+            await Task.WhenAll(LoadTechnicalReviews(), LoadWorkflow(), LoadNotes());
+            Snackbar.Add("پرونده برای بررسی فنی ارسال شد.", Severity.Success);
+        }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+        finally { _reviewBusy = false; }
+    }
     private async Task StartWorkflow(){try{await Api.StartWorkflowAsync(new("PurchaseFile",Id,_summary.Data!.CurrentDepartmentId));await LoadWorkflow();Snackbar.Add("گردش کار آغاز شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
     private async Task ExecuteMatrixAction(WorkflowActionDto action)
     {

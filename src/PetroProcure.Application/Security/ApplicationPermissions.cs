@@ -8,6 +8,8 @@ public static class ApplicationPermissions
     public const string PurchaseFileView = "PurchaseFile.View";
     public const string PurchaseFileEdit = "PurchaseFile.Edit";
     public const string PurchaseFileSendToDepartment = "PurchaseFile.SendToDepartment";
+    public const string PurchaseFileRequestTechnicalReview = "PurchaseFile.RequestTechnicalReview";
+    public const string PurchaseFileViewTechnicalReview = "PurchaseFile.ViewTechnicalReview";
     public const string PurchaseFileClose = "PurchaseFile.Close";
     public const string PurchaseFileArchive = "PurchaseFile.Archive";
 
@@ -132,6 +134,11 @@ public static class ApplicationPermissions
     public const string OrdersConvertShortageToIndent = "Orders.ConvertShortageToIndent";
     public const string OrdersManageShortageAlerts = "Orders.ManageShortageAlerts";
 
+    public const string ApplicantViewDashboard = "Applicant.ViewDashboard";
+    public const string ApplicantViewTechnicalReviews = "Applicant.ViewTechnicalReviews";
+    public const string ApplicantSubmitTechnicalReview = "Applicant.SubmitTechnicalReview";
+    public const string ApplicantRequestClarification = "Applicant.RequestClarification";
+
     public const string ReportView = "Report.View";
     public const string ReportPrint = "Report.Print";
     public const string ReportExportPdf = "Report.ExportPdf";
@@ -168,6 +175,8 @@ public static class ApplicationPermissions
         PurchaseFileView,
         PurchaseFileEdit,
         PurchaseFileSendToDepartment,
+        PurchaseFileRequestTechnicalReview,
+        PurchaseFileViewTechnicalReview,
         PurchaseFileClose,
         PurchaseFileArchive,
         IndentCreate,
@@ -281,6 +290,10 @@ public static class ApplicationPermissions
         OrdersConvertNeedToIndent,
         OrdersConvertShortageToIndent,
         OrdersManageShortageAlerts,
+        ApplicantViewDashboard,
+        ApplicantViewTechnicalReviews,
+        ApplicantSubmitTechnicalReview,
+        ApplicantRequestClarification,
         ReportView,
         ReportPrint,
         ReportExportPdf,

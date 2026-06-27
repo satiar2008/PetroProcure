@@ -22,6 +22,16 @@ public static class OrdersEndpoints
             Results.Ok(await h.Handle(new UpdateInventoryControlItemCommand(id, r.MinimumStockLevel, r.ReorderPoint, r.MaximumStockLevel, r.SafetyStock, r.IsStockControlled, r.IsActive, r.Notes), ct)))
             .RequirePermission(ApplicationPermissions.OrdersManageInventoryControl);
 
+        orders.MapPost("/inventory-control", async (CreateInventoryControlItemRequest r, OrdersCommandHandler h, CancellationToken ct) =>
+            Results.Created("/api/orders/inventory-control", await h.Handle(new CreateInventoryControlItemCommand(
+                r.MescItemId, r.WarehouseId, r.InitialQuantity, r.MinimumStockLevel, r.ReorderPoint,
+                r.MaximumStockLevel, r.SafetyStock, r.IsStockControlled, r.Notes), ct)))
+            .RequirePermission(ApplicationPermissions.OrdersManageInventoryControl);
+
+        orders.MapPost("/inventory-control/{id:guid}/stock-adjustment", async (Guid id, CreateStockAdjustmentRequest r, OrdersCommandHandler h, CancellationToken ct) =>
+            Results.Ok(await h.Handle(new CreateStockAdjustmentCommand(id, r.WarehouseId, r.Quantity, r.Description), ct)))
+            .RequirePermission(ApplicationPermissions.OrdersManageInventoryControl);
+
         orders.MapGet("/stock-balances", async ([AsParameters] StockBalanceListRequest r, OrdersQueryHandler h, CancellationToken ct) =>
             await h.Handle(new GetStockBalancesQuery(r), ct)).RequirePermission(ApplicationPermissions.OrdersViewInventory);
 
@@ -53,6 +63,10 @@ public static class OrdersEndpoints
 
         orders.MapPost("/material-needs/{id:guid}/convert-to-indent", async (Guid id, ConvertMaterialNeedToIndentRequest r, OrdersCommandHandler h, CancellationToken ct) =>
             Results.Ok(new { IndentId = await h.Handle(new ConvertMaterialNeedToIndentCommand(id, r.YearPart, r.TypeDigit, r.Title), ct) }))
+            .RequirePermission(ApplicationPermissions.OrdersConvertNeedToIndent);
+
+        orders.MapPost("/material-needs/convert-to-indent", async (ConvertMaterialNeedsToIndentRequest r, OrdersCommandHandler h, CancellationToken ct) =>
+            Results.Ok(new { IndentId = await h.Handle(new ConvertMaterialNeedsToIndentCommand(r.MaterialNeedIds, r.YearPart, r.TypeDigit, r.Title), ct) }))
             .RequirePermission(ApplicationPermissions.OrdersConvertNeedToIndent);
 
         orders.MapGet("/shortage-alerts", async (string? status, string? mescCode, int? pageNumber, int? pageSize, OrdersQueryHandler h, CancellationToken ct) =>

@@ -4,6 +4,7 @@ using MudBlazor.Services;
 using PetroProcure.Web.Services;
 using PetroProcure.Web.Services.Api;
 using PetroProcure.Web.Services.Auth;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
@@ -15,6 +16,10 @@ builder.AddServiceDefaults();
 builder.Services.AddLocalization(options => options.ResourcesPath = "Resources");
 builder.Services.AddMudServices();
 builder.Services.AddAuthorizationCore();
+builder.Services.AddAuthentication(InteractiveServerAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, InteractiveServerAuthenticationHandler>(
+        InteractiveServerAuthenticationHandler.SchemeName, _ => { });
+builder.Services.AddAuthorization();
 builder.Services.AddScoped<AuthSession>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<PetroProcureAuthenticationStateProvider>();
@@ -82,6 +87,8 @@ app.UseRequestLocalization(new RequestLocalizationOptions
 });
 
 app.UseAntiforgery();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapGet("/report-preview/purchase-file/{id:guid}", async (Guid id, IPetroProcureApiClient api, CancellationToken ct) =>
     Results.File(await api.GetPurchaseFileSummaryPdfAsync(id, ct), "application/pdf"));

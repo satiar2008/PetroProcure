@@ -70,6 +70,7 @@ public sealed class PetroProcureDbContext : IdentityDbContext<ApplicationUser, I
 
     public DbSet<PurchaseFileNote> PurchaseFileNotes => Set<PurchaseFileNote>();
     public DbSet<PurchaseFileSequence> PurchaseFileSequences => Set<PurchaseFileSequence>();
+    public DbSet<PurchaseFileTechnicalReview> PurchaseFileTechnicalReviews => Set<PurchaseFileTechnicalReview>();
 
     public DbSet<FileDocument> FileDocuments => Set<FileDocument>();
 

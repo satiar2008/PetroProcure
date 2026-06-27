@@ -60,7 +60,7 @@ else if (_detail is not null)
             }
             catch { _maxUploadBytes = 50L * 1024L * 1024L; }
         }
-        catch (Exception ex) { _error = ex.Message; }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
         finally { _loading = false; }
     }
 
@@ -103,9 +103,15 @@ else if (_detail is not null)
         <MudPaper Class="form-panel mb-4" Elevation="0">
             <MudText Typo="Typo.h6">اقدامات وضعیت</MudText>
             <MudTextField @bind-Value="_comment" Label="توضیح اقدام" Lines="2" Variant="Variant.Outlined" Class="mt-3" />
+            @if (_detail!.PurchaseOrder.Status == PurchaseOrderStatus.Draft && _detail.Items.Count == 0)
+            {
+                <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mt-3">
+                    برای ارسال سفارش خرید، ابتدا باید حداقل یک قلم در سفارش ثبت شود.
+                </MudAlert>
+            }
             <div class="report-actions mt-3">
                 @if (PurchaseOrderUiPolicy.CanSubmit(_detail!.PurchaseOrder.Status, Access.HasPermission))
-                { <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy" OnClick="@(()=>ChangeStatus("submit", new SubmitPurchaseOrderRequest(_comment), "سفارش ارسال شد."))">ارسال برای بررسی</MudButton> }
+                { <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="_busy || _detail.Items.Count == 0" OnClick="@(()=>ChangeStatus("submit", new SubmitPurchaseOrderRequest(_comment), "سفارش ارسال شد."))">ارسال برای بررسی</MudButton> }
                 @if (PurchaseOrderUiPolicy.CanApprove(_detail!.PurchaseOrder.Status, Access.HasPermission))
                 { <MudButton Color="Color.Success" Variant="Variant.Filled" Disabled="_busy" OnClick="@(()=>ChangeStatus("approve", new ApprovePurchaseOrderRequest(_comment), "سفارش تأیید شد."))">تأیید</MudButton> }
                 @if (PurchaseOrderUiPolicy.CanReject(_detail!.PurchaseOrder.Status, Access.HasPermission))
@@ -189,20 +195,25 @@ else if (_detail is not null)
     private async Task ChangeStatus(string action, object request, string success)
     {
         if (!await Confirm("تأیید اقدام", "این اقدام روی سفارش خرید اعمال شود؟", Color.Primary)) return;
+        if (action == "submit" && _detail?.Items.Count == 0)
+        {
+            Snackbar.Add("برای ارسال سفارش خرید، حداقل یک قلم لازم است.", Severity.Warning);
+            return;
+        }
         _busy = true;
         try { await Api.ChangePurchaseOrderStatusAsync(Id, action, request); _comment = null; await Load(); Snackbar.Add(success, Severity.Success); }
-        catch (Exception ex) { Snackbar.Add("اقدام ناموفق بود: " + ex.Message, Severity.Error); }
+        catch (Exception ex) { Snackbar.Add("اقدام ناموفق بود: " + UiErrorText.From(ex), Severity.Error); }
         finally { _busy = false; }
     }
     private Task Reject(){ if(string.IsNullOrWhiteSpace(_comment)){Snackbar.Add("برای رد سفارش، توضیح الزامی است.",Severity.Warning);return Task.CompletedTask;} return ChangeStatus("reject", new RejectPurchaseOrderRequest(_comment), "سفارش رد شد."); }
     private Task Cancel(){ if(string.IsNullOrWhiteSpace(_comment)){Snackbar.Add("برای لغو سفارش، دلیل الزامی است.",Severity.Warning);return Task.CompletedTask;} return ChangeStatus("cancel", new CancelPurchaseOrderRequest(_comment), "سفارش لغو شد."); }
-    private async Task RemoveItem(Guid itemId){ if(!await Confirm("حذف قلم","قلم از سفارش حذف شود؟",Color.Error))return;try{await Api.RemovePurchaseOrderItemAsync(Id,itemId);await Load();Snackbar.Add("قلم حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
-    private async Task UploadDocument(InputFileChangeEventArgs e){_uploading=true;try{var file=e.File;await using var stream=file.OpenReadStream(_maxUploadBytes);await Api.UploadPurchaseOrderDocumentAsync(Id,stream,file.Name,string.IsNullOrWhiteSpace(file.ContentType)?"application/octet-stream":file.ContentType,_documentType,_documentDescription);_documentDescription=null;await Load();Snackbar.Add("سند بارگذاری شد.",Severity.Success);}catch(Exception ex){Snackbar.Add("بارگذاری ناموفق بود: "+ex.Message,Severity.Error);}finally{_uploading=false;}}
-    private async Task DownloadDocument(Guid documentId){try{var file=await Api.DownloadPurchaseOrderDocumentAsync(Id,documentId);await JS.InvokeVoidAsync("petroProcureDownloadFile",file.Content,file.ContentType,file.FileName);}catch(Exception ex){Snackbar.Add("دانلود سند ناموفق بود: "+ex.Message,Severity.Error);}}
-    private async Task DeleteDocument(Guid documentId){if(!await Confirm("حذف سند","سند سفارش خرید حذف نرم شود؟",Color.Error))return;try{await Api.DeletePurchaseOrderDocumentAsync(Id,documentId);await Load();Snackbar.Add("سند حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task RemoveItem(Guid itemId){ if(!await Confirm("حذف قلم","قلم از سفارش حذف شود؟",Color.Error))return;try{await Api.RemovePurchaseOrderItemAsync(Id,itemId);await Load();Snackbar.Add("قلم حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(UiErrorText.From(ex),Severity.Error);}}
+    private async Task UploadDocument(InputFileChangeEventArgs e){_uploading=true;try{var file=e.File;await using var stream=file.OpenReadStream(_maxUploadBytes);await Api.UploadPurchaseOrderDocumentAsync(Id,stream,file.Name,string.IsNullOrWhiteSpace(file.ContentType)?"application/octet-stream":file.ContentType,_documentType,_documentDescription);_documentDescription=null;await Load();Snackbar.Add("سند بارگذاری شد.",Severity.Success);}catch(Exception ex){Snackbar.Add("بارگذاری ناموفق بود: "+UiErrorText.From(ex),Severity.Error);}finally{_uploading=false;}}
+    private async Task DownloadDocument(Guid documentId){try{var file=await Api.DownloadPurchaseOrderDocumentAsync(Id,documentId);await JS.InvokeVoidAsync("petroProcureDownloadFile",file.Content,file.ContentType,file.FileName);}catch(Exception ex){Snackbar.Add("دانلود سند ناموفق بود: "+UiErrorText.From(ex),Severity.Error);}}
+    private async Task DeleteDocument(Guid documentId){if(!await Confirm("حذف سند","سند سفارش خرید حذف نرم شود؟",Color.Error))return;try{await Api.DeletePurchaseOrderDocumentAsync(Id,documentId);await Load();Snackbar.Add("سند حذف شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(UiErrorText.From(ex),Severity.Error);}}
     private async Task TogglePreview(){_showPreview=!_showPreview;if(_showPreview)await EnsurePdf();}
     private async Task OpenPdf(){await EnsurePdf();if(_pdfDataUrl is not null)await JS.InvokeVoidAsync("open",_pdfDataUrl,"_blank");}
-    private async Task EnsurePdf(){if(_pdfDataUrl is not null)return;_pdfLoading=true;try{var bytes=await Api.GetPurchaseOrderPdfAsync(Id);_pdfDataUrl=$"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";}catch(Exception ex){Snackbar.Add("دریافت گزارش ناموفق بود: "+ex.Message,Severity.Error);}finally{_pdfLoading=false;}}
-    private async Task SaveReport(){try{await Api.SavePurchaseOrderPdfAsync(Id);await Load();Snackbar.Add("گزارش در اسناد پرونده ذخیره شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    private async Task EnsurePdf(){if(_pdfDataUrl is not null)return;_pdfLoading=true;try{var bytes=await Api.GetPurchaseOrderPdfAsync(Id);_pdfDataUrl=$"data:application/pdf;base64,{Convert.ToBase64String(bytes)}";}catch(Exception ex){Snackbar.Add("دریافت گزارش ناموفق بود: "+UiErrorText.From(ex),Severity.Error);}finally{_pdfLoading=false;}}
+    private async Task SaveReport(){try{await Api.SavePurchaseOrderPdfAsync(Id);await Load();Snackbar.Add("گزارش در اسناد پرونده ذخیره شد.",Severity.Success);}catch(Exception ex){Snackbar.Add(UiErrorText.From(ex),Severity.Error);}}
     private async Task<bool> Confirm(string title,string message,Color color){var dialog=await Dialog.ShowAsync<ConfirmDialog>(title,new DialogParameters{{"Message",message},{"ConfirmColor",color}});var result=await dialog.Result;return result is not null&&!result.Canceled;}
 }

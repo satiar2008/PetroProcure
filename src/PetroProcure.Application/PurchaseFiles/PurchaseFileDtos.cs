@@ -38,3 +38,39 @@ public sealed record PurchaseFileTimelineDto(
 public sealed record PurchaseFileMescSnapshot(
     Guid Id, string Code, string GeneralGroupCode, string GeneralDescription,
     string SpecificDescription, bool IsActive);
+
+public sealed record PurchaseFileTechnicalReviewDto(
+    Guid Id,
+    Guid PurchaseFileId,
+    string PurchaseFileNumber,
+    string PurchaseFileTitle,
+    Guid DepartmentId,
+    string DepartmentName,
+    Guid RequestedByUserId,
+    Guid? ReviewedByUserId,
+    PurchaseFileTechnicalReviewStatus Status,
+    PurchaseFileTechnicalReviewDecision? Decision,
+    string? RequestComment,
+    string? Comments,
+    string? RecommendationNotes,
+    DateTime RequestedAt,
+    DateTime? StartedAt,
+    DateTime? CompletedAt,
+    IReadOnlyList<PurchaseFileItemDto> Items);
+
+public sealed record ApplicantDashboardDto(
+    int PendingTechnicalReviews,
+    int InProgressTechnicalReviews,
+    int ClarificationRequests,
+    int CompletedThisMonth,
+    double? AverageResponseHours,
+    IReadOnlyList<PurchaseFileTechnicalReviewDto> RecentReviews);
+
+public sealed record DepartmentDashboardDto(
+    string DepartmentKey,
+    string Title,
+    int InboxTasks,
+    int PendingActions,
+    int OverdueTasks,
+    IReadOnlyDictionary<string, int> StatusCounts,
+    IReadOnlyList<PurchaseFileListDto> RecentPurchaseFiles);

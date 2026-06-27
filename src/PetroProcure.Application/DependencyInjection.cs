@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IPurchaseFileNumberService, PurchaseFileNumberService>();
         services.AddScoped<PurchaseFileCommandHandler>();
         services.AddScoped<PurchaseFileQueryHandler>();
+        services.AddScoped<PurchaseFileTechnicalReviewHandler>();
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.SectionName));
         services.AddScoped<WorkflowCommandHandler>();
         services.AddScoped<WorkflowQueryHandler>();

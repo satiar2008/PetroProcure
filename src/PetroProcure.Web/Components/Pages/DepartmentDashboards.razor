@@ -1,20 +1,74 @@
 @page "/purchase"
-@* @page "/orders" *@
-@page "/applicant"
 @page "/tender-commission"
 @page "/reports"
 @page "/ai"
 @inject NavigationManager Navigation
+@inject IPetroProcureApiClient Api
+@inject ISnackbar Snackbar
 <PageTitle>@Title</PageTitle>
 <PageHeader Title="@Title" Subtitle="@Subtitle">
     <Actions><DepartmentBadge Title="@Title" Icon="@Icon" /></Actions>
 </PageHeader>
-<DashboardOverview Department="@Title" />
+
+<DataStateView TItem="PurchaseFileSummaryDto" Loading="_loading" Error="@ErrorText" Items="_dashboard?.RecentPurchaseFiles"
+               EmptyTitle="داده‌ای برای داشبورد وجود ندارد" EmptyDescription="هنوز پرونده یا وظیفه فعالی برای این واحد ثبت نشده است." Retry="Load">
+    @if (_dashboard is not null)
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="وظایف کارتابل" Value="@_dashboard.InboxTasks.ToString("N0")" /></MudItem>
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="اقدام‌های در انتظار" Value="@_dashboard.PendingActions.ToString("N0")" /></MudItem>
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="عقب‌افتاده" Value="@_dashboard.OverdueTasks.ToString("N0")" /></MudItem>
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="پرونده‌های جاری" Value="@_dashboard.StatusCounts.Values.Sum().ToString("N0")" /></MudItem>
+        </MudGrid>
+
+        <MudGrid>
+            <MudItem xs="12" md="5">
+                <MudPaper Class="data-panel" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-3">وضعیت پرونده‌ها</MudText>
+                    @if (_dashboard.StatusCounts.Count == 0)
+                    {
+                        <EmptyState Title="وضعیتی ثبت نشده" Description="هنوز پرونده‌ای در این واحد جریان ندارد." />
+                    }
+                    else
+                    {
+                        @foreach (var status in _dashboard.StatusCounts.OrderBy(x => x.Key))
+                        {
+                            <div class="d-flex justify-space-between align-center mb-2">
+                                <span>@StatusText(status.Key)</span>
+                                <MudChip T="string" Size="Size.Small">@status.Value.ToString("N0")</MudChip>
+                            </div>
+                        }
+                    }
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="7">
+                <MudPaper Class="data-panel" Elevation="0">
+                    <MudText Typo="Typo.h6" Class="mb-3">آخرین پرونده‌های مرتبط</MudText>
+                    <MudTable Items="_dashboard.RecentPurchaseFiles" Dense="true" Hover="true">
+                        <HeaderContent><MudTh>شماره پرونده</MudTh><MudTh>عنوان</MudTh><MudTh>وضعیت</MudTh><MudTh>تاریخ ایجاد</MudTh><MudTh></MudTh></HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.FileNumber</MudTd>
+                            <MudTd>@context.Title</MudTd>
+                            <MudTd><StatusChip Text="@PurchaseFileUiPolicy.StatusText(context.Status)" Color="@PurchaseFileUiPolicy.StatusColor(context.Status)" /></MudTd>
+                            <MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
+                            <MudTd><MudButton Size="Size.Small" Href="@($"/purchase/files/{context.Id}")">مشاهده</MudButton></MudTd>
+                        </RowTemplate>
+                        <NoRecordsContent><EmptyState Title="پرونده‌ای برای نمایش وجود ندارد" Description="پرونده‌های مرتبط این واحد اینجا نمایش داده می‌شوند." /></NoRecordsContent>
+                    </MudTable>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    }
+</DataStateView>
 @code {
     private string Path => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+    private DepartmentDashboardDto? _dashboard;
+    private bool _loading = true;
+    private string? _error;
+    private string? ErrorText => _error;
     private string Title => Path switch {
         "purchase" => "داشبورد واحد خرید", "orders" => "سفارشات و کنترل موجودی", "warehouse" => "داشبورد انبار",
-        "applicant" => "داشبورد متقاضی", "tender-commission" => "کمیسیون مناقصه", "admin" => "مدیریت سامانه",
+        "tender-commission" => "کمیسیون مناقصه", "admin" => "مدیریت سامانه",
         "reports" => "گزارش‌های مدیریتی", "ai" => "دستیار هوشمند پتروپروکیور", _ => "داشبورد" };
     private string Subtitle => "نمای کلی شاخص‌ها، وظایف و فعالیت‌های جاری";
     private string Icon => Path switch {
@@ -22,4 +76,24 @@
         "warehouse" => Icons.Material.Filled.Warehouse, "applicant" => Icons.Material.Filled.PersonPin,
         "tender-commission" => Icons.Material.Filled.Gavel, "admin" => Icons.Material.Filled.AdminPanelSettings,
         "reports" => Icons.Material.Filled.Assessment, "ai" => Icons.Material.Filled.AutoAwesome, _ => Icons.Material.Filled.Dashboard };
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try { _dashboard = await Api.GetDepartmentDashboardAsync(Path); }
+        catch (Exception ex)
+        {
+            _error = "امکان دریافت داشبورد واحد وجود ندارد.";
+            Snackbar.Add(UiErrorText.From(ex), Severity.Error);
+        }
+        finally { _loading = false; }
+    }
+
+    private static string StatusText(string status) =>
+        Enum.TryParse<PurchaseFileStatus>(status, out var parsed)
+            ? PurchaseFileUiPolicy.StatusText(parsed)
+            : status;
 }

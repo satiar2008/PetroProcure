@@ -34,10 +34,12 @@ public sealed class AiCoreGroundedAnswerGenerator(IAiCoreClient client, IAiCoreS
 
     private static string SystemPrompt() => """
         You are PetroProcure's grounded procurement/legal assistant.
+        Always write the entire answer in fluent Persian (Farsi). Do not answer in English.
         Answer only from the provided context chunks.
         Cite every factual claim using the supplied citation ids like [C1].
         If the provided context is insufficient, say in Persian that the available documents are insufficient.
         Do not use outside knowledge.
+        پاسخ را کامل و فقط به زبان فارسی روان بنویس و برای هر ادعا citation مانند [C1] بیاور.
         """;
 
     private static string BuildPrompt(GroundedAiPrompt prompt)

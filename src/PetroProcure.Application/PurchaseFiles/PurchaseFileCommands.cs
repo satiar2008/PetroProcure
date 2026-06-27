@@ -47,8 +47,8 @@ public sealed class PurchaseFileCommandHandler(
 
     public async Task<PurchaseFileDto> Handle(CreatePurchaseFileFromIndentCommand command, CancellationToken ct = default)
     {
-        if (await repository.SourceIndentAlreadyUsedAsync(command.IndentId, ct))
-            throw new PurchaseFileConflictException("A purchase file already exists for this indent.");
+        if (await repository.FindBySourceIndentAsync(command.IndentId, true, ct) is { } existingFile)
+            return ToDto(existingFile);
         var indent = await repository.FindApprovedIndentAsync(command.IndentId, ct)
             ?? throw new PurchaseFileValidationException("Only an approved or purchase-sent indent can create a purchase file.");
         var number = await numberService.GenerateNextFileNumber(command.Year, ct);

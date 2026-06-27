@@ -36,6 +36,9 @@ public static class PurchaseFileEndpoints
             .RequirePermission(ApplicationPermissions.PurchaseFileView);
         files.MapGet("/{id:guid}/items/grouped", async (Guid id, PurchaseFileQueryHandler handler, CancellationToken ct) =>
             (await handler.Handle(new GetPurchaseFileItemsGroupedByMescGeneralGroupQuery(id), ct)).Select(x => x.ToContract())).RequirePermission(ApplicationPermissions.PurchaseFileView);
+        files.MapGet("/{id:guid}/technical-reviews", async (Guid id, PurchaseFileTechnicalReviewHandler handler, CancellationToken ct) =>
+            (await handler.Handle(new GetPurchaseFileTechnicalReviewsQuery(id), ct)).Select(x => x.ToContract()))
+            .RequireAnyPermission(ApplicationPermissions.PurchaseFileViewTechnicalReview, ApplicationPermissions.PurchaseFileView);
 
         files.MapPost("/", async (CreatePurchaseFileRequest request, PurchaseFileCommandHandler handler, CancellationToken ct) =>
         {
@@ -78,6 +81,12 @@ public static class PurchaseFileEndpoints
             Results.Ok((await handler.Handle(new AddPurchaseFileNoteCommand(
                 id, request.DepartmentId, request.NoteText, request.IsInternal), ct)).ToContract()))
             .RequirePermission(ApplicationPermissions.PurchaseFileEdit);
+        files.MapPost("/{id:guid}/technical-reviews/request", async (
+            Guid id, RequestTechnicalReviewRequest request, PurchaseFileTechnicalReviewHandler handler, CancellationToken ct) =>
+            Results.Created($"/api/purchase-files/{id}/technical-reviews",
+                (await handler.Handle(new RequestPurchaseFileTechnicalReviewCommand(
+                    id, request.DepartmentId, request.Comment, request.DueDate), ct)).ToContract()))
+            .RequirePermission(ApplicationPermissions.PurchaseFileRequestTechnicalReview);
         files.MapPost("/{id:guid}/complete", async (Guid id, PurchaseFileLifecycleRequest request, PurchaseFileCommandHandler handler, CancellationToken ct) =>
         {
             await handler.Handle(new CompletePurchaseFileCommand(id, request.Reason), ct); return Results.NoContent();

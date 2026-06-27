@@ -2,41 +2,428 @@
 @inject IPetroProcureApiClient Api
 @inject ISnackbar Snackbar
 @inject IUserAccessContext Access
+@inject IDialogService Dialog
 
 <PageTitle>جزئیات استعلام</PageTitle>
 <PageHeader Title="@(_detail?.Inquiry.InquiryNumber ?? "جزئیات استعلام")" Subtitle="@(_detail?.Inquiry.Title ?? "")">
     @if (_detail is not null && InquiryUiPolicy.CanSend(_detail.Inquiry.Status, Access.HasPermission))
     {
-        <MudButton OnClick="Send" Color="Color.Primary" Variant="Variant.Outlined">ارسال</MudButton>
+        <MudButton OnClick="Send" Color="Color.Primary" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Send">ارسال</MudButton>
     }
 </PageHeader>
 
-<DataStateView TItem="InquiryItemDto" Loading="_loading" Error="_error" Retry="Load">
-@if(_detail is not null){
-<MudTabs Rounded="true" Elevation="0">
-<MudTabPanel Text="خلاصه"><MudPaper Class="data-panel" Elevation="0"><div class="summary-grid">
-@Info("شماره",_detail.Inquiry.InquiryNumber) @Info("وضعیت",InquiryUiPolicy.StatusText(_detail.Inquiry.Status)) @Info("نوع",InquiryUiPolicy.TypeText(_detail.Inquiry.InquiryType))
-<div class="summary-item"><span>تاریخ ایجاد</span><strong><DateDisplay Value="@_detail.Inquiry.CreatedAt" /></strong></div>
-<div class="summary-item"><span>مهلت پاسخ</span><strong><DateDisplay Value="@_detail.Inquiry.DeadlineDate" /></strong></div>
-<div class="summary-item"><span>ارسال</span><strong><DateDisplay Value="@_detail.Inquiry.SentAt" /></strong></div>
-</div></MudPaper></MudTabPanel>
-<MudTabPanel Text="اقلام"><MudTable Items="_detail.Items" Dense="true"><HeaderContent><MudTh>گروه</MudTh><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>مقدار</MudTh></HeaderContent><RowTemplate><MudTd>@context.MescGeneralGroupCode</MudTd><MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.RequestedQuantity</MudTd></RowTemplate></MudTable></MudTabPanel>
-<MudTabPanel Text="تأمین‌کنندگان">@if (InquiryUiPolicy.CanManageSuppliers(_detail.Inquiry.Status, Access.HasPermission)) { <SupplierSelector Value="_supplier" ValueChanged="AddSupplier" /> }<MudTable Items="_detail.Suppliers" Dense="true"><HeaderContent><MudTh>کد</MudTh><MudTh>نام</MudTh><MudTh>وضعیت</MudTh><MudTh>دعوت</MudTh></HeaderContent><RowTemplate><MudTd>@context.SupplierCode</MudTd><MudTd>@context.SupplierName</MudTd><MudTd>@context.Status</MudTd><MudTd><DateDisplay Value="@context.InvitedAt" /></MudTd></RowTemplate></MudTable></MudTabPanel>
-<MudTabPanel Text="پیشنهادها">@if (InquiryUiPolicy.CanReceiveQuote(_detail.Inquiry.Status, Access.HasPermission)) { <MudButton OnClick="AddQuote" Color="Color.Primary" Variant="Variant.Outlined" Class="mb-3">ثبت پیشنهاد نمونه</MudButton> }<MudTable Items="_detail.Quotes" Dense="true"><HeaderContent><MudTh>تأمین‌کننده</MudTh><MudTh>مبلغ نهایی</MudTh><MudTh>وضعیت</MudTh><MudTh>انتخاب</MudTh></HeaderContent><RowTemplate><MudTd>@_detail.Suppliers.FirstOrDefault(s=>s.SupplierId==context.SupplierId)?.SupplierName</MudTd><MudTd>@context.FinalAmount</MudTd><MudTd>@context.Status</MudTd><MudTd>@if (InquiryUiPolicy.CanSelectSupplier(_detail.Inquiry.Status, Access.HasPermission)) { <MudButton Size="Size.Small" OnClick="@(()=>SelectQuote(context.Id))">انتخاب</MudButton> }</MudTd></RowTemplate></MudTable></MudTabPanel>
-<MudTabPanel Text="مقایسه"><MudButton OnClick="LoadComparison" Variant="Variant.Outlined">بارگذاری مقایسه</MudButton>@if(_comparison is null){<EmptyState Title="مقایسه‌ای برای نمایش نیست" Description="پس از ثبت پیشنهادها، مقایسه قابل مشاهده است." />}else{<MudTable Items="_comparison.Suppliers" Dense="true"><HeaderContent><MudTh>تأمین‌کننده</MudTh><MudTh>مبلغ کل</MudTh><MudTh>مبلغ نهایی</MudTh><MudTh>انتخاب‌شده</MudTh></HeaderContent><RowTemplate><MudTd>@context.SupplierName</MudTd><MudTd>@context.TotalAmount</MudTd><MudTd>@context.FinalAmount</MudTd><MudTd>@(context.IsSelected?"بله":"خیر")</MudTd></RowTemplate></MudTable>}</MudTabPanel>
-<MudTabPanel Text="اسناد"><EmptyState Title="اسناد استعلام" Description="اتصال کامل به مخزن اسناد در فاز بعدی انجام می‌شود." /></MudTabPanel>
-</MudTabs>
-}
-</DataStateView>
+@if (_detail is not null)
+{
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <MudAlert Severity="Severity.Warning" Variant="Variant.Outlined" Class="mb-3">
+            @_error
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="Load" Class="ms-2">تلاش مجدد</MudButton>
+        </MudAlert>
+    }
 
-@code{
-[Parameter] public Guid Id{get;set;} private bool _loading=true; private string? _error; private InquiryDetailDto? _detail; private SupplierLookupDto? _supplier; private InquiryComparisonDto? _comparison;
-protected override Task OnInitializedAsync()=>Load();
-private async Task Load(){_loading=true;_error=null;try{_detail=await Api.GetInquiryAsync(Id);}catch(Exception ex){_error=ex.Message;}finally{_loading=false;}}
-private RenderFragment Info(string l,string v)=>@<div class="summary-item"><span>@l</span><strong>@v</strong></div>;
-private async Task Send(){if(_detail is null || !InquiryUiPolicy.CanSend(_detail.Inquiry.Status, Access.HasPermission)){Snackbar.Add("ارسال استعلام در وضعیت فعلی مجاز نیست.",Severity.Warning);return;}try{await Api.SendInquiryAsync(Id);Snackbar.Add("استعلام ارسال شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
-private async Task AddSupplier(SupplierLookupDto? s){if(s is null)return;if(_detail is null || !InquiryUiPolicy.CanManageSuppliers(_detail.Inquiry.Status, Access.HasPermission)){Snackbar.Add("افزودن تأمین‌کننده در وضعیت فعلی مجاز نیست.",Severity.Warning);return;}try{await Api.AddInquirySupplierAsync(Id,new(s.Id));Snackbar.Add("تأمین‌کننده اضافه شد.",Severity.Success);_supplier=null;await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
-private async Task AddQuote(){if(_detail is null || !InquiryUiPolicy.CanReceiveQuote(_detail.Inquiry.Status, Access.HasPermission)){Snackbar.Add("ثبت پیشنهاد در وضعیت فعلی مجاز نیست.",Severity.Warning);return;}var target=_detail.Suppliers.FirstOrDefault();if(target is null){Snackbar.Add("ابتدا تأمین‌کننده اضافه کنید.",Severity.Warning);return;}try{await Api.AddSupplierQuoteAsync(Id,new(target.Id,"Q-"+DateTime.Now.Ticks,null,null,"IRR",null,null,null,1000,0,0,null,null));Snackbar.Add("پیشنهاد ثبت شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
-private async Task SelectQuote(Guid q){if(_detail is null || !InquiryUiPolicy.CanSelectSupplier(_detail.Inquiry.Status, Access.HasPermission)){Snackbar.Add("انتخاب پیشنهاد در وضعیت فعلی مجاز نیست.",Severity.Warning);return;}try{await Api.SelectSupplierQuoteAsync(Id,q,"انتخاب از رابط کاربری");Snackbar.Add("پیشنهاد انتخاب شد.",Severity.Success);await Load();}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
-private async Task LoadComparison(){try{_comparison=await Api.GetInquiryComparisonAsync(Id);}catch(Exception ex){Snackbar.Add(ex.Message,Severity.Error);}}
+    <MudTabs Rounded="true" Elevation="0">
+        <MudTabPanel Text="خلاصه">
+            <MudPaper Class="data-panel" Elevation="0">
+                <div class="summary-grid">
+                    @Info("شماره", _detail.Inquiry.InquiryNumber)
+                    @Info("وضعیت", InquiryUiPolicy.StatusText(_detail.Inquiry.Status))
+                    @Info("نوع", InquiryUiPolicy.TypeText(_detail.Inquiry.InquiryType))
+                    <div class="summary-item"><span>تاریخ ایجاد</span><strong><DateDisplay Value="@_detail.Inquiry.CreatedAt" /></strong></div>
+                    <div class="summary-item"><span>مهلت پاسخ</span><strong><DateDisplay Value="@_detail.Inquiry.DeadlineDate" /></strong></div>
+                    <div class="summary-item"><span>ارسال</span><strong><DateDisplay Value="@_detail.Inquiry.SentAt" /></strong></div>
+                </div>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="اقلام">
+            <MudTable Items="_detail.Items" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>گروه</MudTh><MudTh>کد MESC</MudTh><MudTh>شرح</MudTh><MudTh>مقدار</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.MescGeneralGroupCode</MudTd><MudTd>@context.MescCode</MudTd><MudTd>@context.SpecificDescription</MudTd><MudTd>@context.RequestedQuantity</MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudTabPanel>
+
+        <MudTabPanel Text="تأمین‌کنندگان">
+            @if (InquiryUiPolicy.CanManageSuppliers(_detail.Inquiry.Status, Access.HasPermission))
+            {
+                <MudPaper Class="form-panel mb-3" Elevation="0">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">افزودن تأمین‌کننده</MudText>
+                    <SupplierSelector Value="_supplier" ValueChanged="AddSupplier" />
+                </MudPaper>
+            }
+            <MudTable Items="VisibleSuppliers" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>کد</MudTh><MudTh>نام</MudTh><MudTh>وضعیت</MudTh><MudTh>دعوت</MudTh><MudTh>عملیات</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.SupplierCode</MudTd>
+                    <MudTd>@context.SupplierName</MudTd>
+                    <MudTd><StatusChip Text="@SupplierStatusText(context.Status)" /></MudTd>
+                    <MudTd><DateDisplay Value="@context.InvitedAt" /></MudTd>
+                    <MudTd>
+                        @if (InquiryUiPolicy.CanManageSuppliers(_detail.Inquiry.Status, Access.HasPermission))
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                                           Color="Color.Error"
+                                           Size="Size.Small"
+                                           Disabled="_supplierBusy"
+                                           OnClick="@(() => RemoveSupplier(context))" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <EmptyState Title="تأمین‌کننده‌ای ثبت نشده" Description="برای ارسال استعلام، حداقل یک تأمین‌کننده اضافه کنید." />
+                </NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+
+        <MudTabPanel Text="پیشنهادها">
+            @if (InquiryUiPolicy.CanReceiveQuote(_detail.Inquiry.Status, Access.HasPermission))
+            {
+                <MudButton OnClick="OpenQuoteForm" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Add" Class="mb-3">
+                    ثبت پیشنهاد دریافتی
+                </MudButton>
+                @if (_quoteFormOpen)
+                {
+                    @QuoteForm()
+                }
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Class="mb-3">
+                    ثبت پیشنهاد پس از ارسال استعلام به تأمین‌کنندگان فعال می‌شود.
+                </MudAlert>
+            }
+            <MudTable Items="_detail.Quotes" Dense="true" Hover="true">
+                <HeaderContent>
+                    <MudTh>تأمین‌کننده</MudTh><MudTh>شماره پیشنهاد</MudTh><MudTh>مبلغ کل</MudTh><MudTh>مبلغ نهایی</MudTh><MudTh>وضعیت</MudTh><MudTh>اقلام</MudTh><MudTh>انتخاب</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@SupplierName(context)</MudTd>
+                    <MudTd>@(context.QuoteNumber ?? "—")</MudTd>
+                    <MudTd>@FormatMoney(context.TotalAmount, context.Currency)</MudTd>
+                    <MudTd>@FormatMoney(context.FinalAmount, context.Currency)</MudTd>
+                    <MudTd><StatusChip Text="@QuoteStatusText(context.Status)" /></MudTd>
+                    <MudTd>@context.Items.Count</MudTd>
+                    <MudTd>
+                        @if (InquiryUiPolicy.CanSelectSupplier(_detail.Inquiry.Status, Access.HasPermission))
+                        {
+                            <MudButton Size="Size.Small" OnClick="@(() => SelectQuote(context.Id))">انتخاب</MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <EmptyState Title="پیشنهادی ثبت نشده" Description="پس از دریافت پیشنهاد از تأمین‌کننده، آن را از همین تب ثبت کنید." />
+                </NoRecordsContent>
+            </MudTable>
+        </MudTabPanel>
+
+        <MudTabPanel Text="مقایسه">
+            <MudButton OnClick="LoadComparison" Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.CompareArrows">بارگذاری مقایسه</MudButton>
+            @if (_comparison is null)
+            {
+                <EmptyState Title="مقایسه‌ای برای نمایش نیست" Description="پس از ثبت پیشنهادها، مقایسه قابل مشاهده است." />
+            }
+            else
+            {
+                <MudTable Items="_comparison.Suppliers" Dense="true" Hover="true">
+                    <HeaderContent><MudTh>تأمین‌کننده</MudTh><MudTh>مبلغ کل</MudTh><MudTh>مبلغ نهایی</MudTh><MudTh>انتخاب‌شده</MudTh></HeaderContent>
+                    <RowTemplate><MudTd>@context.SupplierName</MudTd><MudTd>@FormatMoney(context.TotalAmount, context.Currency)</MudTd><MudTd>@FormatMoney(context.FinalAmount, context.Currency)</MudTd><MudTd>@(context.IsSelected ? "بله" : "خیر")</MudTd></RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+
+        <MudTabPanel Text="اسناد">
+            <EmptyState Title="اسناد استعلام" Description="اتصال کامل به مخزن اسناد در فاز بعدی انجام می‌شود." />
+        </MudTabPanel>
+    </MudTabs>
+}
+else
+{
+    <DataStateView TItem="InquiryItemDto" Loading="_loading" Error="_error" Retry="Load" />
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true, _supplierBusy, _quoteBusy, _quoteFormOpen;
+    private string? _error, _quoteNumber, _deliveryTerms, _paymentTerms, _technicalNote, _commercialNote;
+    private string _currency = "IRR";
+    private DateTime? _quoteDate = DateTime.Today, _validUntil, _deliveryDate;
+    private decimal? _taxAmount, _discountAmount;
+    private Guid _quoteSupplierId;
+    private InquiryDetailDto? _detail;
+    private SupplierLookupDto? _supplier;
+    private InquiryComparisonDto? _comparison;
+    private List<QuoteLine> _quoteLines = [];
+
+    private IEnumerable<InquirySupplierDto> VisibleSuppliers =>
+        _detail?.Suppliers.Where(x => x.Status != InquirySupplierStatus.Excluded) ?? [];
+
+    private decimal QuoteTotal => _quoteLines.Where(x => x.Quantity > 0 && x.UnitPrice > 0).Sum(x => x.Quantity * x.UnitPrice);
+    private decimal QuoteFinal => QuoteTotal + (_taxAmount ?? 0) - (_discountAmount ?? 0);
+
+    protected override Task OnInitializedAsync() => Load();
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _detail = await Api.GetInquiryAsync(Id);
+            if (_detail is null) _error = "استعلام درخواستی یافت نشد.";
+        }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
+        finally { _loading = false; }
+    }
+
+    private RenderFragment Info(string label, string value) =>
+        @<div class="summary-item"><span>@label</span><strong>@value</strong></div>;
+
+    private RenderFragment QuoteForm() => @<MudPaper Class="form-panel mb-4" Elevation="0">
+        <MudText Typo="Typo.subtitle1" Class="mb-3">ثبت پیشنهاد دریافتی</MudText>
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudSelect T="Guid" @bind-Value="_quoteSupplierId" Label="تأمین‌کننده" Variant="Variant.Outlined" Required="true">
+                    @foreach (var supplier in VisibleSuppliers)
+                    {
+                        <MudSelectItem Value="@supplier.Id">@supplier.SupplierCode - @supplier.SupplierName</MudSelectItem>
+                    }
+                </MudSelect>
+            </MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_quoteNumber" Label="شماره پیشنهاد" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><MudTextField @bind-Value="_currency" Label="ارز" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_quoteDate" Label="تاریخ پیشنهاد" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_validUntil" Label="اعتبار تا" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_deliveryDate" Label="تاریخ تحویل" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudNumericField @bind-Value="_taxAmount" Label="مالیات" Min="0m" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><MudNumericField @bind-Value="_discountAmount" Label="تخفیف" Min="0m" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="9"><MudTextField @bind-Value="_deliveryTerms" Label="شرایط تحویل" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_paymentTerms" Label="شرایط پرداخت" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="6"><MudTextField @bind-Value="_technicalNote" Label="یادداشت فنی" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12"><MudTextField @bind-Value="_commercialNote" Label="یادداشت بازرگانی" Lines="2" Variant="Variant.Outlined" /></MudItem>
+        </MudGrid>
+        <MudTable Items="_quoteLines" Dense="true" Class="mt-3">
+            <HeaderContent>
+                <MudTh>قلم</MudTh><MudTh>مقدار</MudTh><MudTh>قیمت واحد</MudTh><MudTh>جمع</MudTh><MudTh>انطباق فنی</MudTh><MudTh>یادداشت</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd>@context.MescCode - @context.Description</MudTd>
+                <MudTd><MudNumericField @bind-Value="context.Quantity" Min="0m" Variant="Variant.Outlined" /></MudTd>
+                <MudTd><MudNumericField @bind-Value="context.UnitPrice" Min="0m" Variant="Variant.Outlined" /></MudTd>
+                <MudTd>@FormatMoney(context.Total, _currency)</MudTd>
+                <MudTd>
+                    <MudSelect T="TechnicalComplianceStatus" @bind-Value="context.TechnicalComplianceStatus" Dense="true" Variant="Variant.Outlined">
+                        @foreach (var status in Enum.GetValues<TechnicalComplianceStatus>())
+                        {
+                            <MudSelectItem Value="@status">@TechnicalComplianceText(status)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudTd>
+                <MudTd><MudTextField @bind-Value="context.TechnicalNote" Variant="Variant.Outlined" /></MudTd>
+            </RowTemplate>
+        </MudTable>
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mt-3">
+            <MudText Typo="Typo.subtitle2">جمع کل: @FormatMoney(QuoteTotal, _currency) | مبلغ نهایی: @FormatMoney(QuoteFinal, _currency)</MudText>
+            <MudStack Row="true">
+                <MudButton Variant="Variant.Text" Disabled="_quoteBusy" OnClick="@(() => _quoteFormOpen = false)">انصراف</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="!CanSaveQuote" OnClick="SaveQuote">ثبت پیشنهاد</MudButton>
+            </MudStack>
+        </MudStack>
+    </MudPaper>;
+
+    private void OpenQuoteForm()
+    {
+        if (_detail is null) return;
+        var suppliers = VisibleSuppliers.ToList();
+        if (suppliers.Count == 0)
+        {
+            Snackbar.Add("برای ثبت پیشنهاد، ابتدا تأمین‌کننده‌ای برای استعلام ثبت کنید.", Severity.Warning);
+            return;
+        }
+
+        _quoteSupplierId = suppliers[0].Id;
+        _quoteNumber = null;
+        _currency = "IRR";
+        _quoteDate = DateTime.Today;
+        _validUntil = null;
+        _deliveryDate = null;
+        _taxAmount = null;
+        _discountAmount = null;
+        _deliveryTerms = null;
+        _paymentTerms = null;
+        _technicalNote = null;
+        _commercialNote = null;
+        _quoteLines = _detail.Items.Select(x => new QuoteLine(x.Id, x.MescCode, x.SpecificDescription, x.RequestedQuantity)).ToList();
+        _quoteFormOpen = true;
+    }
+
+    private bool CanSaveQuote =>
+        !_quoteBusy && _detail is not null && _quoteSupplierId != Guid.Empty && QuoteTotal > 0 && !string.IsNullOrWhiteSpace(_currency);
+
+    private async Task SaveQuote()
+    {
+        if (!CanSaveQuote || _detail is null) return;
+        var lines = _quoteLines.Where(x => x.Quantity > 0 && x.UnitPrice > 0).ToList();
+        if (lines.Count == 0)
+        {
+            Snackbar.Add("برای ثبت پیشنهاد، حداقل یک قلم باید قیمت معتبر داشته باشد.", Severity.Warning);
+            return;
+        }
+
+        _quoteBusy = true;
+        try
+        {
+            var quote = await Api.AddSupplierQuoteAsync(Id, new AddSupplierQuoteRequest(
+                _quoteSupplierId, _quoteNumber, _quoteDate, _validUntil, _currency, _deliveryTerms,
+                _paymentTerms, _deliveryDate, QuoteTotal, _taxAmount, _discountAmount, _technicalNote, _commercialNote));
+            foreach (var line in lines)
+            {
+                await Api.AddSupplierQuoteItemAsync(Id, quote.Id, new AddSupplierQuoteItemRequest(
+                    line.InquiryItemId, line.Quantity, line.UnitPrice, _deliveryDate,
+                    line.TechnicalComplianceStatus, line.TechnicalNote));
+            }
+
+            Snackbar.Add("پیشنهاد دریافتی ثبت شد.", Severity.Success);
+            _quoteFormOpen = false;
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+        finally { _quoteBusy = false; }
+    }
+
+    private async Task Send()
+    {
+        if (_detail is null || !InquiryUiPolicy.CanSend(_detail.Inquiry.Status, Access.HasPermission))
+        {
+            Snackbar.Add("ارسال استعلام در وضعیت فعلی مجاز نیست.", Severity.Warning);
+            return;
+        }
+        try
+        {
+            await Api.SendInquiryAsync(Id);
+            Snackbar.Add("استعلام ارسال شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+    }
+
+    private async Task AddSupplier(SupplierLookupDto? supplier)
+    {
+        if (supplier is null) return;
+        if (_detail is null || !InquiryUiPolicy.CanManageSuppliers(_detail.Inquiry.Status, Access.HasPermission))
+        {
+            Snackbar.Add("افزودن تأمین‌کننده در وضعیت فعلی مجاز نیست.", Severity.Warning);
+            return;
+        }
+        _supplierBusy = true;
+        try
+        {
+            await Api.AddInquirySupplierAsync(Id, new(supplier.Id));
+            Snackbar.Add("تأمین‌کننده اضافه شد.", Severity.Success);
+            _supplier = null;
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+        finally { _supplierBusy = false; }
+    }
+
+    private async Task RemoveSupplier(InquirySupplierDto supplier)
+    {
+        if (_detail is null || !InquiryUiPolicy.CanManageSuppliers(_detail.Inquiry.Status, Access.HasPermission)) return;
+        var dialog = await Dialog.ShowAsync<ConfirmDialog>("حذف تأمین‌کننده",
+            new DialogParameters { { "Message", $"تأمین‌کننده «{supplier.SupplierName}» از استعلام حذف شود؟" }, { "ConfirmColor", Color.Error } });
+        var result = await dialog.Result;
+        if (result is null || result.Canceled) return;
+
+        _supplierBusy = true;
+        try
+        {
+            await Api.RemoveInquirySupplierAsync(Id, supplier.Id);
+            Snackbar.Add("تأمین‌کننده حذف شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+        finally { _supplierBusy = false; }
+    }
+
+    private async Task SelectQuote(Guid quoteId)
+    {
+        if (_detail is null || !InquiryUiPolicy.CanSelectSupplier(_detail.Inquiry.Status, Access.HasPermission))
+        {
+            Snackbar.Add("انتخاب پیشنهاد در وضعیت فعلی مجاز نیست.", Severity.Warning);
+            return;
+        }
+        try
+        {
+            await Api.SelectSupplierQuoteAsync(Id, quoteId, "انتخاب از رابط کاربری");
+            Snackbar.Add("پیشنهاد انتخاب شد.", Severity.Success);
+            await Load();
+        }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+    }
+
+    private async Task LoadComparison()
+    {
+        try { _comparison = await Api.GetInquiryComparisonAsync(Id); }
+        catch (Exception ex) { Snackbar.Add(UiErrorText.From(ex), Severity.Error); }
+    }
+
+    private string SupplierName(SupplierQuoteDto quote) =>
+        _detail?.Suppliers.FirstOrDefault(x => x.Id == quote.InquirySupplierId)?.SupplierName
+        ?? _detail?.Suppliers.FirstOrDefault(x => x.SupplierId == quote.SupplierId)?.SupplierName
+        ?? "—";
+
+    private static string FormatMoney(decimal value, string? currency) =>
+        $"{value:N0} {(string.IsNullOrWhiteSpace(currency) ? "IRR" : currency)}";
+
+    private static string SupplierStatusText(InquirySupplierStatus status) => status switch
+    {
+        InquirySupplierStatus.Draft => "ثبت اولیه",
+        InquirySupplierStatus.Invited => "دعوت‌شده",
+        InquirySupplierStatus.Responded => "پاسخ داده",
+        InquirySupplierStatus.Declined => "انصراف",
+        InquirySupplierStatus.NoResponse => "بدون پاسخ",
+        InquirySupplierStatus.Excluded => "حذف‌شده",
+        _ => status.ToString()
+    };
+
+    private static string QuoteStatusText(SupplierQuoteStatus status) => status switch
+    {
+        SupplierQuoteStatus.Draft => "پیش‌نویس",
+        SupplierQuoteStatus.Received => "دریافت‌شده",
+        SupplierQuoteStatus.UnderReview => "در بررسی",
+        SupplierQuoteStatus.Accepted => "پذیرفته‌شده",
+        SupplierQuoteStatus.Rejected => "ردشده",
+        SupplierQuoteStatus.Selected => "انتخاب‌شده",
+        SupplierQuoteStatus.Cancelled => "لغوشده",
+        _ => status.ToString()
+    };
+
+    private static string TechnicalComplianceText(TechnicalComplianceStatus status) => status switch
+    {
+        TechnicalComplianceStatus.NotReviewed => "بررسی نشده",
+        TechnicalComplianceStatus.Compliant => "منطبق",
+        TechnicalComplianceStatus.PartiallyCompliant => "نسبتاً منطبق",
+        TechnicalComplianceStatus.NonCompliant => "نامنطبق",
+        TechnicalComplianceStatus.NeedsClarification => "نیازمند شفاف‌سازی",
+        _ => status.ToString()
+    };
+
+    private sealed class QuoteLine(Guid inquiryItemId, string mescCode, string description, decimal quantity)
+    {
+        public Guid InquiryItemId { get; } = inquiryItemId;
+        public string MescCode { get; } = mescCode;
+        public string Description { get; } = description;
+        public decimal Quantity { get; set; } = quantity;
+        public decimal UnitPrice { get; set; }
+        public TechnicalComplianceStatus TechnicalComplianceStatus { get; set; } = TechnicalComplianceStatus.NotReviewed;
+        public string? TechnicalNote { get; set; }
+        public decimal Total => Quantity * UnitPrice;
+    }
 }

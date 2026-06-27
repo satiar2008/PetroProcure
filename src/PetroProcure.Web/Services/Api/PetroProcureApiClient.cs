@@ -31,6 +31,15 @@ public interface IPetroProcureApiClient
     Task<PurchaseFileDto?> GetPurchaseFileAsync(Guid id, CancellationToken ct = default);
     Task<PurchaseFileLifecycleDto?> GetPurchaseFileLifecycleAsync(Guid id, CancellationToken ct = default);
     Task<List<PurchaseFileGroupedItemsDto>> GetGroupedItemsAsync(Guid id, CancellationToken ct = default);
+    Task<List<PurchaseFileTechnicalReviewDto>> GetPurchaseFileTechnicalReviewsAsync(Guid purchaseFileId, CancellationToken ct = default);
+    Task<PurchaseFileTechnicalReviewDto> RequestTechnicalReviewAsync(Guid purchaseFileId, RequestTechnicalReviewRequest request, CancellationToken ct = default);
+    Task<ApplicantDashboardDto> GetApplicantDashboardAsync(CancellationToken ct = default);
+    Task<List<PurchaseFileTechnicalReviewDto>> GetApplicantTechnicalReviewsAsync(CancellationToken ct = default);
+    Task<PurchaseFileTechnicalReviewDto?> GetApplicantTechnicalReviewAsync(Guid id, CancellationToken ct = default);
+    Task<PurchaseFileTechnicalReviewDto> StartTechnicalReviewAsync(Guid id, CancellationToken ct = default);
+    Task<PurchaseFileTechnicalReviewDto> SubmitTechnicalReviewAsync(Guid id, SubmitTechnicalReviewRequest request, CancellationToken ct = default);
+    Task<PurchaseFileTechnicalReviewDto> RequestTechnicalReviewClarificationAsync(Guid id, TechnicalReviewClarificationRequest request, CancellationToken ct = default);
+    Task<DepartmentDashboardDto> GetDepartmentDashboardAsync(string key, CancellationToken ct = default);
     Task<List<MescItemDto>> SearchMescItemsAsync(string term, CancellationToken ct = default);
     Task<IndentDto?> GetIndentAsync(Guid id, CancellationToken ct = default);
     Task<List<IndentSummaryDto>> GetIndentsAsync(CancellationToken ct = default);
@@ -233,17 +242,23 @@ public interface IPetroProcureApiClient
     Task SendInquiryAsync(Guid id, CancellationToken ct = default);
     Task CancelInquiryAsync(Guid id, string reason, CancellationToken ct = default);
     Task<InquirySupplierDto> AddInquirySupplierAsync(Guid id, AddInquirySupplierRequest request, CancellationToken ct = default);
+    Task RemoveInquirySupplierAsync(Guid id, Guid inquirySupplierId, CancellationToken ct = default);
     Task<SupplierQuoteDto> AddSupplierQuoteAsync(Guid id, AddSupplierQuoteRequest request, CancellationToken ct = default);
+    Task<SupplierQuoteItemDto> AddSupplierQuoteItemAsync(Guid id, Guid quoteId, AddSupplierQuoteItemRequest request, CancellationToken ct = default);
     Task<InquiryComparisonDto?> GetInquiryComparisonAsync(Guid id, CancellationToken ct = default);
     Task SelectSupplierQuoteAsync(Guid inquiryId, Guid quoteId, string? reason, CancellationToken ct = default);
     Task<OrdersDashboardDto> GetOrdersDashboardAsync(CancellationToken ct = default);
     Task<PagedResult<InventoryControlItemDto>> GetInventoryControlItemsAsync(InventoryControlListRequest request, CancellationToken ct = default);
+    Task<InventoryControlItemDto> CreateInventoryControlItemAsync(CreateInventoryControlItemRequest request, CancellationToken ct = default);
     Task<InventoryControlItemDto> UpdateInventoryControlItemAsync(Guid id, UpdateInventoryControlItemRequest request, CancellationToken ct = default);
+    Task<InventoryControlItemDto> CreateStockAdjustmentAsync(Guid id, CreateStockAdjustmentRequest request, CancellationToken ct = default);
     Task<PagedResult<MaterialNeedDto>> GetMaterialNeedsAsync(MaterialNeedListRequest request, CancellationToken ct = default);
+    Task<List<MaterialNeedsGroupedByMescDto>> GetMaterialNeedsGroupedByMescAsync(MaterialNeedListRequest request, CancellationToken ct = default);
     Task<MaterialNeedDetailDto?> GetMaterialNeedAsync(Guid id, CancellationToken ct = default);
     Task<MaterialNeedDto> CreateMaterialNeedAsync(CreateMaterialNeedRequest request, CancellationToken ct = default);
     Task ChangeMaterialNeedStatusAsync(Guid id, string action, object? body = null, CancellationToken ct = default);
     Task<Guid> ConvertMaterialNeedToIndentAsync(Guid id, ConvertMaterialNeedToIndentRequest request, CancellationToken ct = default);
+    Task<Guid> ConvertMaterialNeedsToIndentAsync(ConvertMaterialNeedsToIndentRequest request, CancellationToken ct = default);
     Task<PagedResult<ShortageAlertDto>> GetShortageAlertsAsync(ShortageAlertListRequest request, CancellationToken ct = default);
     Task<List<ShortageAlertDto>> DetectShortagesAsync(DetectShortageAlertsRequest request, CancellationToken ct = default);
     Task<Guid> ConvertShortageToIndentAsync(Guid id, ConvertShortageToIndentRequest request, CancellationToken ct = default);
@@ -337,6 +352,51 @@ public sealed class PetroProcureApiClient(
 
     public async Task<List<PurchaseFileGroupedItemsDto>> GetGroupedItemsAsync(Guid id, CancellationToken ct = default) =>
         await GetJsonAsync<List<PurchaseFileGroupedItemsDto>>($"/api/purchase-files/{id}/items/grouped", ct) ?? [];
+
+    public async Task<List<PurchaseFileTechnicalReviewDto>> GetPurchaseFileTechnicalReviewsAsync(Guid id, CancellationToken ct = default) =>
+        await GetJsonAsync<List<PurchaseFileTechnicalReviewDto>>($"/api/purchase-files/{id}/technical-reviews", ct) ?? [];
+
+    public async Task<PurchaseFileTechnicalReviewDto> RequestTechnicalReviewAsync(Guid id, RequestTechnicalReviewRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/purchase-files/{id}/technical-reviews/request", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseFileTechnicalReviewDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<ApplicantDashboardDto> GetApplicantDashboardAsync(CancellationToken ct = default) =>
+        await GetJsonAsync<ApplicantDashboardDto>("/api/applicant/dashboard", ct)
+        ?? new(0, 0, 0, 0, null, []);
+
+    public async Task<List<PurchaseFileTechnicalReviewDto>> GetApplicantTechnicalReviewsAsync(CancellationToken ct = default) =>
+        await GetJsonAsync<List<PurchaseFileTechnicalReviewDto>>("/api/applicant/technical-reviews", ct) ?? [];
+
+    public Task<PurchaseFileTechnicalReviewDto?> GetApplicantTechnicalReviewAsync(Guid id, CancellationToken ct = default) =>
+        GetJsonAsync<PurchaseFileTechnicalReviewDto>($"/api/applicant/technical-reviews/{id}", ct);
+
+    public async Task<PurchaseFileTechnicalReviewDto> StartTechnicalReviewAsync(Guid id, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsync($"/api/applicant/technical-reviews/{id}/start", null, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseFileTechnicalReviewDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PurchaseFileTechnicalReviewDto> SubmitTechnicalReviewAsync(Guid id, SubmitTechnicalReviewRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/applicant/technical-reviews/{id}/submit", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseFileTechnicalReviewDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<PurchaseFileTechnicalReviewDto> RequestTechnicalReviewClarificationAsync(Guid id, TechnicalReviewClarificationRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/applicant/technical-reviews/{id}/request-clarification", request, ct);
+        await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<PurchaseFileTechnicalReviewDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<DepartmentDashboardDto> GetDepartmentDashboardAsync(string key, CancellationToken ct = default) =>
+        await GetJsonAsync<DepartmentDashboardDto>($"/api/departments/{Uri.EscapeDataString(key)}/dashboard", ct)
+        ?? new(key, "داشبورد", 0, 0, 0, new Dictionary<string, int>(), []);
 
     public async Task<List<MescItemDto>> SearchMescItemsAsync(string term, CancellationToken ct = default) =>
         await GetJsonAsync<List<MescItemDto>>(
@@ -1344,8 +1404,12 @@ public sealed class PetroProcureApiClient(
     { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/cancel", new CancelInquiryRequest(reason), ct); await Ensure(response, ct); }
     public async Task<InquirySupplierDto> AddInquirySupplierAsync(Guid id, AddInquirySupplierRequest request, CancellationToken ct = default)
     { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/suppliers", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<InquirySupplierDto>(cancellationToken: ct))!; }
+    public async Task RemoveInquirySupplierAsync(Guid id, Guid inquirySupplierId, CancellationToken ct = default)
+    { var response = await Client().DeleteAsync($"/api/inquiries/{id}/suppliers/{inquirySupplierId}", ct); await Ensure(response, ct); }
     public async Task<SupplierQuoteDto> AddSupplierQuoteAsync(Guid id, AddSupplierQuoteRequest request, CancellationToken ct = default)
     { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/quotes", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<SupplierQuoteDto>(cancellationToken: ct))!; }
+    public async Task<SupplierQuoteItemDto> AddSupplierQuoteItemAsync(Guid id, Guid quoteId, AddSupplierQuoteItemRequest request, CancellationToken ct = default)
+    { var response = await Client().PostAsJsonAsync($"/api/inquiries/{id}/quotes/{quoteId}/items", request, ct); await Ensure(response, ct); return (await response.Content.ReadFromJsonAsync<SupplierQuoteItemDto>(cancellationToken: ct))!; }
     public Task<InquiryComparisonDto?> GetInquiryComparisonAsync(Guid id, CancellationToken ct = default) => GetJsonAsync<InquiryComparisonDto>($"/api/inquiries/{id}/comparison", ct);
     public async Task SelectSupplierQuoteAsync(Guid inquiryId, Guid quoteId, string? reason, CancellationToken ct = default)
     { var response = await Client().PostAsJsonAsync($"/api/inquiries/{inquiryId}/quotes/{quoteId}/select", new SelectSupplierQuoteRequest(reason), ct); await Ensure(response, ct); }
@@ -1359,9 +1423,21 @@ public sealed class PetroProcureApiClient(
         return await GetJsonAsync<PagedResult<InventoryControlItemDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
     }
 
+    public async Task<InventoryControlItemDto> CreateInventoryControlItemAsync(CreateInventoryControlItemRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/orders/inventory-control", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<InventoryControlItemDto>(cancellationToken: ct))!;
+    }
+
     public async Task<InventoryControlItemDto> UpdateInventoryControlItemAsync(Guid id, UpdateInventoryControlItemRequest request, CancellationToken ct = default)
     {
         var response = await Client().PutAsJsonAsync($"/api/orders/inventory-control/{id}", request, ct); await Ensure(response, ct);
+        return (await response.Content.ReadFromJsonAsync<InventoryControlItemDto>(cancellationToken: ct))!;
+    }
+
+    public async Task<InventoryControlItemDto> CreateStockAdjustmentAsync(Guid id, CreateStockAdjustmentRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync($"/api/orders/inventory-control/{id}/stock-adjustment", request, ct); await Ensure(response, ct);
         return (await response.Content.ReadFromJsonAsync<InventoryControlItemDto>(cancellationToken: ct))!;
     }
 
@@ -1375,6 +1451,18 @@ public sealed class PetroProcureApiClient(
         };
         var url = "/api/orders/material-needs?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value)).Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
         return await GetJsonAsync<PagedResult<MaterialNeedDto>>(url, ct) ?? new([], r.PageNumber, r.PageSize, 0);
+    }
+
+    public async Task<List<MaterialNeedsGroupedByMescDto>> GetMaterialNeedsGroupedByMescAsync(MaterialNeedListRequest r, CancellationToken ct = default)
+    {
+        var query = new Dictionary<string, string?>
+        {
+            ["Status"] = r.Status?.ToString(), ["Priority"] = r.Priority?.ToString(), ["MescCode"] = r.MescCode,
+            ["ApplicantDepartmentId"] = r.ApplicantDepartmentId?.ToString(), ["CreatedDateFrom"] = r.CreatedDateFrom?.ToString("O"),
+            ["CreatedDateTo"] = r.CreatedDateTo?.ToString("O"), ["PageNumber"] = r.PageNumber.ToString(), ["PageSize"] = r.PageSize.ToString()
+        };
+        var url = "/api/orders/material-needs/grouped?" + string.Join("&", query.Where(x => !string.IsNullOrWhiteSpace(x.Value)).Select(x => $"{Uri.EscapeDataString(x.Key)}={Uri.EscapeDataString(x.Value!)}"));
+        return await GetJsonAsync<List<MaterialNeedsGroupedByMescDto>>(url, ct) ?? [];
     }
 
     public Task<MaterialNeedDetailDto?> GetMaterialNeedAsync(Guid id, CancellationToken ct = default) =>
@@ -1394,6 +1482,13 @@ public sealed class PetroProcureApiClient(
     public async Task<Guid> ConvertMaterialNeedToIndentAsync(Guid id, ConvertMaterialNeedToIndentRequest request, CancellationToken ct = default)
     {
         var response = await Client().PostAsJsonAsync($"/api/orders/material-needs/{id}/convert-to-indent", request, ct); await Ensure(response, ct);
+        var payload = await response.Content.ReadFromJsonAsync<IndentReference>(cancellationToken: ct);
+        return payload!.IndentId;
+    }
+
+    public async Task<Guid> ConvertMaterialNeedsToIndentAsync(ConvertMaterialNeedsToIndentRequest request, CancellationToken ct = default)
+    {
+        var response = await Client().PostAsJsonAsync("/api/orders/material-needs/convert-to-indent", request, ct); await Ensure(response, ct);
         var payload = await response.Content.ReadFromJsonAsync<IndentReference>(cancellationToken: ct);
         return payload!.IndentId;
     }

@@ -50,6 +50,17 @@ public static class ContractMappings
         new(dto.MescGeneralGroupCode, dto.GeneralDescription, dto.Items.Select(ToContract).ToArray());
     public static PurchaseFileTimelineDto ToContract(this Application.PurchaseFiles.PurchaseFileTimelineDto dto) =>
         new(dto.StatusChanges.Select(ToContract).ToArray(), dto.Notes.Select(ToContract).ToArray());
+    public static PurchaseFileTechnicalReviewDto ToContract(this Application.PurchaseFiles.PurchaseFileTechnicalReviewDto dto) =>
+        new(dto.Id, dto.PurchaseFileId, dto.PurchaseFileNumber, dto.PurchaseFileTitle, dto.DepartmentId,
+            dto.DepartmentName, dto.RequestedByUserId, dto.ReviewedByUserId, dto.Status, dto.Decision,
+            dto.RequestComment, dto.Comments, dto.RecommendationNotes, dto.RequestedAt, dto.StartedAt,
+            dto.CompletedAt, dto.Items.Select(ToContract).ToArray());
+    public static ApplicantDashboardDto ToContract(this Application.PurchaseFiles.ApplicantDashboardDto dto) =>
+        new(dto.PendingTechnicalReviews, dto.InProgressTechnicalReviews, dto.ClarificationRequests,
+            dto.CompletedThisMonth, dto.AverageResponseHours, dto.RecentReviews.Select(ToContract).ToArray());
+    public static DepartmentDashboardDto ToContract(this Application.PurchaseFiles.DepartmentDashboardDto dto) =>
+        new(dto.DepartmentKey, dto.Title, dto.InboxTasks, dto.PendingActions, dto.OverdueTasks,
+            dto.StatusCounts, dto.RecentPurchaseFiles.Select(ToContract).ToArray());
 
     public static FileDocumentDto ToContract(this Application.Documents.FileDocumentDto dto) =>
         new(dto.Id, dto.PurchaseFileId, dto.DepartmentId, dto.DocumentType, dto.OriginalFileName,

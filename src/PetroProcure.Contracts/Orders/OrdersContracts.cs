@@ -37,6 +37,10 @@ public sealed record InventoryControlListRequest(string? SearchTerm = null, bool
     int PageNumber = 1, int PageSize = 20);
 public sealed record UpdateInventoryControlItemRequest(decimal MinimumStockLevel, decimal ReorderPoint,
     decimal? MaximumStockLevel, decimal? SafetyStock, bool IsStockControlled, bool IsActive, string? Notes);
+public sealed record CreateStockAdjustmentRequest(Guid WarehouseId, decimal Quantity, string? Description);
+public sealed record CreateInventoryControlItemRequest(Guid MescItemId, Guid WarehouseId, decimal InitialQuantity,
+    decimal MinimumStockLevel, decimal ReorderPoint, decimal? MaximumStockLevel, decimal? SafetyStock,
+    bool IsStockControlled, string? Notes);
 public sealed record StockBalanceListRequest(string? SearchTerm = null, Guid? WarehouseId = null,
     int PageNumber = 1, int PageSize = 20);
 public sealed record MaterialNeedListRequest(MaterialNeedStatus? Status = null, MaterialNeedPriority? Priority = null,
@@ -49,6 +53,8 @@ public sealed record ReviewMaterialNeedRequest(string? Comment = null);
 public sealed record ApproveMaterialNeedRequest(string? Comment = null);
 public sealed record RejectMaterialNeedRequest(string Reason);
 public sealed record ConvertMaterialNeedToIndentRequest(int YearPart, int TypeDigit, string? Title = null);
+public sealed record ConvertMaterialNeedsToIndentRequest(IReadOnlyList<Guid> MaterialNeedIds, int YearPart, int TypeDigit,
+    string? Title = null);
 public sealed record ShortageAlertListRequest(ShortageAlertStatus? Status = null, string? MescCode = null,
     int PageNumber = 1, int PageSize = 20);
 public sealed record DetectShortageAlertsRequest(bool IncludeExistingOpen = false);

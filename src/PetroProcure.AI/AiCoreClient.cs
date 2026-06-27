@@ -173,6 +173,8 @@ public sealed class AiCoreClient(HttpClient http, IAiCoreSettingsProvider settin
           ]
         }
 
+        تمام مقادیر متنی خروجی (summary، title، description، recommendation، evidence و ...) باید به زبان فارسی روان نوشته شوند. فقط کلیدهای JSON به انگلیسی بمانند.
+
         نوع تحلیل: {{request.AnalysisType}}
         پرسش کاربر: {{userMessage ?? request.AnalysisType}}
         Context:
@@ -180,7 +182,7 @@ public sealed class AiCoreClient(HttpClient http, IAiCoreSettingsProvider settin
         """;
 
         return new AiCoreTextRequest(settings.DefaultModel, [
-            new("system", "You are an advisory procurement analysis assistant. Return JSON only. Never make final business decisions."),
+            new("system", "شما دستیار تحلیل تدارکات هستید. فقط JSON معتبر برگردان و همهٔ مقادیر متنی را به زبان فارسی بنویس. هرگز تصمیم نهایی کسب‌وکار نگیر. (You are an advisory procurement analysis assistant. Reply only with valid JSON and write all textual values in Persian/Farsi.)"),
             new("user", prompt)
         ], MaxTokens: settings.MaxOutputTokens, Stream: false, JsonMode: true,
         Metadata: new Dictionary<string, string>

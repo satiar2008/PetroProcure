@@ -28,7 +28,7 @@ public sealed class AiJobProcessor(
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private const string AdvisorySystemPrompt =
-        "You are an advisory refinery procurement analysis assistant. Provide summaries, findings, warnings, and recommendations only. Never make final business decisions.";
+        "You are an advisory refinery procurement analysis assistant. Always write all textual output in fluent Persian (Farsi), not English. Provide summaries, findings, warnings, and recommendations only. Never make final business decisions. همهٔ خروجی متنی باید به زبان فارسی روان باشد.";
 
     public async Task<int> ProcessBatchAsync(string workerId, int batchSize, CancellationToken ct)
     {
@@ -307,13 +307,19 @@ public sealed class AiJobProcessor(
             : configuredUrl.TrimEnd('/');
     }
 
-    private static CreateAiJobRequest DeserializeRequest(string requestJson) =>
-        JsonSerializer.Deserialize<CreateAiJobRequest>(requestJson, JsonOptions)
-        ?? throw new InvalidOperationException("AI job request payload is invalid.");
+    private static CreateAiJobRequest DeserializeRequest(string requestJson)
+    {
+        var request = JsonSerializer.Deserialize<CreateAiJobRequest>(requestJson, JsonOptions)
+            ?? throw new InvalidOperationException("AI job request payload is invalid.");
+        var analysisType = string.IsNullOrWhiteSpace(request.AnalysisType)
+            ? AiAnalysisType.Summary.ToString()
+            : request.AnalysisType.Trim();
+        return request with { AnalysisType = analysisType };
+    }
 
     private static bool IsEmbeddingIngestion(CreateAiJobRequest request) => IsEmbeddingIngestion(request.AnalysisType);
-    private static bool IsEmbeddingIngestion(string analysisType) =>
-        analysisType.Equals(AiAnalysisType.EmbeddingIngestion.ToString(), StringComparison.OrdinalIgnoreCase);
+    private static bool IsEmbeddingIngestion(string? analysisType) =>
+        string.Equals(analysisType, AiAnalysisType.EmbeddingIngestion.ToString(), StringComparison.OrdinalIgnoreCase);
 
     private static AiFindingSeverity ToSeverity(string severity) =>
         Enum.TryParse<AiFindingSeverity>(severity, true, out var parsed) ? parsed : AiFindingSeverity.Info;

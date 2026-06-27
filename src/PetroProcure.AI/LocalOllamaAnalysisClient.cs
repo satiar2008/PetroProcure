@@ -67,6 +67,7 @@ public sealed class LocalOllamaAnalysisClient(
 
         return $$"""
         You are an advisory refinery procurement analysis assistant.
+        Write every textual value (summary, title, description, recommendation) in fluent Persian (Farsi), not English. Only JSON keys stay in English.
         Never make final business decisions. Human users and commissions remain responsible for approvals.
         Return only valid JSON with this shape:
         {

@@ -1,0 +1,62 @@
+@page "/applicant"
+@rendermode InteractiveServer
+@inject IPetroProcureApiClient Api
+@inject IUserAccessContext Access
+@inject NavigationManager Navigation
+
+<PageTitle>داشبورد متقاضی</PageTitle>
+<PageHeader Title="داشبورد متقاضی" Subtitle="بررسی‌های فنی ارجاع‌شده و وظایف جاری متقاضی">
+    <Actions>
+        <MudButton Href="/applicant/technical-reviews" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.FactCheck">بررسی‌های فنی</MudButton>
+    </Actions>
+</PageHeader>
+
+<DataStateView TItem="PurchaseFileTechnicalReviewDto" Loading="_loading" Error="_error" Items="_dashboard?.RecentReviews" Retry="Load">
+    @if (_dashboard is not null)
+    {
+        <MudGrid Class="mb-4">
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="در انتظار بررسی" Value="@_dashboard.PendingTechnicalReviews.ToString("N0")" /></MudItem>
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="در حال بررسی" Value="@_dashboard.InProgressTechnicalReviews.ToString("N0")" /></MudItem>
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="شفاف‌سازی" Value="@_dashboard.ClarificationRequests.ToString("N0")" /></MudItem>
+            <MudItem xs="12" sm="6" md="3"><SummaryItem Label="تکمیل‌شده ماه" Value="@_dashboard.CompletedThisMonth.ToString("N0")" /></MudItem>
+        </MudGrid>
+        <MudPaper Class="data-panel" Elevation="0">
+            <MudText Typo="Typo.h6" Class="mb-3">آخرین بررسی‌های ارجاع‌شده</MudText>
+            <MudTable Items="_dashboard.RecentReviews" Dense="true" Hover="true">
+                <HeaderContent><MudTh>پرونده</MudTh><MudTh>وضعیت</MudTh><MudTh>تصمیم</MudTh><MudTh>تاریخ درخواست</MudTh><MudTh>عملیات</MudTh></HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.PurchaseFileNumber — @context.PurchaseFileTitle</MudTd>
+                    <MudTd><StatusChip Text="@ApplicantUiPolicy.StatusText(context.Status)" Color="@ApplicantUiPolicy.StatusColor(context.Status)" /></MudTd>
+                    <MudTd>@ApplicantUiPolicy.DecisionText(context.Decision)</MudTd>
+                    <MudTd><DateDisplay Value="@context.RequestedAt" IncludeTime="true" /></MudTd>
+                    <MudTd><MudButton Size="Size.Small" Href="@($"/applicant/technical-reviews/{context.Id}")">مشاهده</MudButton></MudTd>
+                </RowTemplate>
+            </MudTable>
+        </MudPaper>
+    }
+</DataStateView>
+
+@code {
+    private ApplicantDashboardDto? _dashboard;
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Access.HasPermission(ApplicantUiPolicy.ViewDashboard))
+        {
+            Navigation.NavigateTo("/access-denied");
+            return;
+        }
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _loading = true;
+        _error = null;
+        try { _dashboard = await Api.GetApplicantDashboardAsync(); }
+        catch (Exception ex) { _error = UiErrorText.From(ex); }
+        finally { _loading = false; }
+    }
+}

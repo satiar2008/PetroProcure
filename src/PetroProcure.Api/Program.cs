@@ -165,6 +165,7 @@ app.MapAuthEndpoints();
 app.MapMescCatalogEndpoints();
 app.MapIndentEndpoints();
 app.MapPurchaseFileEndpoints();
+app.MapApplicantEndpoints();
 app.MapDocumentEndpoints();
 app.MapWorkflowEndpoints();
 app.MapReportEndpoints();
