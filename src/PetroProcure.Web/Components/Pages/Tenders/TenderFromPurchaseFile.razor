@@ -15,8 +15,8 @@
             <MudGrid>
                 <MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان مناقصه" Required="true" /></MudItem>
                 <MudItem xs="12" md="6"><MudSelect T="TenderType" @bind-Value="_type" Label="نوع مناقصه">@foreach(var t in Enum.GetValues<TenderType>()){<MudSelectItem Value="@t">@TenderUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
-                <MudItem xs="12" md="6"><MudDatePicker @bind-Date="_deadline" Label="مهلت ارسال پیشنهاد" /></MudItem>
-                <MudItem xs="12" md="6"><MudDatePicker @bind-Date="_opening" Label="تاریخ گشایش" /></MudItem>
+                <MudItem xs="12" md="6"><PersianDatePicker @bind-Date="_deadline" Label="مهلت ارسال پیشنهاد" /></MudItem>
+                <MudItem xs="12" md="6"><PersianDatePicker @bind-Date="_opening" Label="تاریخ گشایش" /></MudItem>
                 <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Lines="3" /></MudItem>
             </MudGrid>
         </MudPaper>

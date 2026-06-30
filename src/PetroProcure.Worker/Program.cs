@@ -8,6 +8,10 @@ using Microsoft.Extensions.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 
+// Allow the worker to run under the Windows Service Control Manager (used by the IIS installer).
+// This is a no-op when the process is started from the console.
+builder.Services.AddWindowsService(options => options.ServiceName = "PetroProcureWorker");
+
 builder.AddServiceDefaults();
 builder.Services.AddApplication(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);

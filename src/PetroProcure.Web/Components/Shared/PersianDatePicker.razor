@@ -1,0 +1,25 @@
+@using System.Globalization
+
+<MudDatePicker Date="@Date"
+               DateChanged="@DateChanged"
+               Culture="@PersianCulture"
+               DateFormat="yyyy/MM/dd"
+               Clearable="true"
+               @attributes="UserAttributes" />
+
+@code {
+    private static readonly CultureInfo PersianCulture = CreatePersianCulture();
+
+    [Parameter] public DateTime? Date { get; set; }
+    [Parameter] public EventCallback<DateTime?> DateChanged { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public IReadOnlyDictionary<string, object?>? UserAttributes { get; set; }
+
+    private static CultureInfo CreatePersianCulture()
+    {
+        var culture = new CultureInfo("fa-IR");
+        culture.DateTimeFormat.Calendar = new PersianCalendar();
+        culture.DateTimeFormat.ShortDatePattern = "yyyy/MM/dd";
+        culture.DateTimeFormat.LongDatePattern = "dddd، dd MMMM yyyy";
+        return culture;
+    }
+}

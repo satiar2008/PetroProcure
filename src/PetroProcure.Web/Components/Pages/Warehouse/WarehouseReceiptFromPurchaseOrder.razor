@@ -23,7 +23,7 @@ else if (_po is not null)
                     { <MudSelectItem Value="@warehouse.Id">@warehouse.Name (@warehouse.Code)</MudSelectItem> }
                 </MudSelect>
             </MudItem>
-            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_receiptDate" Label="تاریخ رسید" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><PersianDatePicker @bind-Date="_receiptDate" Label="تاریخ رسید" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_deliveryNoteNumber" Label="شماره حواله/بارنامه" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_carrierName" Label="حمل‌کننده" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_vehicleNumber" Label="شماره خودرو" Variant="Variant.Outlined" /></MudItem>

@@ -39,6 +39,7 @@ public sealed class PurchaseFileCommandHandler(
         var file = new PurchaseFile(
             Guid.NewGuid(), number, command.Title, command.Description, command.Priority, null,
             command.PurchaseDepartmentId, command.CurrentDepartmentId, command.ResponsibleUserId, currentUser.UserId);
+        ApplyInitialWorkflowStatus(file, command.PurchaseDepartmentId, command.CurrentDepartmentId);
         await repository.AddAsync(file, ct);
         await repository.SaveChangesAsync(ct);
         if (fileStorageService is not null) await fileStorageService.EnsurePurchaseFileFoldersAsync(file, ct);
@@ -56,6 +57,7 @@ public sealed class PurchaseFileCommandHandler(
         var file = new PurchaseFile(
             Guid.NewGuid(), number, indent.Title, indent.Description, command.Priority, indent.Id,
             command.PurchaseDepartmentId, command.PurchaseDepartmentId, command.ResponsibleUserId, currentUser.UserId);
+        ApplyInitialWorkflowStatus(file, command.PurchaseDepartmentId, command.PurchaseDepartmentId);
         foreach (var source in indent.Items)
         {
             file.AddItem(new PurchaseFileItem(
@@ -137,6 +139,14 @@ public sealed class PurchaseFileCommandHandler(
     {
         if (await repository.FileNumberExistsAsync(number, ct))
             throw new PurchaseFileConflictException($"Purchase file '{number}' already exists.");
+    }
+
+    private void ApplyInitialWorkflowStatus(PurchaseFile file, Guid purchaseDepartmentId, Guid currentDepartmentId)
+    {
+        var status = currentDepartmentId == purchaseDepartmentId
+            ? PurchaseFileStatus.InPurchaseDepartment
+            : PurchaseFileStatus.WaitingForPurchaseDepartment;
+        Execute(() => file.ChangeStatus(status, currentUser.UserId, "Initial purchase file routing.", currentDepartmentId, currentUser.IsSystemAdmin));
     }
 
     private async Task<PurchaseFile> Required(Guid id, bool details, CancellationToken ct) =>

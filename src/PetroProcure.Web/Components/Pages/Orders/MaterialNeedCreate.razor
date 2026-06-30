@@ -12,7 +12,7 @@
         <MescItemSelector @bind-Value="_item" Required="true" />
         <MudGrid Class="mt-3">
             <MudItem xs="12" md="4"><MudNumericField @bind-Value="_quantity" Label="مقدار مورد نیاز" Required="true" RequiredError="مقدار الزامی است" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_neededBy" Label="تاریخ نیاز" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><PersianDatePicker @bind-Date="_neededBy" Label="تاریخ نیاز" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudSelect @bind-Value="_priority" Label="اولویت" Variant="Variant.Outlined">@foreach (var p in Enum.GetValues<MaterialNeedPriority>()) { <MudSelectItem Value="@p">@OrdersUiPolicy.PriorityText(p)</MudSelectItem> }</MudSelect></MudItem>
             <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Lines="4" Variant="Variant.Outlined" /></MudItem>
         </MudGrid>

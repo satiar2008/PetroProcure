@@ -31,6 +31,19 @@ public sealed class MescCatalogTests
     }
 
     [Fact]
+    public async Task CreatingItem_FailsWhenUnitIsNotAllowed()
+    {
+        var repository = new FakeRepository();
+        repository.Groups.Add(new MescGeneralGroup(Guid.NewGuid(), "123456", "Pipe fittings"));
+        var handler = CreateCommandHandler(repository);
+
+        var exception = await Assert.ThrowsAsync<MescCatalogValidationException>(() =>
+            handler.Handle(new CreateMescItemCommand("1234567890", "Steel pipe", "DEV")));
+
+        Assert.Contains("not allowed", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task GroupedQuery_ReturnsItemsUnderGeneralDescription()
     {
         var repository = new FakeRepository();

@@ -1,8 +1,14 @@
 <MudDialog>
 <DialogContent><MudForm @ref="_form">
     <MudTextField @bind-Value="_code" Label="کد MESC" Required="true" Validation="@((Func<string,string?>)ValidateCode)" Variant="Variant.Outlined" />
+    <MudTextField @bind-Value="_generalDescription" Label="شرح عمومی گروه" Required="true" RequiredError="شرح عمومی گروه الزامی است" Variant="Variant.Outlined" Class="mt-3" />
     <MudTextField @bind-Value="_description" Label="شرح اختصاصی" Required="true" RequiredError="شرح اختصاصی الزامی است" Variant="Variant.Outlined" Class="mt-3" />
-    <MudTextField @bind-Value="_unit" Label="واحد اندازه‌گیری" Required="true" RequiredError="واحد اندازه‌گیری الزامی است" Variant="Variant.Outlined" Class="mt-3" />
+    <MudSelect T="string" @bind-Value="_unit" Label="واحد شمارش" Required="true" RequiredError="واحد شمارش الزامی است" Variant="Variant.Outlined" Class="mt-3">
+        @foreach (var unit in AllowedUnits)
+        {
+            <MudSelectItem Value="@unit">@unit</MudSelectItem>
+        }
+    </MudSelect>
     <MudText Typo="Typo.caption" Class="mt-2">کد گروه عمومی به‌صورت خودکار از ۶ رقم اول استخراج می‌شود.</MudText>
 </MudForm></DialogContent>
 <DialogActions><MudButton OnClick="Cancel">انصراف</MudButton><MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Save">ذخیره</MudButton></DialogActions>
@@ -10,9 +16,11 @@
 @code {
     [CascadingParameter] private IMudDialogInstance Dialog { get; set; }=default!;
     [Parameter] public MescItemDto? Model { get; set; }
-    private MudForm? _form;private string _code="",_description="",_unit="";
-    protected override void OnInitialized(){if(Model is not null){_code=Model.Code;_description=Model.SpecificDescription;_unit=Model.UnitOfMeasure;}}
+    private static readonly string[] AllowedUnits = ["عدد", "بسته", "کیلوگرم", "متر"];
+    private MudForm? _form;private string _code="",_generalDescription="",_description="",_unit="";
+    protected override void OnInitialized(){if(Model is not null){_code=Model.Code;_generalDescription=Model.GeneralDescription;_description=Model.SpecificDescription;_unit=NormalizeUnit(Model.UnitOfMeasure);}}
     private static string? ValidateCode(string value)=>value?.Length>=6&&value.All(char.IsDigit)?null:"کد MESC باید حداقل ۶ رقم و فقط شامل عدد باشد.";
-    private async Task Save(){await _form!.Validate();if(!_form.IsValid)return;Dialog.Close(DialogResult.Ok((_code,_description,_unit)));}
+    private static string NormalizeUnit(string unit)=>unit switch{"EA"=>"عدد","PKG"=>"بسته","KG"=>"کیلوگرم","M"=>"متر",_=>AllowedUnits.Contains(unit)?unit:string.Empty};
+    private async Task Save(){await _form!.Validate();if(!_form.IsValid)return;Dialog.Close(DialogResult.Ok((_code,_generalDescription,_description,_unit)));}
     private void Cancel()=>Dialog.Cancel();
 }

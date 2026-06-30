@@ -13,8 +13,8 @@
         <MudItem xs="12" md="4"><SupplierSelector Value="_supplier" ValueChanged="OnSupplierChanged" Required="true" /></MudItem>
         <MudItem xs="12" md="4"><MudSelect T="PurchaseOrderType" @bind-Value="_type" Label="نوع سفارش" Variant="Variant.Outlined">@foreach(var t in Enum.GetValues<PurchaseOrderType>()){<MudSelectItem Value="@t">@PurchaseOrderUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
         <MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان" Required="true" Variant="Variant.Outlined" /></MudItem>
-        <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_orderDate" Label="تاریخ سفارش" Variant="Variant.Outlined" /></MudItem>
-        <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_deliveryDate" Label="موعد تحویل" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_orderDate" Label="تاریخ سفارش" Variant="Variant.Outlined" /></MudItem>
+        <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_deliveryDate" Label="موعد تحویل" Variant="Variant.Outlined" /></MudItem>
         <MudItem xs="12" md="3"><MudTextField @bind-Value="_currency" Label="ارز" Variant="Variant.Outlined" /></MudItem>
         <MudItem xs="12" md="3"><MudNumericField T="decimal?" @bind-Value="_total" Label="مبلغ کل" Variant="Variant.Outlined" /></MudItem>
         <MudItem xs="12" md="3"><MudNumericField T="decimal?" @bind-Value="_tax" Label="مالیات" Variant="Variant.Outlined" /></MudItem>

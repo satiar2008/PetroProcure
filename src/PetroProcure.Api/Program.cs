@@ -79,12 +79,33 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Apply EF Core migrations (which also seed roles, permissions, MESC samples and the admin user via
+// HasData) when running in Development, when explicitly requested through Database:MigrateOnStartup
+// (used by the IIS installer), or when launched with the "--migrate" switch.
+var migrateOnStartup = app.Environment.IsDevelopment()
+    || builder.Configuration.GetValue<bool>("Database:MigrateOnStartup");
+var migrateOnly = args.Contains("--migrate", StringComparer.OrdinalIgnoreCase);
+
+if (migrateOnStartup || migrateOnly)
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider
         .GetRequiredService<PetroProcure.Infrastructure.Persistence.PetroProcureDbContext>()
         .Database.MigrateAsync();
+}
+
+// "--migrate" runs migrations + admin bootstrap seeding deterministically and then exits, so the
+// installer can provision the database before the IIS site starts serving requests.
+if (migrateOnly)
+{
+    foreach (var hostedService in app.Services.GetServices<IHostedService>())
+    {
+        if (hostedService is PetroProcure.Infrastructure.Identity.AdminBootstrapService bootstrap)
+            await bootstrap.StartAsync(CancellationToken.None);
+    }
+
+    Console.WriteLine("PetroProcure database migration and seeding completed.");
+    return;
 }
 
 app.UseExceptionHandler(exceptionHandlerApp => exceptionHandlerApp.Run(async context =>

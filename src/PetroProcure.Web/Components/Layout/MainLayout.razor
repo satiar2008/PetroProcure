@@ -63,7 +63,10 @@
                     <MudMenuItem OnClick="ToggleTheme" Icon="@(_isDarkMode ? Icons.Material.Filled.LightMode : Icons.Material.Filled.DarkMode)">
                         @(_isDarkMode ? "حالت روشن" : "حالت تاریک")
                     </MudMenuItem>
-                    <MudMenuItem Href="/admin/settings" Icon="@Icons.Material.Filled.Settings">تنظیمات</MudMenuItem>
+                    @if (Access.HasPermission(AdminUiPolicy.ManageSettings))
+                    {
+                        <MudMenuItem Href="/admin/settings" Icon="@Icons.Material.Filled.Settings">تنظیمات</MudMenuItem>
+                    }
                     <MudDivider />
                     <MudMenuItem Href="/logout" Icon="@Icons.Material.Filled.Logout">خروج از سامانه</MudMenuItem>
                 </ChildContent>

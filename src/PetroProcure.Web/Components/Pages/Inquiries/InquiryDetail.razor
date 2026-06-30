@@ -198,9 +198,9 @@ else
             </MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_quoteNumber" Label="شماره پیشنهاد" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudTextField @bind-Value="_currency" Label="ارز" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_quoteDate" Label="تاریخ پیشنهاد" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_validUntil" Label="اعتبار تا" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_deliveryDate" Label="تاریخ تحویل" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_quoteDate" Label="تاریخ پیشنهاد" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_validUntil" Label="اعتبار تا" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_deliveryDate" Label="تاریخ تحویل" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="3"><MudNumericField @bind-Value="_taxAmount" Label="مالیات" Min="0m" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="3"><MudNumericField @bind-Value="_discountAmount" Label="تخفیف" Min="0m" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="9"><MudTextField @bind-Value="_deliveryTerms" Label="شرایط تحویل" Variant="Variant.Outlined" /></MudItem>

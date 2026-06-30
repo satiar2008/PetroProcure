@@ -46,8 +46,10 @@ public sealed class MescCommandHandler(
             throw new MescCatalogConflictException($"MESC item '{code}' already exists.");
 
         var group = await ResolveGroup(code, command.GeneralDescription, cancellationToken);
-        var unitId = await ResolveUnit(command.UnitOfMeasure, command.UnitOfMeasureId, cancellationToken);
-        var item = new MescItem(Guid.NewGuid(), code, command.SpecificDescription, command.UnitOfMeasure, unitId);
+        var unitOfMeasure = NormalizeAllowedUnit(command.UnitOfMeasure)
+            ?? throw new MescCatalogValidationException($"Unit of measure '{command.UnitOfMeasure}' is not allowed.");
+        var unitId = await ResolveUnit(unitOfMeasure, command.UnitOfMeasureId, cancellationToken);
+        var item = new MescItem(Guid.NewGuid(), code, command.SpecificDescription, unitOfMeasure, unitId);
         item.LinkGeneralGroup(group);
         await repository.AddItemAsync(item, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
@@ -63,8 +65,10 @@ public sealed class MescCommandHandler(
             throw new MescCatalogConflictException($"MESC item '{code}' already exists.");
 
         var group = await ResolveGroup(code, command.GeneralDescription, cancellationToken);
-        var unitId = await ResolveUnit(command.UnitOfMeasure, command.UnitOfMeasureId, cancellationToken);
-        item.Update(code, command.SpecificDescription, command.UnitOfMeasure, unitId);
+        var unitOfMeasure = NormalizeAllowedUnit(command.UnitOfMeasure)
+            ?? throw new MescCatalogValidationException($"Unit of measure '{command.UnitOfMeasure}' is not allowed.");
+        var unitId = await ResolveUnit(unitOfMeasure, command.UnitOfMeasureId, cancellationToken);
+        item.Update(code, command.SpecificDescription, unitOfMeasure, unitId);
         item.LinkGeneralGroup(group);
         await repository.SaveChangesAsync(cancellationToken);
         return ToDto(item, group);
@@ -102,11 +106,22 @@ public sealed class MescCommandHandler(
 
     private async Task<Guid> ResolveUnit(string unitOfMeasure, Guid? unitOfMeasureId, CancellationToken cancellationToken)
     {
-        if (unitOfMeasureId.HasValue && unitOfMeasureId.Value != Guid.Empty) return unitOfMeasureId.Value;
         var resolved = await repository.ResolveUnitOfMeasureIdAsync(unitOfMeasure, cancellationToken);
         if (resolved == Guid.Empty) throw new MescCatalogValidationException($"Unit of measure '{unitOfMeasure}' does not exist.");
+        if (unitOfMeasureId.HasValue && unitOfMeasureId.Value != Guid.Empty && unitOfMeasureId.Value != resolved)
+            throw new MescCatalogValidationException($"Unit of measure '{unitOfMeasure}' does not match the selected unit id.");
         return resolved;
     }
+
+    private static string? NormalizeAllowedUnit(string unitOfMeasure) =>
+        string.IsNullOrWhiteSpace(unitOfMeasure) ? null : unitOfMeasure.Trim() switch
+        {
+            "EA" or "عدد" => "عدد",
+            "PKG" or "بسته" => "بسته",
+            "KG" or "کیلوگرم" => "کیلوگرم",
+            "M" or "متر" => "متر",
+            _ => null
+        };
 
     private static MescItemDto ToDto(MescItem item, MescGeneralGroup group) =>
         new(item.Id, item.Code, item.GeneralGroupCode, group.Description, item.Description, item.UnitOfMeasure, item.UnitOfMeasureId, item.IsActive);

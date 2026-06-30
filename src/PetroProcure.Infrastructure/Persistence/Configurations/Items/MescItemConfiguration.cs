@@ -86,8 +86,8 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 Code = "3344550001",
                 GeneralGroupCode = "334455",
                 Description = "پمپ سانتریفیوژ عمومی",
-                UnitOfMeasure = "DEV",
-                UnitOfMeasureId = SeedDataIds.DeviceUnitId,
+                UnitOfMeasure = "عدد",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },
@@ -141,8 +141,8 @@ internal sealed class MescItemConfiguration : IEntityTypeConfiguration<MescItem>
                 Code = "3344550002",
                 GeneralGroupCode = "334455",
                 Description = "پمپ دنده‌ای",
-                UnitOfMeasure = "DEV",
-                UnitOfMeasureId = SeedDataIds.DeviceUnitId,
+                UnitOfMeasure = "عدد",
+                UnitOfMeasureId = SeedDataIds.EachUnitId,
                 IsActive = true,
                 CreatedAtUtc = createdAt
             },

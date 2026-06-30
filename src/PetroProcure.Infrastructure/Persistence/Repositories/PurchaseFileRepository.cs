@@ -128,7 +128,8 @@ internal sealed class PurchaseFileRepository(PetroProcureDbContext dbContext) : 
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
         var recent = await files.OrderByDescending(x => x.CreatedAt).Take(5)
             .Select(file => new PurchaseFileListDto(file.Id, file.FileNumber, file.Title, file.Status, file.Priority,
-                file.CurrentDepartmentId, file.ResponsibleUserId, file.CreatedAt, file.Items.Count, null))
+                file.CurrentDepartmentId, file.ResponsibleUserId, file.CreatedAt, file.Items.Count, null,
+                dbContext.Inquiries.Count(inquiry => inquiry.PurchaseFileId == file.Id)))
             .ToListAsync(ct);
         return new(
             departmentKey,
@@ -152,7 +153,8 @@ internal sealed class PurchaseFileRepository(PetroProcureDbContext dbContext) : 
         await dbContext.PurchaseFiles.AsNoTracking().OrderByDescending(file => file.CreatedAt)
             .Select(file => new PurchaseFileListDto(
                 file.Id, file.FileNumber, file.Title, file.Status, file.Priority,
-                file.CurrentDepartmentId, file.ResponsibleUserId, file.CreatedAt, file.Items.Count, null))
+                file.CurrentDepartmentId, file.ResponsibleUserId, file.CreatedAt, file.Items.Count, null,
+                dbContext.Inquiries.Count(inquiry => inquiry.PurchaseFileId == file.Id)))
             .ToListAsync(ct);
     public async Task<PagedResult<PurchaseFileListDto>> GetPagedAsync(PurchaseFileListRequest request, CancellationToken ct)
     {
@@ -187,7 +189,8 @@ internal sealed class PurchaseFileRepository(PetroProcureDbContext dbContext) : 
                 file.CurrentDepartmentId, file.ResponsibleUserId, file.CreatedAt, file.Items.Count,
                 file.SourceIndentId.HasValue
                     ? dbContext.Indents.Where(i => i.Id == file.SourceIndentId).Select(i => i.IndentNumber).FirstOrDefault()
-                    : null))
+                    : null,
+                dbContext.Inquiries.Count(inquiry => inquiry.PurchaseFileId == file.Id)))
             .ToListAsync(ct);
         return new(items, page, size, total);
     }

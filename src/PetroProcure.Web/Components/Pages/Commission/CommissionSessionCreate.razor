@@ -25,7 +25,7 @@
                         <MudTextField @bind-Value="_title" Label="عنوان جلسه" Required="true" RequiredError="عنوان جلسه الزامی است." />
                     </MudItem>
                     <MudItem xs="12" md="6">
-                        <MudDatePicker @bind-Date="_sessionDate" Label="تاریخ جلسه" Required="true" RequiredError="تاریخ جلسه الزامی است." />
+                        <PersianDatePicker @bind-Date="_sessionDate" Label="تاریخ جلسه" Required="true" RequiredError="تاریخ جلسه الزامی است." />
                     </MudItem>
                     <MudItem xs="12" md="6">
                         <MudTextField @bind-Value="_location" Label="محل برگزاری" />

@@ -14,13 +14,14 @@ public static class MescCatalogEndpoints
         groups.MapGet("/", async (bool includeInactive, MescQueryHandler handler, CancellationToken ct) =>
             (await handler.Handle(new GetMescGeneralGroupsQuery(includeInactive), ct)).Select(x => x.ToContract()))
             .RequirePermission(ApplicationPermissions.ItemView);
-        groups.MapPost("/", Execute(async (CreateMescGeneralGroupRequest request, MescCommandHandler handler, CancellationToken ct) =>
+        groups.MapPost("/", async (CreateMescGeneralGroupRequest request, MescCommandHandler handler, CancellationToken ct) =>
+            await Execute(async () =>
         {
             var result = await handler.Handle(new CreateMescGeneralGroupCommand(request.Code, request.GeneralDescription), ct);
             return Results.Created($"/api/mesc/groups/{result.Id}", result.ToContract());
         })).RequirePermission(ApplicationPermissions.ItemCreate);
-        groups.MapPut("/{id:guid}", Execute(async (Guid id, UpdateMescGeneralGroupRequest request, MescCommandHandler handler, CancellationToken ct) =>
-            Results.Ok((await handler.Handle(new UpdateMescGeneralGroupCommand(id, request.Code, request.GeneralDescription), ct)).ToContract())))
+        groups.MapPut("/{id:guid}", async (Guid id, UpdateMescGeneralGroupRequest request, MescCommandHandler handler, CancellationToken ct) =>
+            await Execute(async () => Results.Ok((await handler.Handle(new UpdateMescGeneralGroupCommand(id, request.Code, request.GeneralDescription), ct)).ToContract())))
             .RequirePermission(ApplicationPermissions.ItemEdit);
 
         var items = app.MapGroup("/api/mesc/items").WithTags("MESC Catalog");
@@ -34,22 +35,25 @@ public static class MescCatalogEndpoints
             await handler.Handle(new GetMescItemByCodeQuery(code, includeInactive), ct) is { } item
                 ? Results.Ok(item.ToContract())
                 : Results.NotFound()).RequirePermission(ApplicationPermissions.ItemView);
-        items.MapPost("/", Execute(async (CreateMescItemRequest request, MescCommandHandler handler, CancellationToken ct) =>
+        items.MapPost("/", async (CreateMescItemRequest request, MescCommandHandler handler, CancellationToken ct) =>
+            await Execute(async () =>
         {
             var result = await handler.Handle(new CreateMescItemCommand(
                 request.Code, request.SpecificDescription, request.UnitOfMeasure, request.GeneralDescription, request.UnitOfMeasureId), ct);
             return Results.Created($"/api/mesc/items/{result.Code}", result.ToContract());
         })).RequirePermission(ApplicationPermissions.ItemCreate);
-        items.MapPut("/{id:guid}", Execute(async (Guid id, UpdateMescItemRequest request, MescCommandHandler handler, CancellationToken ct) =>
-            Results.Ok((await handler.Handle(new UpdateMescItemCommand(
+        items.MapPut("/{id:guid}", async (Guid id, UpdateMescItemRequest request, MescCommandHandler handler, CancellationToken ct) =>
+            await Execute(async () => Results.Ok((await handler.Handle(new UpdateMescItemCommand(
                 id, request.Code, request.SpecificDescription, request.UnitOfMeasure, request.GeneralDescription, request.UnitOfMeasureId), ct)).ToContract())))
             .RequirePermission(ApplicationPermissions.ItemEdit);
-        items.MapPost("/{id:guid}/activate", Execute(async (Guid id, MescCommandHandler handler, CancellationToken ct) =>
+        items.MapPost("/{id:guid}/activate", async (Guid id, MescCommandHandler handler, CancellationToken ct) =>
+            await Execute(async () =>
         {
             await handler.Handle(new ActivateMescItemCommand(id), ct);
             return Results.NoContent();
         })).RequirePermission(ApplicationPermissions.ItemActivateDeactivate);
-        items.MapPost("/{id:guid}/deactivate", Execute(async (Guid id, MescCommandHandler handler, CancellationToken ct) =>
+        items.MapPost("/{id:guid}/deactivate", async (Guid id, MescCommandHandler handler, CancellationToken ct) =>
+            await Execute(async () =>
         {
             await handler.Handle(new DeactivateMescItemCommand(id), ct);
             return Results.NoContent();
@@ -58,6 +62,27 @@ public static class MescCatalogEndpoints
         return app;
     }
 
-    private static Delegate Execute(Delegate endpoint) => endpoint;
-
+    private static async Task<IResult> Execute(Func<Task<IResult>> action)
+    {
+        try
+        {
+            return await action();
+        }
+        catch (MescCatalogValidationException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+        catch (MescCatalogNotFoundException ex)
+        {
+            return Results.NotFound(new { error = ex.Message });
+        }
+        catch (MescCatalogConflictException ex)
+        {
+            return Results.Conflict(new { error = ex.Message });
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
+    }
 }

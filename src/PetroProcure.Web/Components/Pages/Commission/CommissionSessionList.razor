@@ -42,10 +42,10 @@
             <MudButton OnClick="Clear" Variant="Variant.Text">پاک‌سازی</MudButton>
         </MudItem>
         <MudItem xs="12" md="3">
-            <MudDatePicker @bind-Date="_dateFrom" Label="از تاریخ جلسه" />
+            <PersianDatePicker @bind-Date="_dateFrom" Label="از تاریخ جلسه" />
         </MudItem>
         <MudItem xs="12" md="3">
-            <MudDatePicker @bind-Date="_dateTo" Label="تا تاریخ جلسه" />
+            <PersianDatePicker @bind-Date="_dateTo" Label="تا تاریخ جلسه" />
         </MudItem>
         <MudItem xs="12" md="3">
             <MudSelect T="string" @bind-Value="_sortBy" Label="مرتب‌سازی">

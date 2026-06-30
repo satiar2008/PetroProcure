@@ -35,6 +35,15 @@ public sealed class ProcurementLifecycleIntegrationTests(SqlServerFixture fixtur
         Assert.True(await db.Permissions.AnyAsync());
         Assert.True(await db.Users.AnyAsync(x => x.UserName == "admin"));
         Assert.True(await db.UnitOfMeasures.CountAsync() >= 6);
+        var activeUnits = await db.UnitOfMeasures
+            .Where(x => x.IsActive)
+            .Select(x => x.Name)
+            .ToArrayAsync();
+        Assert.Equal(4, activeUnits.Length);
+        Assert.Contains("عدد", activeUnits);
+        Assert.Contains("بسته", activeUnits);
+        Assert.Contains("کیلوگرم", activeUnits);
+        Assert.Contains("متر", activeUnits);
         Assert.True(await db.MescGeneralGroups.CountAsync() >= 3);
         Assert.True(await db.MescItems.CountAsync() >= 10);
         Assert.True(await db.Indents.AnyAsync(x => x.IndentNumber == "2630001"));

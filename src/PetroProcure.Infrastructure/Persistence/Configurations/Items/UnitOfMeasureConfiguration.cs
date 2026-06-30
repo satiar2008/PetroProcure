@@ -33,8 +33,8 @@ internal sealed class UnitOfMeasureConfiguration : IEntityTypeConfiguration<Unit
             new { Id = SeedDataIds.EachUnitId, Code = "EA", Name = "عدد", IsActive = true, CreatedAtUtc = createdAt },
             new { Id = SeedDataIds.MeterUnitId, Code = "M", Name = "متر", IsActive = true, CreatedAtUtc = createdAt },
             new { Id = SeedDataIds.KilogramUnitId, Code = "KG", Name = "کیلوگرم", IsActive = true, CreatedAtUtc = createdAt },
-            new { Id = SeedDataIds.LiterUnitId, Code = "L", Name = "لیتر", IsActive = true, CreatedAtUtc = createdAt },
+            new { Id = SeedDataIds.LiterUnitId, Code = "L", Name = "لیتر", IsActive = false, CreatedAtUtc = createdAt },
             new { Id = SeedDataIds.PackageUnitId, Code = "PKG", Name = "بسته", IsActive = true, CreatedAtUtc = createdAt },
-            new { Id = SeedDataIds.DeviceUnitId, Code = "DEV", Name = "دستگاه", IsActive = true, CreatedAtUtc = createdAt });
+            new { Id = SeedDataIds.DeviceUnitId, Code = "DEV", Name = "دستگاه", IsActive = false, CreatedAtUtc = createdAt });
     }
 }

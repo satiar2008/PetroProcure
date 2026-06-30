@@ -41,6 +41,20 @@ public static class InquiryUiPolicy
         InquiryStatus.Cancelled => "لغوشده",
         _ => s.ToString()
     };
+    public static MudBlazor.Color StatusColor(InquiryStatus s) => s switch
+    {
+        InquiryStatus.Draft => MudBlazor.Color.Default,
+        InquiryStatus.ReadyToSend => MudBlazor.Color.Info,
+        InquiryStatus.Sent => MudBlazor.Color.Info,
+        InquiryStatus.PartiallyResponded => MudBlazor.Color.Warning,
+        InquiryStatus.FullyResponded => MudBlazor.Color.Primary,
+        InquiryStatus.UnderComparison => MudBlazor.Color.Primary,
+        InquiryStatus.SupplierSelected => MudBlazor.Color.Success,
+        InquiryStatus.Closed => MudBlazor.Color.Success,
+        InquiryStatus.Cancelled => MudBlazor.Color.Error,
+        _ => MudBlazor.Color.Default
+    };
+
     public static string TypeText(InquiryType t) => t switch
     {
         InquiryType.PriceInquiry => "استعلام قیمت",

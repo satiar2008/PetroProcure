@@ -26,7 +26,7 @@ public sealed record PurchaseFileDto(
 public sealed record PurchaseFileListDto(
     Guid Id, string FileNumber, string Title, PurchaseFileStatus Status,
     PurchaseFilePriority Priority, Guid CurrentDepartmentId, Guid? ResponsibleUserId,
-    DateTime CreatedAt, int ItemCount, string? SourceIndentNumber = null);
+    DateTime CreatedAt, int ItemCount, string? SourceIndentNumber = null, int InquiryCount = 0);
 
 public sealed record PurchaseFileItemsGroupedDto(
     string MescGeneralGroupCode, string GeneralDescription, IReadOnlyList<PurchaseFileItemDto> Items);

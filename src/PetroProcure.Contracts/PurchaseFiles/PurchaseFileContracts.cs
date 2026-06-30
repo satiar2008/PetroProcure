@@ -23,7 +23,7 @@ public sealed record PurchaseFileDto(
 public sealed record PurchaseFileSummaryDto(
     Guid Id, string FileNumber, string Title, PurchaseFileStatus Status,
     PurchaseFilePriority Priority, Guid CurrentDepartmentId, Guid? ResponsibleUserId,
-    DateTime CreatedAt, int ItemCount, string? SourceIndentNumber);
+    DateTime CreatedAt, int ItemCount, string? SourceIndentNumber, int InquiryCount = 0);
 public sealed record PurchaseFileDetailDto(
     PurchaseFileDto PurchaseFile, IReadOnlyList<PurchaseFileGroupedItemsDto> ItemGroups);
 public sealed record PurchaseFileGroupedItemsDto(

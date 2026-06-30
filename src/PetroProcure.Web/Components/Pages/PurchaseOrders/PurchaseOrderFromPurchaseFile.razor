@@ -18,8 +18,8 @@ else if (_file is not null)
                 <SupplierSelector Value="_supplier" ValueChanged="OnSupplierChanged" Required="true" />
                 <MudTextField @bind-Value="_title" Label="عنوان سفارش" Required="true" Variant="Variant.Outlined" Class="mt-3" />
                 <MudSelect T="PurchaseOrderType" @bind-Value="_type" Label="نوع سفارش" Variant="Variant.Outlined" Class="mt-3">@foreach(var t in Enum.GetValues<PurchaseOrderType>()){<MudSelectItem Value="@t">@PurchaseOrderUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect>
-                <MudDatePicker @bind-Date="_orderDate" Label="تاریخ سفارش" Variant="Variant.Outlined" Class="mt-3" />
-                <MudDatePicker @bind-Date="_deliveryDate" Label="موعد تحویل" Variant="Variant.Outlined" Class="mt-3" />
+                <PersianDatePicker @bind-Date="_orderDate" Label="تاریخ سفارش" Variant="Variant.Outlined" Class="mt-3" />
+                <PersianDatePicker @bind-Date="_deliveryDate" Label="موعد تحویل" Variant="Variant.Outlined" Class="mt-3" />
                 <MudTextField @bind-Value="_deliveryLocation" Label="محل تحویل" Variant="Variant.Outlined" Class="mt-3" />
             </MudPaper>
         </MudItem>

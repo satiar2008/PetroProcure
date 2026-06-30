@@ -10,7 +10,7 @@
 @if(_file is not null){
 <MudPaper Class="data-panel" Elevation="0"><MudText Typo="Typo.h6">@_file.FileNumber - @_file.Title</MudText></MudPaper>
 <MudPaper Class="form-panel" Elevation="0">
-    <MudGrid><MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان استعلام" Variant="Variant.Outlined" /></MudItem><MudItem xs="12" md="3"><MudDatePicker @bind-Date="_deadline" Label="مهلت پاسخ" Variant="Variant.Outlined" /></MudItem></MudGrid>
+    <MudGrid><MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان استعلام" Variant="Variant.Outlined" /></MudItem><MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_deadline" Label="مهلت پاسخ" Variant="Variant.Outlined" /></MudItem></MudGrid>
     <MudText Typo="Typo.subtitle1" Class="mt-4">تأمین‌کنندگان</MudText><SupplierSelector Value="_selectedSupplier" ValueChanged="OnSupplierSelected" />
     <MudChipSet T="string" Class="mt-2">@foreach(var s in _suppliers){<MudChip T="string">@s.SupplierCode - @s.Name</MudChip>}</MudChipSet>
 </MudPaper>

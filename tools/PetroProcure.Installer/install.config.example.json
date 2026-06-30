@@ -1,0 +1,20 @@
+{
+  "//": "Rename to install.config.json and place next to PetroProcure.Installer.exe for an unattended install.",
+  "InstallPath": "C:\\inetpub\\PetroProcure",
+  "FileStorageRoot": "C:\\PetroProcure\\ProcurementRoot",
+
+  "SqlServer": "localhost",
+  "SqlDatabase": "PetroProcureDb",
+  "SqlIntegratedSecurity": false,
+  "SqlUser": "sa",
+  "SqlPassword": "CHANGE_ME",
+
+  "ApiSiteName": "PetroProcureApi",
+  "ApiPort": 5080,
+  "WebSiteName": "PetroProcureWeb",
+  "WebPort": 5081,
+
+  "AdminPassword": "CHANGE_ME_admin_password",
+  "JwtSigningKey": "",
+  "InstallWorker": true
+}

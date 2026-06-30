@@ -45,7 +45,7 @@ public sealed class ProcurementLifecycleEndpointTests(ApiAuthorizationFactory fa
         Assert.Equal(created.Id, lifecycle.PurchaseFileId);
         Assert.Equal(created.FileNumber, lifecycle.FileNumber);
         Assert.Equal(created.Title, lifecycle.Title);
-        Assert.Equal(nameof(PurchaseFileStatus.Draft), lifecycle.Status);
+        Assert.Equal(nameof(PurchaseFileStatus.InPurchaseDepartment), lifecycle.Status);
         Assert.Equal(0, lifecycle.DocumentsCount);
         Assert.Equal(0, lifecycle.ReportsCount);
         Assert.Contains(lifecycle.Steps, step => step.Stage == "Indent" && step.Count == 0);

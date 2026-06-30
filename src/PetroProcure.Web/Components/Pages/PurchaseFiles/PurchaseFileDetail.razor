@@ -27,12 +27,47 @@ else if (_summary.Data is { } file)
                 <SummaryItem Label="تعداد اقلام" Value="@file.Items.Count.ToString()" />
             </div><MudDivider Class="my-4" /><MudText Typo="Typo.subtitle2">شرح پرونده</MudText>
             <MudText Typo="Typo.body2">@(file.Description ?? "شرحی ثبت نشده است.")</MudText>
+
+            <MudDivider Class="my-4" />
+            <div class="d-flex align-center justify-space-between mb-2">
+                <MudText Typo="Typo.subtitle2">
+                    استعلام‌های این پرونده
+                    @if (_inquiries.Data is { } inqHeader) { <MudChip T="string" Size="Size.Small" Color="Color.Primary" Class="mx-2">@inqHeader.Count</MudChip> }
+                </MudText>
+            </div>
+            @if (_inquiries.Loading) { <MudProgressLinear Indeterminate="true" /> }
+            else if (_inquiries.Error is not null) { @ErrorState(_inquiries.Error, LoadInquiries) }
+            else if (_inquiries.Data is null || _inquiries.Data.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">برای این پرونده هنوز استعلامی ثبت نشده است.</MudAlert>
+            }
+            else
+            {
+                <MudTable Items="_inquiries.Data" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent><MudTh>شماره استعلام</MudTh><MudTh>عنوان</MudTh><MudTh>نوع</MudTh><MudTh>وضعیت</MudTh><MudTh>اقلام</MudTh><MudTh>تأمین‌کنندگان</MudTh><MudTh>تاریخ ایجاد</MudTh><MudTh></MudTh></HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.InquiryNumber</MudTd>
+                        <MudTd>@context.Title</MudTd>
+                        <MudTd>@InquiryUiPolicy.TypeText(context.InquiryType)</MudTd>
+                        <MudTd><StatusChip Text="@InquiryUiPolicy.StatusText(context.Status)" Color="@InquiryUiPolicy.StatusColor(context.Status)" /></MudTd>
+                        <MudTd>@context.ItemCount</MudTd>
+                        <MudTd>@context.SupplierCount</MudTd>
+                        <MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
+                        <MudTd>
+                            <PermissionView Permission="@InquiryUiPolicy.View">
+                                <MudButton Size="Size.Small" StartIcon="@Icons.Material.Filled.OpenInNew" Href="@($"/purchase/inquiries/{context.Id}")">بازکردن</MudButton>
+                            </PermissionView>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
             <PermissionView Permission="@InquiryUiPolicy.Create">
                 <MudButton Class="mt-4" Variant="Variant.Outlined" Color="Color.Primary"
-                           StartIcon="@Icons.Material.Filled.RequestQuote"
+                           StartIcon="@(HasInquiries ? Icons.Material.Filled.AddCircleOutline : Icons.Material.Filled.RequestQuote)"
                            Disabled="_creatingInquiry"
                            OnClick="@(() => CreateInquiryFromFile(file))">
-                    @(_creatingInquiry ? "در حال ایجاد استعلام..." : "ایجاد استعلام از پرونده خرید")
+                    @(_creatingInquiry ? "در حال ایجاد استعلام..." : (HasInquiries ? "استعلام جدید" : "ایجاد استعلام از پرونده خرید"))
                 </MudButton>
             </PermissionView>
             <PermissionView Permission="@TenderUiPolicy.Create">
@@ -145,6 +180,7 @@ else if (_summary.Data is { } file)
     private readonly TabLoadState<PurchaseFileLifecycleDto> _lifecycle = new();
     private readonly TabLoadState<List<WorkflowActionDto>> _workflowActions = new();
     private readonly TabLoadState<List<PurchaseFileNoteDto>> _notes = new();
+    private readonly TabLoadState<List<InquirySummaryDto>> _inquiries = new();
     private readonly TabLoadState<List<PurchaseContractSummaryDto>> _contracts = new();
     private readonly TabLoadState<List<PurchaseOrderSummaryDto>> _purchaseOrders = new();
     private bool _showPreview, _savingReport, _noteBusy, _internalNote, _reportLoading, _reviewBusy, _creatingInquiry;
@@ -158,6 +194,7 @@ else if (_summary.Data is { } file)
     private DateTime? _technicalReviewDueDate;
     private bool Editable => _summary.Data?.Status is not PurchaseFileStatus.Completed and not PurchaseFileStatus.Archived;
     private bool CanEdit => _summary.Data is { } value && PurchaseFileUiPolicy.CanEdit(value.Status, Access.HasPermission);
+    private bool HasInquiries => _inquiries.Data is { Count: > 0 };
 
     private readonly HashSet<int> _loadedTabs = [];
 
@@ -168,6 +205,7 @@ else if (_summary.Data is { } file)
         // parallel requests on heavy purchase files.
         _loadedTabs.Clear();
         await LoadSummary();
+        await LoadInquiries();
     }
 
     private async Task OnTabChanged(int index)
@@ -207,6 +245,7 @@ else if (_summary.Data is { } file)
     private async Task LoadLifecycle() => await Load(_lifecycle, async () =>
         await Api.GetPurchaseFileLifecycleAsync(Id) ?? throw new HttpRequestException("گردش کامل خرید یافت نشد."), "گردش کامل خرید دریافت نشد.");
     private async Task LoadTechnicalReviews() => await Load(_technicalReviews, () => Api.GetPurchaseFileTechnicalReviewsAsync(Id), "بررسی‌های فنی دریافت نشد.");
+    private async Task LoadInquiries() => await Load(_inquiries, () => Api.GetPurchaseFileInquiriesAsync(Id), "استعلام‌های پرونده دریافت نشد.");
     private async Task LoadContracts() => await Load(_contracts, () => Api.GetPurchaseFileContractsAsync(Id), "قراردادهای پرونده دریافت نشد.");
     private async Task LoadPurchaseOrders() => await Load(_purchaseOrders, () => Api.GetPurchaseFilePurchaseOrdersAsync(Id), "سفارش‌های خرید پرونده دریافت نشد.");
     private async Task CreateInquiryFromFile(PurchaseFileDto file)
@@ -381,7 +420,7 @@ else if (_summary.Data is { } file)
                         <MudTextField @bind-Value="_technicalReviewComment" Label="توضیح درخواست بررسی فنی" Lines="3" Variant="Variant.Outlined" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3">
-                        <MudDatePicker @bind-Date="_technicalReviewDueDate" Label="مهلت پاسخ" Variant="Variant.Outlined" />
+                        <PersianDatePicker @bind-Date="_technicalReviewDueDate" Label="مهلت پاسخ" Variant="Variant.Outlined" />
                     </MudItem>
                     <MudItem xs="12" sm="6" md="3" Class="d-flex align-end">
                         <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Send"

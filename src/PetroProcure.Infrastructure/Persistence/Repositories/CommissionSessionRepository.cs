@@ -117,13 +117,13 @@ internal sealed class CommissionSessionRepository(PetroProcureDbContext db) : IC
     }
 
     public async Task<IReadOnlyList<TenderCommissionSessionSummaryDto>> GetByTenderAsync(Guid tenderId, CancellationToken ct) =>
-        await SummaryQuery(db.TenderCommissionSessions.AsNoTracking().Where(x => x.TenderId == tenderId))
-            .OrderByDescending(x => x.SessionDate)
+        await SummaryQuery(db.TenderCommissionSessions.AsNoTracking().Where(x => x.TenderId == tenderId)
+                .OrderByDescending(x => x.SessionDate))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<TenderCommissionSessionSummaryDto>> GetByPurchaseFileAsync(Guid purchaseFileId, CancellationToken ct) =>
-        await SummaryQuery(db.TenderCommissionSessions.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId))
-            .OrderByDescending(x => x.SessionDate)
+        await SummaryQuery(db.TenderCommissionSessions.AsNoTracking().Where(x => x.PurchaseFileId == purchaseFileId)
+                .OrderByDescending(x => x.SessionDate))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<TenderCommissionMemberDto>> GetMembersAsync(Guid sessionId, CancellationToken ct) => await Members(sessionId).ToListAsync(ct);

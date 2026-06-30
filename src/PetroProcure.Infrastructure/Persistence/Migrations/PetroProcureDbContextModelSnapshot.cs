@@ -2525,8 +2525,8 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Description = "پمپ سانتریفیوژ عمومی",
                             GeneralGroupCode = "334455",
                             IsActive = true,
-                            UnitOfMeasure = "DEV",
-                            UnitOfMeasureId = new Guid("20000000-0000-0000-0000-000000000006")
+                            UnitOfMeasure = "عدد",
+                            UnitOfMeasureId = new Guid("20000000-0000-0000-0000-000000000001")
                         },
                         new
                         {
@@ -2580,8 +2580,8 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Description = "پمپ دنده‌ای",
                             GeneralGroupCode = "334455",
                             IsActive = true,
-                            UnitOfMeasure = "DEV",
-                            UnitOfMeasureId = new Guid("20000000-0000-0000-0000-000000000006")
+                            UnitOfMeasure = "عدد",
+                            UnitOfMeasureId = new Guid("20000000-0000-0000-0000-000000000001")
                         },
                         new
                         {
@@ -2668,7 +2668,7 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("20000000-0000-0000-0000-000000000004"),
                             Code = "L",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsActive = true,
+                            IsActive = false,
                             Name = "لیتر"
                         },
                         new
@@ -2684,7 +2684,7 @@ namespace PetroProcure.Infrastructure.Persistence.Migrations
                             Id = new Guid("20000000-0000-0000-0000-000000000006"),
                             Code = "DEV",
                             CreatedAtUtc = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
-                            IsActive = true,
+                            IsActive = false,
                             Name = "دستگاه"
                         });
                 });

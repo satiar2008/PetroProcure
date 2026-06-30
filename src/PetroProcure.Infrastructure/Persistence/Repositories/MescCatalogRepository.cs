@@ -71,6 +71,8 @@ internal sealed class MescCatalogRepository(PetroProcureDbContext dbContext) : I
         from item in dbContext.MescItems.AsNoTracking()
         join generalGroup in dbContext.MescGeneralGroups.AsNoTracking()
             on item.GeneralGroupCode equals generalGroup.Code
+        join unit in dbContext.UnitOfMeasures.AsNoTracking()
+            on item.UnitOfMeasureId equals unit.Id
         where includeInactive || item.IsActive
         orderby item.GeneralGroupCode, item.Code
         select new MescItemDto(
@@ -79,7 +81,7 @@ internal sealed class MescCatalogRepository(PetroProcureDbContext dbContext) : I
             item.GeneralGroupCode,
             generalGroup.Description,
             item.Description,
-            item.UnitOfMeasure,
+            unit.Name,
             item.UnitOfMeasureId,
             item.IsActive);
 }

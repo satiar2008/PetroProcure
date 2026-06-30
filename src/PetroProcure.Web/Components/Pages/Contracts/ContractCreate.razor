@@ -54,9 +54,9 @@ else
             <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_totalAmount" Label="مبلغ کل" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_taxAmount" Label="مالیات/عوارض" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="4"><MudNumericField T="decimal?" @bind-Value="_finalAmount" Label="مبلغ نهایی" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_startDate" Label="تاریخ شروع" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_endDate" Label="تاریخ پایان" Variant="Variant.Outlined" /></MudItem>
-            <MudItem xs="12" md="4"><MudDatePicker @bind-Date="_deliveryDeadline" Label="مهلت تحویل" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><PersianDatePicker @bind-Date="_startDate" Label="تاریخ شروع" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><PersianDatePicker @bind-Date="_endDate" Label="تاریخ پایان" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="4"><PersianDatePicker @bind-Date="_deliveryDeadline" Label="مهلت تحویل" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="6"><MudTextField @bind-Value="_paymentTerms" Label="شرایط پرداخت" Variant="Variant.Outlined" Lines="2" /></MudItem>
             <MudItem xs="12" md="6"><MudTextField @bind-Value="_deliveryTerms" Label="شرایط تحویل" Variant="Variant.Outlined" Lines="2" /></MudItem>
             <MudItem xs="12" md="6"><MudTextField @bind-Value="_warrantyTerms" Label="شرایط گارانتی" Variant="Variant.Outlined" Lines="2" /></MudItem>

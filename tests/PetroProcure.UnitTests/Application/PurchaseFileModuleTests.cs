@@ -20,8 +20,26 @@ public sealed class PurchaseFileModuleTests
             departmentId, departmentId, null));
 
         Assert.Equal("PF-2026-000001", result.FileNumber);
-        Assert.Equal(PurchaseFileStatus.Draft, result.Status);
+        Assert.Equal(PurchaseFileStatus.InPurchaseDepartment, result.Status);
         Assert.Null(result.SourceIndentId);
+        var history = Assert.Single(result.StatusHistory);
+        Assert.Equal(PurchaseFileStatus.Draft, history.FromStatus);
+        Assert.Equal(PurchaseFileStatus.InPurchaseDepartment, history.ToStatus);
+    }
+
+    [Fact]
+    public async Task CreatingPurchaseFileOutsidePurchaseDepartmentWaitsForPurchaseDepartment()
+    {
+        var repository = new FakeRepository();
+        var purchaseDepartmentId = Guid.NewGuid();
+        var currentDepartmentId = Guid.NewGuid();
+
+        var result = await Handler(repository).Handle(new CreatePurchaseFileCommand(
+            2026, "Manual file", "Description", PurchaseFilePriority.High,
+            purchaseDepartmentId, currentDepartmentId, null));
+
+        Assert.Equal(PurchaseFileStatus.WaitingForPurchaseDepartment, result.Status);
+        Assert.Equal(currentDepartmentId, result.CurrentDepartmentId);
     }
 
     [Fact]
@@ -36,6 +54,7 @@ public sealed class PurchaseFileModuleTests
         Assert.Equal(repository.Indent.Items.Single().Id, item.SourceIndentItemId);
         Assert.Equal("Original general", item.GeneralDescription);
         Assert.Equal("Original specific", item.SpecificDescription);
+        Assert.Equal(PurchaseFileStatus.InPurchaseDepartment, result.Status);
     }
 
     [Fact]

@@ -12,7 +12,7 @@
         <MudGrid>
             <MudItem xs="12" md="6"><MudTextField @bind-Value="_title" Label="عنوان" Required="true" RequiredError="عنوان الزامی است" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12" md="3"><MudSelect T="InquiryType" @bind-Value="_type" Label="نوع" Variant="Variant.Outlined">@foreach(var t in Enum.GetValues<InquiryType>()){<MudSelectItem Value="@t">@InquiryUiPolicy.TypeText(t)</MudSelectItem>}</MudSelect></MudItem>
-            <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_deadline" Label="مهلت پاسخ" Variant="Variant.Outlined" /></MudItem>
+            <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_deadline" Label="مهلت پاسخ" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12"><MudTextField @bind-Value="_description" Label="توضیحات" Lines="3" Variant="Variant.Outlined" /></MudItem>
             <MudItem xs="12">
                 <MudSelect T="Guid?" @bind-Value="_purchaseFileId" Label="پرونده خرید" Required="true" RequiredError="پرونده خرید الزامی است" Variant="Variant.Outlined" Clearable="true">

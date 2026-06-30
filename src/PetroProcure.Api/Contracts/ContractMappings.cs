@@ -45,7 +45,7 @@ public static class ContractMappings
             dto.StatusHistory.Select(ToContract).ToArray(), dto.Notes.Select(ToContract).ToArray());
     public static PurchaseFileSummaryDto ToContract(this Application.PurchaseFiles.PurchaseFileListDto dto) =>
         new(dto.Id, dto.FileNumber, dto.Title, dto.Status, dto.Priority, dto.CurrentDepartmentId,
-            dto.ResponsibleUserId, dto.CreatedAt, dto.ItemCount, dto.SourceIndentNumber);
+            dto.ResponsibleUserId, dto.CreatedAt, dto.ItemCount, dto.SourceIndentNumber, dto.InquiryCount);
     public static PurchaseFileGroupedItemsDto ToContract(this Application.PurchaseFiles.PurchaseFileItemsGroupedDto dto) =>
         new(dto.MescGeneralGroupCode, dto.GeneralDescription, dto.Items.Select(ToContract).ToArray());
     public static PurchaseFileTimelineDto ToContract(this Application.PurchaseFiles.PurchaseFileTimelineDto dto) =>

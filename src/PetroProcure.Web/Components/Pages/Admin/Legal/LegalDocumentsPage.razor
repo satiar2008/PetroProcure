@@ -14,7 +14,7 @@
             <MudTextField @bind-Value="_title" Label="عنوان سند" Required="true" Class="mt-3" />
             <MudTextField @bind-Value="_sourceTitle" Label="عنوان منبع" />
             <MudTextField @bind-Value="_sourceNumber" Label="شماره/شناسه منبع" />
-            <MudDatePicker @bind-Date="_sourceDate" Label="تاریخ منبع" />
+            <PersianDatePicker @bind-Date="_sourceDate" Label="تاریخ منبع" />
             <MudTextField @bind-Value="_description" Label="توضیحات" Lines="2" />
             <InputFile OnChange="OnFileSelected" class="mt-3" />
             <MudText Typo="Typo.caption" Color="Color.Secondary">@(_file?.Name ?? "فایلی انتخاب نشده است")</MudText>

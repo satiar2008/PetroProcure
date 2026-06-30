@@ -23,8 +23,8 @@
         <MudItem xs="12" md="3"><MudSelect T="Guid?" @bind-Value="_department" Label="واحد جاری" Variant="Variant.Outlined" Margin="Margin.Dense" Clearable="true">
             @foreach (var department in Access.Departments) { <MudSelectItem T="Guid?" Value="@department.Id">@department.Title</MudSelectItem> }
         </MudSelect></MudItem>
-        <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_from" Label="از تاریخ" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
-        <MudItem xs="12" md="3"><MudDatePicker @bind-Date="_to" Label="تا تاریخ" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_from" Label="از تاریخ" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+        <MudItem xs="12" md="3"><PersianDatePicker @bind-Date="_to" Label="تا تاریخ" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
         <MudItem xs="12" md="3" Class="d-flex align-center">
             <MudButton FullWidth="true" Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Search" OnClick="ApplyFilters">اعمال فیلتر</MudButton>
         </MudItem>
@@ -39,10 +39,21 @@
             <MudTh><MudTableSortLabel SortLabel="Status" T="PurchaseFileSummaryDto">وضعیت</MudTableSortLabel></MudTh>
             <MudTh>اولویت</MudTh><MudTh>واحد جاری</MudTh><MudTh>درخواست مبنا</MudTh>
             <MudTh><MudTableSortLabel SortLabel="CreatedAt" T="PurchaseFileSummaryDto">تاریخ ایجاد</MudTableSortLabel></MudTh>
-            <MudTh>اقلام</MudTh><MudTh></MudTh>
+            <MudTh>اقلام</MudTh><MudTh>استعلام</MudTh><MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
-            <MudTd><MudLink Href="@($"/purchase/files/{context.Id}")"><strong>@context.FileNumber</strong></MudLink></MudTd>
+            <MudTd>
+                <div class="d-flex align-center" style="gap:.4rem">
+                    <MudLink Href="@($"/purchase/files/{context.Id}")"><strong>@context.FileNumber</strong></MudLink>
+                    @if (context.InquiryCount > 0)
+                    {
+                        <MudTooltip Text="@($"{context.InquiryCount} استعلام برای این پرونده ثبت شده است")">
+                            <MudChip T="string" Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined"
+                                     Icon="@Icons.Material.Filled.RequestQuote">@context.InquiryCount</MudChip>
+                        </MudTooltip>
+                    }
+                </div>
+            </MudTd>
             <MudTd>@context.Title</MudTd>
             <MudTd><StatusChip Text="@StatusText(context.Status)" Color="@StatusColor(context.Status)" /></MudTd>
             <MudTd>@PriorityText(context.Priority)</MudTd>
@@ -50,6 +61,13 @@
             <MudTd>@(context.SourceIndentNumber ?? "—")</MudTd>
             <MudTd><DateDisplay Value="@context.CreatedAt" /></MudTd>
             <MudTd>@context.ItemCount</MudTd>
+            <MudTd>
+                @if (context.InquiryCount > 0)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Info">@context.InquiryCount</MudChip>
+                }
+                else { <span>—</span> }
+            </MudTd>
             <MudTd><MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Href="@($"/purchase/files/{context.Id}")" /></MudTd>
         </RowTemplate>
         <NoRecordsContent><EmptyState Icon="@Icons.Material.Filled.FolderOff" Title="پرونده‌ای یافت نشد" Description="فیلترهای جستجو را تغییر دهید." /></NoRecordsContent>
